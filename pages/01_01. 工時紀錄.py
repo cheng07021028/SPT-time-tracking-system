@@ -1373,7 +1373,10 @@ if clear_today_cache_clicked:
     st.rerun()
 if load_today_clicked:
     _spt_perf_t = time.perf_counter()
-    df_loaded = today_records(include_finished=not show_unfinished_only, unfinished_only=show_unfinished_only)
+    with st.spinner("正在載入今日明細，已改用快速查詢路徑..."):
+        df_loaded = today_records(include_finished=not show_unfinished_only, unfinished_only=show_unfinished_only)
+    if not isinstance(df_loaded, pd.DataFrame):
+        df_loaded = pd.DataFrame()
     st.session_state[V259_TODAY_TABLE_KEY] = df_loaded
     st.session_state[V259_TODAY_TABLE_TS_KEY] = _v259_now_label()
     _spt_perf_t = _spt_perf_tick(
@@ -1382,6 +1385,8 @@ if load_today_clicked:
         threshold_ms=500.0,
         detail={"rows": len(df_loaded) if isinstance(df_loaded, pd.DataFrame) else 0, "unfinished_only": bool(show_unfinished_only)},
     )
+    if isinstance(df_loaded, pd.DataFrame) and len(df_loaded) >= 300 and not show_unfinished_only:
+        st.caption("今日明細已使用互動查詢上限載入；若需要查完整歷史，請到 02｜歷史紀錄依日期/條件查詢。")
 df = st.session_state.get(V259_TODAY_TABLE_KEY, pd.DataFrame())
 if isinstance(df, pd.DataFrame) and not df.empty:
     if is_admin:
@@ -1389,7 +1394,7 @@ if isinstance(df, pd.DataFrame) and not df.empty:
             st.caption("此區僅系統管理員可見。可調整今日工時紀錄表格的欄位寬度與欄位位置順序；設定會永久保存。")
             render_width_settings("01.time_records.main", df, title="01 工時紀錄欄位順序與欄寬設定 / Column Order and Width")
     _spt_perf_t = time.perf_counter()
-    render_table(df, "01.time_records.main", editable=False, height=420)
+    render_table(df, "01.time_records.main", editable=False, height=420, show_width_settings=False)
     _spt_perf_t = _spt_perf_tick(
         "01_render_today_records_main_table",
         _spt_perf_t,

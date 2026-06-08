@@ -11,6 +11,7 @@ V63 design goals:
 from __future__ import annotations
 
 import json
+import os
 import math
 import uuid
 from datetime import datetime, timedelta, time as dt_time
@@ -231,6 +232,25 @@ def _active_predicate() -> str:
 
 def _not_deleted_predicate() -> str:
     return "(deleted_at IS NULL OR deleted_at='')"
+
+
+def _env_int(name: str, default: int, *, min_value: int = 1, max_value: int = 5000) -> int:
+    """Read bounded integer environment settings for interactive page queries."""
+    try:
+        value = int(float(str(os.environ.get(name, default)).strip()))
+    except Exception:
+        value = int(default)
+    return max(int(min_value), min(int(max_value), value))
+
+
+def _today_end_text(day: str) -> str:
+    try:
+        return (pd.to_datetime(day).to_pydatetime() + timedelta(days=1)).strftime("%Y-%m-%d")
+    except Exception:
+        try:
+            return (datetime.strptime(day, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+        except Exception:
+            return day
 
 
 def _base_cols() -> str:
@@ -579,16 +599,47 @@ def load_records(start_date: str | None = None, end_date: str | None = None, emp
 
 
 def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:
+    """Fast interactive query for 01 Today Records.
+
+    V83: the previous query used ``start_date=? OR substr(start_timestamp,1,10)=?``.
+    On Neon/PostgreSQL that OR + function path can bypass indexes and scan the
+    whole time_records table when the operator presses 「重新整理今日明細」.
+    This function now uses indexed start_date first, only falling back to a
+    bounded timestamp range when no rows are found.  It also keeps interactive
+    row counts small so table rendering cannot lock the page.
+    """
     today = today_text()
+    limit = _env_int("SPT_TODAY_RECORDS_REFRESH_MAX_ROWS", 300, min_value=50, max_value=2000)
+    active_limit = _env_int("SPT_TODAY_ACTIVE_REFRESH_MAX_ROWS", 200, min_value=20, max_value=1000)
+
     if unfinished_only:
-        sql = f"SELECT {_base_cols()} FROM time_records WHERE {_active_predicate()} ORDER BY id DESC LIMIT 500"
+        # Current active work is usually small.  Keep this independent from
+        # finished history so operators can recover even when old data is large.
+        sql = f"SELECT {_base_cols()} FROM time_records WHERE {_active_predicate()} ORDER BY id DESC LIMIT {active_limit}"
         return _safe_df(sql, ())
-    sql = f"SELECT {_base_cols()} FROM time_records WHERE {_not_deleted_predicate()} AND (start_date=? OR substr(COALESCE(start_timestamp,''),1,10)=?)"
-    params: list[Any] = [today, today]
+
     if not include_finished:
-        sql += f" AND {_active_predicate()}"
-    sql += " ORDER BY id DESC LIMIT 800"
-    return _safe_df(sql, tuple(params))
+        sql = f"SELECT {_base_cols()} FROM time_records WHERE {_active_predicate()} AND (start_date=? OR start_date IS NULL OR start_date='') ORDER BY id DESC LIMIT {active_limit}"
+        return _safe_df(sql, (today,))
+
+    # Fast path: indexed start_date query.  Do not use OR/substr here.
+    sql = f"SELECT {_base_cols()} FROM time_records WHERE {_not_deleted_predicate()} AND start_date=? ORDER BY id DESC LIMIT {limit}"
+    df = _safe_df(sql, (today,))
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        return df
+
+    # Legacy fallback for old rows that have timestamp but missing start_date.
+    # It is bounded and only runs when the indexed query returns no rows.
+    next_day = _today_end_text(today)
+    fallback_limit = min(limit, 300)
+    fallback_sql = (
+        f"SELECT {_base_cols()} FROM time_records "
+        f"WHERE {_not_deleted_predicate()} "
+        "AND COALESCE(start_date,'')='' "
+        "AND start_timestamp>=? AND start_timestamp<? "
+        f"ORDER BY id DESC LIMIT {fallback_limit}"
+    )
+    return _safe_df(fallback_sql, (f"{today} 00:00:00", f"{next_day} 00:00:00"))
 
 
 def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None, work_order: str | None = None, **kwargs) -> pd.DataFrame:
