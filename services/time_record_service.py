@@ -30,6 +30,12 @@ from services.db_service import (
     is_postgres_enabled,
 )
 try:
+    # V96: db_service has a targeted invalidator in current builds.  Import it
+    # opportunistically so 01 read refreshes do not evict master/settings caches.
+    from services.db_service import _v30_clear_cache_for_tables as _spt_clear_cache_for_tables
+except Exception:  # pragma: no cover
+    _spt_clear_cache_for_tables = None  # type: ignore
+try:
     from services.timezone_service import now_text, today_text
 except Exception:  # pragma: no cover
     def now_text() -> str:
@@ -556,7 +562,10 @@ def _row_to_payload(
 def _cache_clear() -> None:
     global _REST_PERIODS_CACHE, _REST_PERIODS_CACHE_AT
     try:
-        clear_query_cache()
+        if callable(_spt_clear_cache_for_tables):
+            _spt_clear_cache_for_tables({"time_records", "system_logs"})
+        else:
+            clear_query_cache()
     except Exception:
         pass
     # Runtime write paths may change settings/imported rows. Keep calculation settings fresh without querying Neon for every row.

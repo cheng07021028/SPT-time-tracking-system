@@ -35,7 +35,11 @@ def _spt_perf_tick(name: str, start: float, *, threshold_ms: float = 300.0, deta
             )
         except Exception:
             pass
-    if duration_ms >= 3000 and callable(_spt_perf_write_log):
+    # V96: page-load profiling must not synchronously write LOG records.
+    # The LOG write itself can open Neon connections while 01 is rendering and make
+    # a slow page even slower.  Keep lightweight in-process profiler events only;
+    # 99 diagnostics can read those, and write paths still keep formal operation logs.
+    if False and duration_ms >= 3000 and callable(_spt_perf_write_log):
         try:
             _spt_perf_write_log(
                 "PERF_01_SLOW",
@@ -74,6 +78,7 @@ def _v95_raw_data_editor(data=None, *args, **kwargs):
 # button/rerun does not rebuild the entire page.
 V259_TODAY_TABLE_KEY = "v259_01_today_records_df"
 V259_TODAY_TABLE_TS_KEY = "v259_01_today_records_loaded_at"
+V259_TODAY_TABLE_META_KEY = "v259_01_today_records_meta_v96"
 V259_FINISHED_KEY_PREFIX = "v259_01_finished_today_df_"
 V259_FINISHED_TS_PREFIX = "v259_01_finished_today_loaded_at_"
 
@@ -102,7 +107,7 @@ def _v259_clear_display_cache() -> None:
                 del st.session_state[key]
             except Exception:
                 pass
-    for key in [V259_TODAY_TABLE_KEY, V259_TODAY_TABLE_TS_KEY]:
+    for key in [V259_TODAY_TABLE_KEY, V259_TODAY_TABLE_TS_KEY, V259_TODAY_TABLE_META_KEY]:
         try:
             st.session_state.pop(key, None)
         except Exception:
@@ -151,10 +156,20 @@ def _v84_render_column_settings_panel(table_key: str, df: pd.DataFrame, title: s
     if not isinstance(df, pd.DataFrame) or df.empty:
         return
     safe_key = _v84_safe_widget_part(table_key)
-    # V85: keep the Apply button visible.  The V84 checkbox hid the form and made
-    # users think the admin column settings did not have an Apply button.
-    with st.expander(title, expanded=True):
+    # V96: building the full column-settings editor on every 01 render was one
+    # major reason the page appeared late.  Render a lightweight expander first;
+    # only build the text_area/data_editor settings UI when the user explicitly
+    # opens it.  Saved column order/widths are still applied by _v84_apply_table_layout.
+    with st.expander(title, expanded=False):
         st.caption("此區只管理本表格欄位順序與欄寬；不會修改工時資料。設定只會在按下『套用並永久儲存欄位設定』後寫入。")
+        open_settings = st.toggle(
+            "顯示欄位設定 / Show column settings（需要調整時才開啟）",
+            value=False,
+            key=f"v96_show_column_settings_{safe_key}",
+        )
+        if not open_settings:
+            st.caption("目前只套用已永久儲存的欄位設定；未載入欄位設定編輯器，以加快 01 頁面顯示。")
+            return
 
         current_cols = [str(c) for c in df.columns]
         widths = {}
@@ -1552,6 +1567,7 @@ with tc3:
 if clear_today_cache_clicked:
     st.session_state.pop(V259_TODAY_TABLE_KEY, None)
     st.session_state.pop(V259_TODAY_TABLE_TS_KEY, None)
+    st.session_state.pop(V259_TODAY_TABLE_META_KEY, None)
     try:
         clear_today_records_fast_cache()
     except Exception:
@@ -1566,6 +1582,10 @@ if load_today_clicked:
         df_loaded = pd.DataFrame()
     st.session_state[V259_TODAY_TABLE_KEY] = df_loaded
     st.session_state[V259_TODAY_TABLE_TS_KEY] = _v259_now_label()
+    st.session_state[V259_TODAY_TABLE_META_KEY] = {
+        "include_finished": bool(not show_unfinished_only),
+        "unfinished_only": bool(show_unfinished_only),
+    }
     _spt_perf_t = _spt_perf_tick(
         "01_load_today_records_main_table_data",
         _spt_perf_t,
@@ -1979,17 +1999,37 @@ if is_admin:
             st.session_state[edit_mode_key] = False
             st.session_state[admin_select_key] = []
             st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
-            try:
-                clear_today_records_fast_cache()
-            except Exception:
-                pass
-            st.session_state[admin_data_key] = today_records(include_finished=not show_unfinished_only, unfinished_only=show_unfinished_only)
+
+            _wanted_meta = {
+                "include_finished": bool(not show_unfinished_only),
+                "unfinished_only": bool(show_unfinished_only),
+            }
+            _cached_today = st.session_state.get(V259_TODAY_TABLE_KEY)
+            _cached_meta = st.session_state.get(V259_TODAY_TABLE_META_KEY, {})
+            _used_today_cache = False
+            if (not refresh_clicked) and isinstance(_cached_today, pd.DataFrame) and dict(_cached_meta or {}) == _wanted_meta:
+                # V96: loading admin maintenance should be instant if the same Today
+                # Records data is already in the foreground cache.  Do not clear the
+                # DB query cache for a normal Load click.
+                st.session_state[admin_data_key] = _cached_today.copy().reset_index(drop=True)
+                _used_today_cache = True
+            else:
+                if refresh_clicked:
+                    try:
+                        clear_today_records_fast_cache()
+                    except Exception:
+                        pass
+                st.session_state[admin_data_key] = today_records(include_finished=not show_unfinished_only, unfinished_only=show_unfinished_only)
             st.session_state[admin_data_ts_key] = _v259_now_label()
             _spt_perf_tick(
                 "01_admin_maintenance_load_today_records",
                 _load_t0,
                 threshold_ms=1200.0,
-                detail={"rows": len(st.session_state.get(admin_data_key, pd.DataFrame())) if isinstance(st.session_state.get(admin_data_key), pd.DataFrame) else 0},
+                detail={
+                    "rows": len(st.session_state.get(admin_data_key, pd.DataFrame())) if isinstance(st.session_state.get(admin_data_key), pd.DataFrame) else 0,
+                    "used_today_cache": bool(_used_today_cache),
+                    "refresh": bool(refresh_clicked),
+                },
             )
         if unload_clicked:
             st.session_state[admin_load_key] = False
@@ -2013,28 +2053,31 @@ if is_admin:
                 if admin_source_df.empty:
                     st.info("今日目前沒有可維護的工時紀錄。")
                 else:
-                    # V81：先用輕量預覽，點擊展開維護區時不立即建立大型 data_editor。
+                    # V81/V96：先用輕量預覽，點擊展開維護區時不立即建立大型 data_editor。
+                    # 啟動/關閉編輯只切換前台狀態，不 st.rerun、不重新查 DB。
                     p1, p2, p3 = st.columns([1.2, 1.2, 2.4])
-                    if not st.session_state.get(edit_mode_key, False):
+                    edit_mode_active = bool(st.session_state.get(edit_mode_key, False))
+                    start_edit = False
+                    stop_edit = False
+                    if not edit_mode_active:
                         start_edit = p1.button("✎ 啟動編輯模式 / Edit", type="primary", use_container_width=True, key="today_records_admin_start_edit_v81")
+                        if start_edit:
+                            st.session_state[edit_mode_key] = True
+                            st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
+                            edit_mode_active = True
                     else:
                         stop_edit = p1.button("□ 關閉編輯模式 / Close Edit", use_container_width=True, key="today_records_admin_stop_edit_v81")
+                        if stop_edit:
+                            st.session_state[edit_mode_key] = False
+                            st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
+                            edit_mode_active = False
                     p2.caption("編輯模式才會建立可修改表格；預覽模式只顯示前 50 筆，開啟速度較快。")
-                    if not st.session_state.get(edit_mode_key, False):
+                    if not edit_mode_active:
                         try:
                             st.dataframe(admin_source_df.head(50), use_container_width=True, hide_index=True, height=260)
                         except TypeError:
                             st.dataframe(admin_source_df.head(50), use_container_width=True, height=260)
-                        if start_edit:
-                            st.session_state[edit_mode_key] = True
-                            st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
-                            st.rerun()
                     else:
-                        if 'stop_edit' in locals() and stop_edit:
-                            st.session_state[edit_mode_key] = False
-                            st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
-                            st.rerun()
-
                         r1, r2, r3 = st.columns([1.2, 1.2, 2.4])
                         row_limit = r1.selectbox(
                             "本次編輯載入筆數",
