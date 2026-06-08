@@ -1082,6 +1082,204 @@ def _strip_history_cross_day_display_cols(df: pd.DataFrame) -> pd.DataFrame:
     return df.drop(columns=HISTORY_CROSS_DAY_DISPLAY_COLS, errors="ignore")
 
 
+def _v82_text_cell(value) -> str:
+    if value is None:
+        return ""
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    text = str(value).strip()
+    if text.lower() in {"nan", "nat", "none", "null"}:
+        return ""
+    return text
+
+
+def _v82_split_timestamp(value) -> tuple[str, str]:
+    text = _v82_text_cell(value)
+    if not text:
+        return "", ""
+    try:
+        dt = pd.to_datetime(text, errors="coerce")
+        if pd.notna(dt):
+            return dt.strftime("%Y-%m-%d"), dt.strftime("%H:%M:%S")
+    except Exception:
+        pass
+    return text[:10], text[11:19] if len(text) >= 16 else ""
+
+
+def _v82_first_existing_col(df: pd.DataFrame, names: list[str]) -> str | None:
+    for name in names:
+        if name in df.columns:
+            return name
+    return None
+
+
+def _v82_sync_timestamp_to_split_columns(edited_df: pd.DataFrame, original_df: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Synchronize 02 editor timestamp edits into date/time helper columns.
+
+    In 01/02 maintenance, 開始時間戳 and 結束時間戳 are the authoritative
+    edit fields.  When they change, 開始日期/開始時間/結束日期/結束時間 must
+    be regenerated before save/recalc so both pages and Neon remain consistent.
+    """
+    if not isinstance(edited_df, pd.DataFrame) or edited_df.empty:
+        return edited_df.copy() if isinstance(edited_df, pd.DataFrame) else pd.DataFrame()
+    out = edited_df.copy()
+    id_col = "id" if "id" in out.columns else ("ID / ID" if "ID / ID" in out.columns else None)
+    original_map = {}
+    if isinstance(original_df, pd.DataFrame) and id_col and id_col in original_df.columns:
+        for _, old_row in original_df.iterrows():
+            try:
+                rid = int(float(str(old_row.get(id_col)).strip()))
+            except Exception:
+                continue
+            original_map[rid] = old_row
+
+    pairs = {
+        "start": {
+            "ts": ["start_timestamp", "開始時間戳 / Start Timestamp", "開始時間戳"],
+            "date": ["start_date", "開始日期 / Start Date", "開始日期"],
+            "time": ["start_time", "開始時間 / Start Time", "開始時間"],
+        },
+        "end": {
+            "ts": ["end_timestamp", "結束時間戳 / End Timestamp", "結束時間戳"],
+            "date": ["end_date", "結束日期 / End Date", "結束日期"],
+            "time": ["end_time", "結束時間 / End Time", "結束時間"],
+        },
+    }
+    for _prefix, cols in pairs.items():
+        ts_col = _v82_first_existing_col(out, cols["ts"])
+        date_col = _v82_first_existing_col(out, cols["date"])
+        time_col = _v82_first_existing_col(out, cols["time"])
+        if not ts_col:
+            continue
+        for idx, row in out.iterrows():
+            try:
+                rid = int(float(str(row.get(id_col)).strip())) if id_col else None
+            except Exception:
+                rid = None
+            old = original_map.get(rid)
+            cur_ts = _v82_text_cell(row.get(ts_col))
+            old_ts = _v82_text_cell(old.get(ts_col)) if old is not None and ts_col in getattr(old, "index", []) else ""
+            # If the timestamp changed, timestamp wins and split fields are regenerated.
+            if old is not None and cur_ts != old_ts:
+                d, t = _v82_split_timestamp(cur_ts)
+                if date_col:
+                    out.at[idx, date_col] = d
+                if time_col:
+                    out.at[idx, time_col] = t
+                if ts_col and d and t:
+                    out.at[idx, ts_col] = f"{d} {t}"
+            elif cur_ts:
+                # Repair display/helper columns for old rows that only had timestamp.
+                d, t = _v82_split_timestamp(cur_ts)
+                if date_col:
+                    out.at[idx, date_col] = d or _v82_text_cell(row.get(date_col))
+                if time_col:
+                    out.at[idx, time_col] = t or _v82_text_cell(row.get(time_col))
+    return out
+
+
+# ===== V82 HISTORY SAVE DIFF HELPERS =====
+_V82_HISTORY_DISPLAY_TO_INTERNAL = {
+    "ID / ID": "id", "紀錄編號": "id", "ID": "id",
+    "狀態 / Status": "status",
+    "製令 / Work Order": "work_order",
+    "製令號碼 / Work Order No.": "work_order_no",
+    "P/N / Part No.": "part_no",
+    "機型 / Type": "type_name",
+    "工段名稱 / Process": "process_name", "工段 / Process": "process_name",
+    "工號 / Employee ID": "employee_id",
+    "姓名 / Name": "employee_name",
+    "開始動作 / Start Action": "start_action",
+    "開始時間戳 / Start Timestamp": "start_timestamp",
+    "結束動作 / End Action": "end_action",
+    "結束時間戳 / End Timestamp": "end_timestamp",
+    "開始日期 / Start Date": "start_date",
+    "開始時間 / Start Time": "start_time",
+    "結束日期 / End Date": "end_date",
+    "結束時間 / End Time": "end_time",
+    "工時小計 / Hours": "work_hours",
+    "工時分鐘 / Minutes": "work_minutes",
+    "備註 / Remark": "remark",
+    "組立地點 / Assembly Location": "assembly_location",
+    "建立時間 / Created At": "created_at",
+    "更新時間 / Updated At": "updated_at",
+}
+
+_V82_HISTORY_SAVE_IGNORE_COLS = {
+    "刪除", "重算", "刪除 / Delete", "重算 / Recalc",
+    HISTORY_CROSS_DAY_ALERT_COL, HISTORY_CROSS_DAY_RANGE_COL, "跨日結束",
+    "created_at", "updated_at", "version",
+}
+
+
+def _v82_norm_compare_cell(value) -> str:
+    text = _v82_text_cell(value)
+    if not text:
+        return ""
+    try:
+        if text.endswith(".0"):
+            return str(int(float(text)))
+    except Exception:
+        pass
+    return text
+
+
+def _v82_history_normalize_compare_frame(frame: pd.DataFrame | None) -> pd.DataFrame:
+    if not isinstance(frame, pd.DataFrame) or frame.empty:
+        return pd.DataFrame()
+    out = _strip_history_cross_day_display_cols(frame.copy())
+    out = out.drop(columns=["刪除", "重算", "刪除 / Delete", "重算 / Recalc"], errors="ignore")
+    out = out.rename(columns={c: _V82_HISTORY_DISPLAY_TO_INTERNAL.get(str(c), str(c)) for c in out.columns})
+    return out
+
+
+def _v82_history_changed_rows_for_save(original_df: pd.DataFrame, edited_df: pd.DataFrame) -> pd.DataFrame:
+    """Return only rows that really changed before 02 Save/Recalc writes Neon.
+
+    This prevents 02 from sending the whole visible table into save_time_records().
+    It also preserves the rule requested by the user: when 開始時間戳/結束時間戳
+    changes, 開始日期/開始時間/結束日期/結束時間 are synchronized first, then
+    only those changed rows are saved and recalculated.
+    """
+    edited_norm = _v82_history_normalize_compare_frame(edited_df)
+    original_norm = _v82_history_normalize_compare_frame(original_df)
+    if edited_norm.empty:
+        return pd.DataFrame(columns=getattr(edited_df, "columns", []))
+    if "id" not in edited_norm.columns or "id" not in original_norm.columns:
+        return edited_df.copy().reset_index(drop=True)
+
+    old_map = {}
+    for _, row in original_norm.iterrows():
+        try:
+            rid = int(float(str(row.get("id")).strip()))
+        except Exception:
+            continue
+        old_map[rid] = row
+
+    changed_indices: list[int] = []
+    compare_cols = [c for c in edited_norm.columns if c in original_norm.columns and c not in _V82_HISTORY_SAVE_IGNORE_COLS]
+    for idx, row in edited_norm.iterrows():
+        try:
+            rid = int(float(str(row.get("id")).strip()))
+        except Exception:
+            changed_indices.append(idx)
+            continue
+        old = old_map.get(rid)
+        if old is None:
+            changed_indices.append(idx)
+            continue
+        for col in compare_cols:
+            if _v82_norm_compare_cell(row.get(col)) != _v82_norm_compare_cell(old.get(col)):
+                changed_indices.append(idx)
+                break
+    if not changed_indices:
+        return pd.DataFrame(columns=edited_df.columns)
+    return edited_df.loc[changed_indices].copy().reset_index(drop=True)
+
+
 def _render_cross_day_edit_notice(edit_df: pd.DataFrame) -> None:
     """Show a light framed preview for cross-day-ended rows in edit mode."""
     if edit_df is None or edit_df.empty:
@@ -1652,9 +1850,14 @@ with tab1:
                 st.session_state[recalc_select_key] = recalc_ids
 
                 if history_action == "儲存編輯":
-                    save_df = _strip_history_cross_day_display_cols(edited).drop(columns=[delete_col_label, recalc_col_label, "刪除", "重算"], errors="ignore")
-                    count = save_time_records(save_df, recalc_edited_timestamps=True)
-                    _add_history_result("success", f"已儲存 {count} 筆歷史紀錄，並已依最新開始/結束時間重算工時、寫入修改紀錄與同步作業平均。", append=False)
+                    save_df_all = _strip_history_cross_day_display_cols(edited).drop(columns=[delete_col_label, recalc_col_label, "刪除", "重算"], errors="ignore")
+                    save_df_all = _v82_sync_timestamp_to_split_columns(save_df_all, df)
+                    changed_df = _v82_history_changed_rows_for_save(df, save_df_all)
+                    if changed_df.empty:
+                        _add_history_result("info", "沒有偵測到實際修改；未寫入 Neon，避免查詢逾時或長時間運轉。", append=False)
+                    else:
+                        count = save_time_records(changed_df, recalc_edited_timestamps=True)
+                        _add_history_result("success", f"已儲存 {count} 筆歷史紀錄，並已依最新開始/結束時間重算工時、寫入修改紀錄與同步作業平均。", append=False)
                     _history_refresh_editor()
                     rerun()
                 elif history_action == "重新計算勾選紀錄工時":
@@ -1662,8 +1865,11 @@ with tab1:
                         _add_history_result("warning", "請先在『重算』欄勾選要重新計算的紀錄，再按確認執行。", append=False)
                         rerun()
                     else:
-                        save_df = _strip_history_cross_day_display_cols(edited).drop(columns=[delete_col_label, recalc_col_label, "刪除", "重算"], errors="ignore")
-                        save_time_records(save_df, recalc_edited_timestamps=True)
+                        save_df_all = _strip_history_cross_day_display_cols(edited).drop(columns=[delete_col_label, recalc_col_label, "刪除", "重算"], errors="ignore")
+                        save_df_all = _v82_sync_timestamp_to_split_columns(save_df_all, df)
+                        changed_df = _v82_history_changed_rows_for_save(df, save_df_all)
+                        if not changed_df.empty:
+                            save_time_records(changed_df, recalc_edited_timestamps=True)
                         count = recalculate_time_records(recalc_ids)
                         _add_history_result("success", f"已先同步修改後的開始/結束日期時間，並重新計算 {count} 筆工時。", append=False)
                         _history_refresh_editor()

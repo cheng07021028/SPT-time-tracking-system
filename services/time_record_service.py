@@ -365,6 +365,19 @@ def _canonicalize_datetime_pair(
         and ((has_d and cur_d != old_d) or (has_t and cur_t != old_t))
     )
 
+    # V82 rule: when users edit the timestamp column in 01/02, the
+    # timestamp is the authority.  Split date/time columns are helper/display
+    # fields and must be regenerated from the edited timestamp.
+    #
+    # This must be checked before split_changed because Streamlit data_editor
+    # sends the whole row back.  The row can contain stale start_date/start_time
+    # values together with the newly edited start_timestamp; if split fields win,
+    # the timestamp edit appears to be ignored and 01/02 drift apart.
+    if ts_changed:
+        ts = cur_ts
+        d, t = _split_ts(ts)
+        return ts, d, t
+
     if split_changed:
         # If only one split field was supplied, preserve the other one from DB.
         d = cur_d if has_d else old_d
@@ -377,21 +390,16 @@ def _canonicalize_datetime_pair(
             return "", "", ""
         return "", d, t
 
-    if ts_changed:
-        ts = cur_ts
-        d, t = _split_ts(ts)
-        return ts, d, t
-
-    # No detected edit.  Prefer complete split fields when provided, otherwise
-    # split timestamp.  This also repairs old rows where only one representation
-    # was stored.
+    # No detected edit.  Prefer timestamp when it exists because timestamp is
+    # the canonical user-edit field in 01/02.  Split fields are regenerated from
+    # it so historical rows do not keep stale start_date/start_time values.
+    if cur_ts:
+        d, t = _split_ts(cur_ts)
+        return cur_ts, d, t
     if cur_d and cur_t:
         ts = _merge_date_time_parts(cur_d, cur_t)
         sd, st = _split_ts(ts)
         return ts, sd or cur_d, st or cur_t
-    if cur_ts:
-        d, t = _split_ts(cur_ts)
-        return cur_ts, d, t
     if before is not None:
         return old_ts, old_d, old_t
     return "", cur_d, cur_t
@@ -882,11 +890,41 @@ def delete_time_records_from_02_history_editor(editor_df: pd.DataFrame, record_i
     return {"ok": True, "deleted_count": int(n), "ids": ids, "version": "V63"}
 
 
-def _insert_or_update_payload(payload: dict[str, Any], record_id: int | None = None) -> tuple[str, int]:
+def _insert_or_update_payload(
+    payload: dict[str, Any],
+    record_id: int | None = None,
+    changed_fields: Iterable[str] | None = None,
+) -> tuple[str, int]:
+    """Insert or update one time record.
+
+    V82 fix: admin/history editors must not UPDATE every column of every
+    visible row.  Updating the full row makes 02 Save/Recalc very slow on Neon
+    and can hit statement_timeout / QueryCanceled when the editor contains many
+    rows.  For existing records, update only fields that actually changed plus
+    updated_at/updated_by/version.
+    """
     cols = [c for c in TIME_RECORD_COLUMNS if c != "id"]
     if record_id:
-        assignments = ", ".join([f"{c}=?" for c in cols if c not in {"created_at"}])
-        vals = [payload.get(c, "") for c in cols if c not in {"created_at"}] + [record_id]
+        allowed = set(TIME_RECORD_COLUMNS) - {"id", "created_at", "version"}
+        if changed_fields is None:
+            update_cols = [c for c in cols if c in allowed]
+        else:
+            seen: set[str] = set()
+            update_cols = []
+            for c in changed_fields:
+                c = str(c)
+                if c in allowed and c not in seen:
+                    update_cols.append(c)
+                    seen.add(c)
+        # Always update audit fields for real edits.  Do not run a no-op UPDATE.
+        if update_cols:
+            for c in ["updated_at", "updated_by"]:
+                if c in allowed and c not in update_cols:
+                    update_cols.append(c)
+        if not update_cols:
+            return "updated", 0
+        assignments = ", ".join([f"{c}=?" for c in update_cols] + ["version=COALESCE(version,1)+1"])
+        vals = [payload.get(c, "") for c in update_cols] + [record_id]
         n = execute(f"UPDATE time_records SET {assignments} WHERE id=? AND (deleted_at IS NULL OR deleted_at='')", tuple(vals))
         return "updated", int(n or 0)
     sql = f"INSERT INTO time_records ({', '.join(cols)}) VALUES ({', '.join(['?']*len(cols))})"
@@ -1060,7 +1098,7 @@ def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) 
         diff = _diff_payload(before, payload)
         if before and not diff:
             continue
-        kind, n = _insert_or_update_payload(payload, rid)
+        kind, n = _insert_or_update_payload(payload, rid, changed_fields=diff.keys())
         saved_id = int(rid or n or 0)
         if n or (kind == "updated" and before is not None):
             # db_service.execute may return 0 for SQLite UPDATE rowcount even when the row was updated.

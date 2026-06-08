@@ -1667,7 +1667,19 @@ def _v80_sync_datetime_editor_columns(edited_df: pd.DataFrame, original_df: pd.D
                 old_t = old_t or st
             split_changed = bool(old is not None and ((date_col and cur_d != old_d) or (time_col and cur_t != old_t)))
             ts_changed = bool(old is not None and ts_col and cur_ts != old_ts)
-            if split_changed and cur_d and cur_t:
+            # V82: timestamp edits are authoritative.  If the user edits
+            # 開始時間戳 / 結束時間戳, regenerate 開始日期/開始時間/結束日期/結束時間
+            # immediately in the page cache, instead of rebuilding the timestamp
+            # from stale split fields.
+            if ts_changed and cur_ts:
+                sd, st = _v80_split_timestamp(cur_ts)
+                if date_col:
+                    out.at[idx, date_col] = sd
+                if time_col:
+                    out.at[idx, time_col] = st
+                if ts_col:
+                    out.at[idx, ts_col] = f"{sd} {st}".strip() if sd and st else cur_ts
+            elif split_changed and cur_d and cur_t:
                 new_ts = f"{cur_d} {cur_t}"
                 if ts_col:
                     out.at[idx, ts_col] = new_ts
@@ -1675,20 +1687,16 @@ def _v80_sync_datetime_editor_columns(edited_df: pd.DataFrame, original_df: pd.D
                     out.at[idx, date_col] = cur_d
                 if time_col:
                     out.at[idx, time_col] = cur_t
-            elif ts_changed and cur_ts:
-                sd, st = _v80_split_timestamp(cur_ts)
-                if date_col:
-                    out.at[idx, date_col] = sd
-                if time_col:
-                    out.at[idx, time_col] = st
-            elif cur_d and cur_t and ts_col:
-                out.at[idx, ts_col] = f"{cur_d} {cur_t}"
             elif cur_ts:
                 sd, st = _v80_split_timestamp(cur_ts)
-                if date_col and not cur_d:
-                    out.at[idx, date_col] = sd
-                if time_col and not cur_t:
-                    out.at[idx, time_col] = st
+                if date_col:
+                    out.at[idx, date_col] = sd or cur_d
+                if time_col:
+                    out.at[idx, time_col] = st or cur_t
+                if ts_col and sd and st:
+                    out.at[idx, ts_col] = f"{sd} {st}"
+            elif cur_d and cur_t and ts_col:
+                out.at[idx, ts_col] = f"{cur_d} {cur_t}"
     return out
 
 
