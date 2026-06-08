@@ -1470,6 +1470,14 @@ with right:
                 except Exception as exc:
                     st.warning(f"同步群組預覽載入失敗，仍可直接按暫停 / 完工 / 下班：{exc}")
 
+    # V93: define admin permission before the first column-settings block uses it.
+    # A previous patch referenced is_admin in Today Finished Records before it was
+    # initialized later in the Today Records section, causing NameError on 01 page load.
+    try:
+        is_admin = bool(_v207_current_user_is_admin())
+    except Exception:
+        is_admin = False
+
     st.markdown("#### 今日已結束紀錄 / Today Finished Records")
     _finished_key, _finished_ts_key = _v259_finish_key(emp_id2, _emp2_name)
     fc1, fc2 = st.columns([1, 3])
@@ -1517,7 +1525,11 @@ except Exception:
     _reset_time = "02:00"
 st.caption(f"顯示規則：重新整理前會顯示當日作業明細；每日 {_reset_time} 後會自動隱藏已結束紀錄。按下立即重新整理後，會立刻隱藏目前所有已結束紀錄，只保留未結束作業；02｜歷史紀錄不受影響。")
 user = get_current_user() or {}
-is_admin = "admin" in [str(x).lower() for x in user.get("roles", [])]
+try:
+    # V93: keep the same tolerant admin rule used by the upper 01 page sections.
+    is_admin = bool(is_admin) or bool(_v207_current_user_is_admin())
+except Exception:
+    is_admin = bool(is_admin)
 show_unfinished_only = False
 if is_admin:
     c_filter1, c_filter2 = st.columns([1.3, 2.7])
