@@ -2486,3 +2486,252 @@ def audit_v47_table_ui_saver() -> dict[str, Any]:
         "write_only_on_explicit_save": True,
     }
 # ================= END V47 NEON FREE SAVER - NO DB ON RENDER TABLE UI =================
+
+# ================= V86 REBOOT-PERSISTENT TABLE UI SETTINGS =================
+# 2026-06-08
+# Purpose:
+# - Keep Neon/PostgreSQL as the authority for table UI preferences.
+# - Reboot App / new session must read saved column order and widths once, then cache.
+# - Avoid the old V47 behavior that returned empty settings on cache miss in Neon mode,
+#   which made 01 tables look like they reverted to default after reboot.
+# - Still do not query Neon on every render: one read per table key per session/process TTL,
+#   and writes only when the user explicitly clicks Apply & Save.
+
+_V86_TABLE_UI_CACHE_TTL_SECONDS = float(os.environ.get("SPT_TABLE_UI_CACHE_TTL_SECONDS", "1800") or 1800)
+_V86_TABLE_UI_MEM_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+
+
+def _v86_key(table_key: str) -> str:
+    return str(table_key or "default").strip() or "default"
+
+
+def _v86_cache_get(table_key: str) -> dict[str, Any] | None:
+    key = _v86_key(table_key)
+    now_ts = time.time()
+    try:
+        item = st.session_state.get(f"_spt_v86_table_ui_{key}")
+        if isinstance(item, dict) and now_ts - float(item.get("ts", 0) or 0) <= _V86_TABLE_UI_CACHE_TTL_SECONDS:
+            data = item.get("data")
+            if isinstance(data, dict):
+                return {"widths": dict(data.get("widths") or {}), "order": list(data.get("order") or [])}
+    except Exception:
+        pass
+    try:
+        item = _V86_TABLE_UI_MEM_CACHE.get(key)
+        if item and now_ts - float(item[0]) <= _V86_TABLE_UI_CACHE_TTL_SECONDS:
+            data = item[1]
+            return {"widths": dict(data.get("widths") or {}), "order": list(data.get("order") or [])}
+    except Exception:
+        pass
+    return None
+
+
+def _v86_cache_put(table_key: str, payload: dict[str, Any]) -> dict[str, Any]:
+    key = _v86_key(table_key)
+    item = {"widths": dict(payload.get("widths") or {}), "order": list(payload.get("order") or [])}
+    now_ts = time.time()
+    try:
+        _V86_TABLE_UI_MEM_CACHE[key] = (now_ts, item)
+        if len(_V86_TABLE_UI_MEM_CACHE) > 500:
+            oldest = min(_V86_TABLE_UI_MEM_CACHE.items(), key=lambda kv: kv[1][0])[0]
+            _V86_TABLE_UI_MEM_CACHE.pop(oldest, None)
+    except Exception:
+        pass
+    try:
+        st.session_state[f"_spt_v86_table_ui_{key}"] = {"ts": now_ts, "data": item}
+    except Exception:
+        pass
+    return item
+
+
+def _v86_clean_widths(data: Any) -> dict[str, int]:
+    if not isinstance(data, dict):
+        return {}
+    out: dict[str, int] = {}
+    for k, v in data.items():
+        key = str(k).strip()
+        if not key:
+            continue
+        try:
+            width = int(float(v))
+        except Exception:
+            continue
+        out[key] = max(40, min(900, width))
+    return out
+
+
+def _v86_clean_order(data: Any) -> list[str]:
+    if not isinstance(data, list):
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in data:
+        col = str(item).strip()
+        if col and col not in seen:
+            out.append(col)
+            seen.add(col)
+    return out
+
+
+def _v86_load_payload(table_key: str, force_reload: bool = False) -> dict[str, Any]:
+    key = _v86_key(table_key)
+    if not force_reload:
+        cached = _v86_cache_get(key)
+        if cached is not None:
+            return cached
+    widths: dict[str, int] = {}
+    order: list[str] = []
+    try:
+        ensure_table_ui_schema()
+        row = query_one("SELECT widths_json, order_json FROM table_ui_settings WHERE table_key=?", (key,))
+        if row:
+            try:
+                widths = _v86_clean_widths(json.loads(row.get("widths_json") or "{}"))
+            except Exception:
+                widths = {}
+            try:
+                order = _v86_clean_order(json.loads(row.get("order_json") or "[]"))
+            except Exception:
+                order = []
+    except Exception:
+        widths, order = {}, []
+    return _v86_cache_put(key, {"widths": widths, "order": order})
+
+
+def refresh_table_ui_settings(table_key: str | None = None) -> dict[str, Any]:
+    """Clear cached UI settings and optionally reload one table key from authority.
+
+    Used when settings are changed or when an admin wants a fresh read without reboot.
+    """
+    if table_key is None:
+        try:
+            _V86_TABLE_UI_MEM_CACHE.clear()
+        except Exception:
+            pass
+        return {"ok": True, "cleared": "all"}
+    key = _v86_key(table_key)
+    try:
+        _V86_TABLE_UI_MEM_CACHE.pop(key, None)
+    except Exception:
+        pass
+    try:
+        st.session_state.pop(f"_spt_v86_table_ui_{key}", None)
+    except Exception:
+        pass
+    payload = _v86_load_payload(key, force_reload=True)
+    return {"ok": True, "table_key": key, "widths": len(payload.get("widths") or {}), "order": len(payload.get("order") or [])}
+
+
+def load_widths(table_key: str) -> dict[str, int]:  # type: ignore[override]
+    return dict(_v86_load_payload(table_key).get("widths") or {})
+
+
+def load_column_order(table_key: str) -> list[str]:  # type: ignore[override]
+    return list(_v86_load_payload(table_key).get("order") or [])
+
+
+def save_widths(table_key: str, widths: dict[str, int]) -> None:  # type: ignore[override]
+    key = _v86_key(table_key)
+    current = _v86_load_payload(key)
+    order = list(current.get("order") or [])
+    widths_clean = _v86_clean_widths(widths or {})
+    ensure_table_ui_schema()
+    if _v47_pg_enabled():
+        execute(
+            """
+            INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(table_key) DO UPDATE SET
+                widths_json=excluded.widths_json,
+                order_json=COALESCE(table_ui_settings.order_json, excluded.order_json),
+                updated_at=CURRENT_TIMESTAMP
+            """,
+            (key, json.dumps(widths_clean, ensure_ascii=False), json.dumps(order, ensure_ascii=False)),
+        )
+    else:
+        execute(
+            """
+            INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)
+            VALUES (?, ?, ?, datetime('now','localtime'))
+            ON CONFLICT(table_key) DO UPDATE SET
+                widths_json=excluded.widths_json,
+                order_json=COALESCE(table_ui_settings.order_json, excluded.order_json),
+                updated_at=excluded.updated_at
+            """,
+            (key, json.dumps(widths_clean, ensure_ascii=False), json.dumps(order, ensure_ascii=False)),
+        )
+    _v86_cache_put(key, {"widths": widths_clean, "order": order})
+
+
+def save_column_order(table_key: str, order: Iterable[str]) -> None:  # type: ignore[override]
+    key = _v86_key(table_key)
+    current = _v86_load_payload(key)
+    widths = dict(current.get("widths") or {})
+    cols = _v86_clean_order(list(order or []))
+    ensure_table_ui_schema()
+    if _v47_pg_enabled():
+        execute(
+            """
+            INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(table_key) DO UPDATE SET
+                order_json=excluded.order_json,
+                widths_json=COALESCE(table_ui_settings.widths_json, excluded.widths_json),
+                updated_at=CURRENT_TIMESTAMP
+            """,
+            (key, json.dumps(widths, ensure_ascii=False), json.dumps(cols, ensure_ascii=False)),
+        )
+    else:
+        execute(
+            """
+            INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)
+            VALUES (?, ?, ?, datetime('now','localtime'))
+            ON CONFLICT(table_key) DO UPDATE SET
+                order_json=excluded.order_json,
+                widths_json=COALESCE(table_ui_settings.widths_json, excluded.widths_json),
+                updated_at=excluded.updated_at
+            """,
+            (key, json.dumps(widths, ensure_ascii=False), json.dumps(cols, ensure_ascii=False)),
+        )
+    _v86_cache_put(key, {"widths": widths, "order": cols})
+
+
+def apply_column_order(table_key: str, df: pd.DataFrame) -> pd.DataFrame:  # type: ignore[override]
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return df
+    order = load_column_order(table_key)
+    if not order:
+        return df
+    ordered = [c for c in order if c in df.columns]
+    rest = [c for c in df.columns if c not in ordered]
+    return df[ordered + rest] if ordered else df
+
+
+def build_column_config(table_key: str, df: pd.DataFrame) -> dict:  # type: ignore[override]
+    widths = load_widths(table_key)
+    config: dict = {}
+    for col in list(df.columns) if isinstance(df, pd.DataFrame) else []:
+        label = COLUMN_LABELS.get(str(col), str(col))
+        width = int(widths.get(str(col), DEFAULT_WIDTHS.get(str(col), 140)))
+        try:
+            if str(col).lower() in {"_delete", "刪除 / delete"}:
+                config[col] = st.column_config.CheckboxColumn(label, width=width)
+            else:
+                config[col] = st.column_config.TextColumn(label, width=width)
+        except Exception:
+            pass
+    return config
+
+
+def audit_v86_table_ui_reboot_persistence() -> dict[str, Any]:
+    return {
+        "version": "V86_REBOOT_PERSISTENT_TABLE_UI_SETTINGS",
+        "authority": "table_ui_settings",
+        "reads_authority_on_cache_miss": True,
+        "cache_ttl_seconds": _V86_TABLE_UI_CACHE_TTL_SECONDS,
+        "cache_items": len(_V86_TABLE_UI_MEM_CACHE),
+        "write_only_on_explicit_save": True,
+        "local_github_restore_on_hot_path": False,
+    }
+
+# =============== END V86 REBOOT-PERSISTENT TABLE UI SETTINGS =================
