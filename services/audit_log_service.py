@@ -3645,3 +3645,112 @@ def get_login_log_stats(start_date=None, end_date=None, keyword: str = "") -> di
     return {"records": a["records"] + s["records"], "success": a["success"] + s["success"], "failed": a["failed"] + s["failed"]}
 
 # ================= END V94 LOGIN STATUS FAST LOAD FIX =================
+
+# ================= V95 LOGIN CLEAR PERMANENT DELETE AUDIT =================
+# 2026-06-08
+# Clear Login Logs must be both effective and auditable:
+# - The actual cleared rows remain soft-deleted via deleted_at in Neon tables.
+# - A separate permanent delete event is written to system_logs / operation_logs.
+# - This keeps a visible record even after the cleared login rows are hidden.
+try:
+    _v95_prev_delete_login_logs_by_date_range = delete_login_logs_by_date_range  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v95_prev_delete_login_logs_by_date_range = None
+
+
+def _v95_current_operator(operator: str = "") -> str:
+    op = str(operator or "").strip()
+    if op:
+        return op
+    try:
+        import streamlit as _st  # type: ignore
+        return str(
+            _st.session_state.get("auth_username")
+            or _st.session_state.get("username")
+            or _st.session_state.get("current_user")
+            or "admin"
+        )
+    except Exception:
+        return "admin"
+
+
+def _v95_record_login_clear_delete_event(start_date: str, end_date: str, deleted_count: int, operator: str = "", result: str = "OK", error: str = "") -> None:
+    actor = _v95_current_operator(operator)
+    ts = _v31_now() if "_v31_now" in globals() else _now()
+    target_id = f"{str(start_date)[:10]}~{str(end_date)[:10]}"
+    detail_obj = {
+        "module": "11_login_records",
+        "action": "CLEAR_LOGIN_LOGS",
+        "start_date": str(start_date)[:10],
+        "end_date": str(end_date)[:10],
+        "deleted_count": int(deleted_count or 0),
+        "operator": actor,
+        "authority": "Neon/PostgreSQL deleted_at soft delete + permanent system_logs audit",
+        "result": result,
+    }
+    if error:
+        detail_obj["error"] = str(error)[:500]
+    try:
+        detail_text = json.dumps(detail_obj, ensure_ascii=False, sort_keys=True)
+    except Exception:
+        detail_text = str(detail_obj)
+    msg = f"清除登入紀錄日期區間 {target_id}，影響 {int(deleted_count or 0)} 筆"
+
+    # Old UI/runtime reads system_logs, so this is the primary audit record.
+    try:
+        from services.db_service import execute
+        execute(
+            """
+            INSERT INTO system_logs (log_time, user_name, action_type, target_table, target_id, message, detail, level)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (ts, actor, "CLEAR_LOGIN_LOGS", "auth_login_logs,security_login_logs", target_id, msg, detail_text, "WARNING" if result == "OK" else "ERROR"),
+        )
+    except Exception:
+        pass
+
+    # New clean architecture compatibility: write operation_logs when available.
+    try:
+        import uuid as _uuid
+        from services.db_service import execute
+        execute(
+            """
+            INSERT INTO operation_logs (log_id, timestamp, actor, module, action, target_type, target_id, before_value, after_value, result, error_message, request_id, app_version)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(_uuid.uuid4()), ts, actor, "11_login_records", "CLEAR_LOGIN_LOGS", "login_logs", target_id,
+                "", detail_text, result, str(error or ""), "", "v95-login-clear-delete-audit",
+            ),
+        )
+    except Exception:
+        pass
+
+
+def delete_login_logs_by_date_range(start_date: str, end_date: str, operator: str = "", **kwargs: Any) -> int:  # type: ignore[override]
+    deleted = 0
+    err = ""
+    try:
+        if _v95_prev_delete_login_logs_by_date_range is None:
+            deleted = 0
+        else:
+            deleted = int(_v95_prev_delete_login_logs_by_date_range(start_date, end_date) or 0)
+        return int(deleted)
+    except Exception as exc:
+        err = str(exc)
+        raise
+    finally:
+        # Always record the clear attempt as a permanent audit event.
+        try:
+            _v95_record_login_clear_delete_event(start_date, end_date, int(deleted or 0), operator=operator, result="ERROR" if err else "OK", error=err)
+        except Exception:
+            pass
+
+
+clear_login_logs_by_date_range = delete_login_logs_by_date_range
+clear_login_logs_by_date = delete_login_logs_by_date_range
+clear_login_logs = delete_login_logs_by_date_range
+delete_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_audit_logs_by_date_range = delete_login_logs_by_date_range
+# ================= END V95 LOGIN CLEAR PERMANENT DELETE AUDIT =================
+

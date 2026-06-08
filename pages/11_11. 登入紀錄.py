@@ -280,7 +280,7 @@ else:
 
 st.divider()
 st.markdown("### 清除登入紀錄 / Clear Login Logs")
-st.warning("V106：清除會同步覆寫 records.json 權威檔，並建立 delete_state.json tombstone；舊 SQLite / legacy / history 紀錄即使回來，也會被 tombstone 擋掉，避免 Reboot App 復活舊資料。")
+st.warning("V95：清除會以 Neon deleted_at 軟刪除登入紀錄，並另外寫入 system_logs / operation_logs 永久刪除稽核紀錄；Reboot 後不會復活，也能追查誰在何時清除哪個日期區間。")
 
 # V1.99：改成點選確認，不再要求輸入 DELETE。
 # 深色主題下文字輸入框容易看不清楚，也不符合使用者要求的「點選確認」。
@@ -298,13 +298,14 @@ if st.button("⊖ 確認清除日期區間內登入紀錄 / Delete Logs in Date 
     if not confirm_delete_logs:
         st.error("請先勾選確認刪除，系統不會使用文字輸入 DELETE。")
     else:
-        count = delete_login_logs_by_date_range(str(start), str(end))
+        _login_clear_operator = str(st.session_state.get("auth_username") or st.session_state.get("username") or "admin")
+        count = delete_login_logs_by_date_range(str(start), str(end), operator=_login_clear_operator)
         st.session_state.pop("_spt_v67_login_logs_cached", None)
         st.session_state.pop("_spt_v67_login_logs_signature", None)
         st.session_state["_spt_v67_login_logs_loaded"] = False
         status_after = get_audit_permanent_status()
         st.success(f"已清除 {count} 筆登入紀錄，權威檔目前 {status_after.get('count', 0)} 筆 / Deleted {count} logs; authority now has {status_after.get('count', 0)} rows")
-        st.caption(f"權威檔已更新：{status_after.get('path', '-')}｜DeleteState：{status_after.get('delete_state_path', '-')}｜DeletedKeys：{status_after.get('deleted_keys', 0)}｜LastDeleted：{status_after.get('last_deleted_count', 0)}")
+        st.caption(f"權威資料已更新：{status_after.get('path', '-')}｜DeleteState：{status_after.get('delete_state_path', '-')}｜本次刪除稽核已寫入 system_logs / operation_logs。")
         st.session_state["v11_reset_confirm_delete_login_logs"] = True
         st.rerun()
 
