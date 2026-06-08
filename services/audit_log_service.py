@@ -3434,3 +3434,214 @@ def audit_v34_login_log_fastpath() -> dict:
     return {"version": "V34_LOGIN_LOG_FASTPATH", "schema_one_time": bool(_V34_LOGIN_SCHEMA_READY), "foreground_github_json_disabled": True, "stats_uses_sql_count": True, "query_has_limit": True, "heartbeat_throttled_seconds": _V34_HEARTBEAT_MIN_SECONDS}
 
 # ================= END V34 FAST LOGIN LOG NEON HOTPATH =================
+
+# ================= V94 LOGIN STATUS FAST LOAD FIX｜2026-06-08 =================
+# 問題：11｜登入紀錄的「載入登入紀錄狀態」會呼叫 get_audit_permanent_status()，
+# 舊版又進一步 get_login_log_stats(None, None, "") 對 auth_login_logs / security_login_logs
+# 做全表 COUNT。資料量大時在 Neon/PostgreSQL 會長時間運轉。
+# 修正：狀態區只做輕量估算，不全表 COUNT；查詢明細仍由「套用查詢」依日期區間讀取。
+
+def _v94_pg_enabled() -> bool:
+    try:
+        from services.db_service import is_postgres_enabled
+        return bool(is_postgres_enabled())
+    except Exception:
+        return False
+
+
+def _v94_query_one_safe(sql: str, params: tuple = ()) -> dict:
+    try:
+        from services.db_service import query_one
+        row = query_one(sql, params) or {}
+        return dict(row) if hasattr(row, "items") else {}
+    except Exception:
+        return {}
+
+
+def _v94_table_exists(table: str) -> bool:
+    if _v94_pg_enabled():
+        row = _v94_query_one_safe("SELECT 1 AS ok FROM information_schema.tables WHERE table_name=? LIMIT 1", (table,))
+        return bool(row.get("ok"))
+    try:
+        conn = get_connection()
+        try:
+            return _table_exists(conn, table)
+        finally:
+            conn.close()
+    except Exception:
+        return False
+
+
+def _v94_estimate_table_rows(table: str) -> int:
+    """Fast approximate row count for status cards. Never scans the full login table."""
+    try:
+        if _v94_pg_enabled():
+            row = _v94_query_one_safe("SELECT reltuples AS c FROM pg_class WHERE relname=? LIMIT 1", (table,))
+            val = row.get("c")
+            if val is not None:
+                return max(0, int(float(val)))
+            # Fallback: max(id) is usually index-backed and much cheaper than COUNT(*).
+            row = _v94_query_one_safe(f"SELECT MAX(id) AS c FROM {table}")
+            return max(0, int(float(row.get("c") or 0)))
+        # Local SQLite fallback is normally tiny; use exact count.
+        conn = get_connection()
+        try:
+            if not _table_exists(conn, table):
+                return 0
+            row = conn.execute(f"SELECT COUNT(*) AS c FROM {table}").fetchone()
+            return int(row["c"] if row is not None else 0)
+        finally:
+            conn.close()
+    except Exception:
+        return 0
+
+
+def bootstrap_audit_log_service() -> dict:  # type: ignore[override]
+    # V94: page entry must not run DDL / CREATE INDEX / legacy migration.
+    # Existing schema is maintained by deployment/migration paths; status/query functions are defensive.
+    return {"ok": True, "backend": "Neon/PostgreSQL" if _v94_pg_enabled() else "SQLite/local fallback", "removed_invalid_login_rows": 0, "fast_entry": True, "v94_no_foreground_schema_ddl": True}
+
+
+def auto_record_session_login(username: str = "", display_name: str = "", roles: str = "", **kwargs):  # type: ignore[override]
+    # V94: do not insert heartbeat/login rows from page 11 render. Actual login/logout is logged by security_service.
+    return None
+
+
+def get_audit_permanent_status() -> dict:  # type: ignore[override]
+    auth_est = _v94_estimate_table_rows("auth_login_logs") if _v94_table_exists("auth_login_logs") else 0
+    sec_est = _v94_estimate_table_rows("security_login_logs") if _v94_table_exists("security_login_logs") else 0
+    total = int(auth_est) + int(sec_est)
+    return {
+        "exists": True,
+        "count": total,
+        "db_count": total,
+        "estimated": bool(_v94_pg_enabled()),
+        "path": "neon://auth_login_logs + security_login_logs",
+        "authority_schema": "Neon/PostgreSQL" if _v94_pg_enabled() else "SQLite/local fallback",
+        "delete_state_path": "neon://deleted_at",
+        "deleted_keys": 0,
+        "fast_entry": True,
+        "v94_no_full_count": True,
+    }
+
+
+def _v94_date_boundaries(start_date=None, end_date=None) -> tuple[str | None, str | None]:
+    from datetime import datetime as _dt, timedelta as _td
+    start_txt = None
+    end_txt = None
+    if start_date:
+        start_txt = str(start_date)[:10] + " 00:00:00"
+    if end_date:
+        try:
+            d = _dt.strptime(str(end_date)[:10], "%Y-%m-%d").date() + _td(days=1)
+            end_txt = d.strftime("%Y-%m-%d 00:00:00")
+        except Exception:
+            end_txt = str(end_date)[:10] + " 23:59:59"
+    return start_txt, end_txt
+
+
+def _v94_login_where(alias: str, time_col: str, start_date=None, end_date=None, keyword: str = "") -> tuple[str, list]:
+    where = [f"({alias}.deleted_at IS NULL OR {alias}.deleted_at='')"]
+    params: list = []
+    start_txt, end_txt = _v94_date_boundaries(start_date, end_date)
+    if start_txt:
+        where.append(f"{time_col} >= ?")
+        params.append(start_txt)
+    if end_txt:
+        where.append(f"{time_col} < ?")
+        params.append(end_txt)
+    if keyword:
+        k = f"%{str(keyword).strip().lower()}%"
+        where.append(
+            "(" + " OR ".join([
+                f"lower(COALESCE({alias}.username,'')) LIKE ?",
+                f"lower(COALESCE({alias}.display_name,'')) LIKE ?",
+                f"lower(COALESCE({alias}.event_type,'')) LIKE ?",
+                f"lower(COALESCE({alias}.result,'')) LIKE ?",
+                f"lower(COALESCE({alias}.message,'')) LIKE ?",
+            ]) + ")"
+        )
+        params.extend([k, k, k, k, k])
+    return " AND ".join(where), params
+
+
+def load_login_logs(start_date=None, end_date=None, keyword: str = "", limit: int = 1000, event_types=None, results=None, include_legacy: bool = True, **kwargs):  # type: ignore[override]
+    import pandas as _pd
+    try:
+        from services.db_service import query_df
+        lim = max(1, min(int(limit or 300), 2000))
+        chunks = []
+        params: list = []
+        if _v94_table_exists("auth_login_logs"):
+            where1, params1 = _v94_login_where("a", "a.event_time", start_date, end_date, keyword)
+            chunks.append(f"""
+                SELECT a.id, a.username, a.display_name, a.event_type, a.result,
+                       COALESCE(a.event_time, a.created_at) AS login_time,
+                       a.logout_time,
+                       CASE WHEN a.idle_seconds IS NULL THEN NULL ELSE CAST(a.idle_seconds AS TEXT) END AS idle_minutes,
+                       a.module_code, a.message, COALESCE(a.source, 'auth_login_logs') AS source,
+                       a.ip_address, a.user_agent, COALESCE(a.created_at, a.event_time) AS created_at
+                FROM auth_login_logs a
+                WHERE {where1}
+            """)
+            params.extend(params1)
+        if include_legacy and _v94_table_exists("security_login_logs"):
+            where2, params2 = _v94_login_where("s", "s.login_time", start_date, end_date, keyword)
+            chunks.append(f"""
+                SELECT s.id, s.username, s.display_name, s.event_type, s.result,
+                       COALESCE(s.login_time, s.created_at) AS login_time,
+                       s.logout_time,
+                       CASE WHEN s.idle_seconds IS NULL THEN NULL ELSE CAST(s.idle_seconds AS TEXT) END AS idle_minutes,
+                       s.module_code, s.message, 'security_login_logs' AS source,
+                       '' AS ip_address, s.user_agent, COALESCE(s.created_at, s.login_time) AS created_at
+                FROM security_login_logs s
+                WHERE {where2}
+            """)
+            params.extend(params2)
+        if not chunks:
+            return _pd.DataFrame()
+        sql = " SELECT * FROM (" + " UNION ALL ".join(chunks) + ") q ORDER BY login_time DESC NULLS LAST, id DESC LIMIT ?"
+        params.append(lim)
+        df = query_df(sql, tuple(params))
+        if df is None:
+            return _pd.DataFrame()
+        if event_types and not df.empty and "event_type" in df.columns:
+            df = df[df["event_type"].isin(event_types)]
+        if results and not df.empty and "result" in df.columns:
+            df = df[df["result"].isin(results)]
+        return df.reset_index(drop=True)
+    except Exception:
+        return _pd.DataFrame()
+
+
+def _v94_count_login_table(table: str, alias: str, time_col: str, start_date=None, end_date=None, keyword: str = "") -> dict:
+    if not _v94_table_exists(table):
+        return {"records": 0, "success": 0, "failed": 0}
+    where, params = _v94_login_where(alias, time_col, start_date, end_date, keyword)
+    try:
+        from services.db_service import query_one
+        row = query_one(
+            f"""
+            SELECT COUNT(*) AS records,
+                   SUM(CASE WHEN upper(COALESCE({alias}.result,'')) IN ('OK','SUCCESS','成功') THEN 1 ELSE 0 END) AS success,
+                   SUM(CASE WHEN upper(COALESCE({alias}.result,'')) IN ('FAIL','FAILED','ERROR','失敗') THEN 1 ELSE 0 END) AS failed
+            FROM {table} {alias}
+            WHERE {where}
+            """,
+            tuple(params),
+        ) or {}
+        return {"records": int(row.get("records") or 0), "success": int(row.get("success") or 0), "failed": int(row.get("failed") or 0)}
+    except Exception:
+        return {"records": 0, "success": 0, "failed": 0}
+
+
+def get_login_log_stats(start_date=None, end_date=None, keyword: str = "") -> dict:  # type: ignore[override]
+    # Exact stats only for explicit date/keyword queries. For no-filter status, use fast estimate.
+    if not start_date and not end_date and not keyword:
+        status = get_audit_permanent_status()
+        return {"records": int(status.get("count") or 0), "success": 0, "failed": 0, "estimated": True}
+    a = _v94_count_login_table("auth_login_logs", "a", "a.event_time", start_date, end_date, keyword)
+    s = _v94_count_login_table("security_login_logs", "s", "s.login_time", start_date, end_date, keyword)
+    return {"records": a["records"] + s["records"], "success": a["success"] + s["success"], "failed": a["failed"] + s["failed"]}
+
+# ================= END V94 LOGIN STATUS FAST LOAD FIX =================

@@ -69,24 +69,63 @@ with st.expander("⧠ 使用說明 / User Guide", expanded=False):
 """)
 
 st.markdown("### 登入紀錄狀態 / Login Log Authority Status")
-st.caption("V34 快速進頁：狀態統計與在線人員清單改為按需載入，避免進入 11 頁面時掃描大量紀錄。")
-if st.button("載入登入紀錄狀態與在線人員 / Load Status", use_container_width=True, key="v34_load_login_status"):
-    st.session_state["v34_login_status_loaded"] = True
+st.caption("V94：狀態改成按鈕載入一次並快取；不再每次 rerun 都全表 COUNT 或重讀在線人員，避免畫面一直運轉。")
 
-if st.session_state.get("v34_login_status_loaded"):
-    status = get_audit_permanent_status()
-    c1, c2, c3 = st.columns(3)
-    c1.metric("權威來源 / Authority", status.get("authority_schema", "Neon/PostgreSQL"))
-    c2.metric("目前有效筆數 / Active Rows", status.get("count", 0))
-    c3.metric("快取/資料庫筆數 / DB Rows", status.get("db_count", 0))
-    st.caption(f"資料來源：{status.get('path', 'neon://auth_login_logs')}｜DeleteState：{status.get('delete_state_path', 'neon://deleted_at')}")
+_status_cols = st.columns([1, 1])
+with _status_cols[0]:
+    _load_status_clicked = st.button(
+        "載入登入紀錄狀態與在線人員 / Load Status",
+        use_container_width=True,
+        key="v94_load_login_status_once",
+    )
+with _status_cols[1]:
+    _clear_status_clicked = st.button(
+        "清除狀態顯示 / Clear Status",
+        use_container_width=True,
+        key="v94_clear_login_status_cache",
+    )
 
-    with st.expander("目前在線人員名單 / Current Online Users", expanded=False):
+if _clear_status_clicked:
+    for _k in ("v94_login_status_cached", "v94_login_status_loaded_at"):
+        st.session_state.pop(_k, None)
+    st.session_state["v34_login_status_loaded"] = False
+    st.rerun()
+
+if _load_status_clicked:
+    with st.spinner("正在載入登入紀錄狀態，僅讀取輕量摘要..."):
+        try:
+            status = get_audit_permanent_status()
+        except Exception as exc:
+            status = {"exists": False, "count": 0, "db_count": 0, "authority_schema": "Unknown", "error": str(exc)}
         try:
             online_df = get_online_users()
         except Exception as exc:
             online_df = pd.DataFrame()
-            st.warning(f"在線人員名單讀取失敗：{exc}")
+            status["online_error"] = str(exc)
+        st.session_state["v94_login_status_cached"] = {"status": status, "online_df": online_df}
+        st.session_state["v94_login_status_loaded_at"] = str(pd.Timestamp.now())
+        st.session_state["v34_login_status_loaded"] = True
+
+_cached_status_payload = st.session_state.get("v94_login_status_cached")
+if _cached_status_payload:
+    status = _cached_status_payload.get("status") or {}
+    online_df = _cached_status_payload.get("online_df")
+    if online_df is None:
+        online_df = pd.DataFrame()
+    c1, c2, c3 = st.columns(3)
+    c1.metric("權威來源 / Authority", status.get("authority_schema", "Neon/PostgreSQL"))
+    _count_label = "估算筆數 / Estimated Rows" if status.get("estimated") else "目前有效筆數 / Active Rows"
+    c2.metric(_count_label, status.get("count", 0))
+    c3.metric("快取/資料庫筆數 / DB Rows", status.get("db_count", 0))
+    if status.get("estimated"):
+        st.caption("此狀態為快速估算，不執行全表 COUNT；請用下方『套用查詢』讀取實際日期區間明細。")
+    if status.get("error"):
+        st.warning(f"狀態讀取警告：{status.get('error')}")
+    if status.get("online_error"):
+        st.warning(f"在線人員名單讀取警告：{status.get('online_error')}")
+    st.caption(f"資料來源：{status.get('path', 'neon://auth_login_logs')}｜DeleteState：{status.get('delete_state_path', 'neon://deleted_at')}｜載入時間：{st.session_state.get('v94_login_status_loaded_at', '-')}")
+
+    with st.expander("目前在線人員名單 / Current Online Users", expanded=False):
         if online_df is None or online_df.empty:
             st.info("目前沒有偵測到在線人員，或尚未產生 heartbeat。")
         else:
