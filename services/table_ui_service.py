@@ -2582,7 +2582,10 @@ def _v86_load_payload(table_key: str, force_reload: bool = False) -> dict[str, A
     widths: dict[str, int] = {}
     order: list[str] = []
     try:
-        ensure_table_ui_schema()
+        # V89: hot-path table rendering must not run CREATE/ALTER schema DDL.
+        # A cache miss should be one small indexed SELECT at most.  The explicit
+        # Apply & Save path still calls ensure_table_ui_schema() before writing,
+        # so permanent records remain durable without blocking 01/02 detail reads.
         row = query_one("SELECT widths_json, order_json FROM table_ui_settings WHERE table_key=?", (key,))
         if row:
             try:

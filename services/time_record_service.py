@@ -575,28 +575,57 @@ def clear_today_finished_from_work_page() -> int:
 
 
 def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:
-    _ensure_time_runtime_columns()
-    sql = f"SELECT {_base_cols()} FROM time_records WHERE {_not_deleted_predicate()}"
-    params: list[Any] = []
-    if start_date:
-        sql += " AND COALESCE(start_date, substr(COALESCE(start_timestamp,''),1,10)) >= ?"
-        params.append(_text(start_date))
-    if end_date:
-        sql += " AND COALESCE(start_date, substr(COALESCE(start_timestamp,''),1,10)) <= ?"
-        params.append(_text(end_date))
-    if employee_id:
-        sql += " AND employee_id = ?"
-        params.append(_text(employee_id))
-    if work_order:
-        sql += " AND (work_order = ? OR work_order_no = ?)"
-        params.extend([_text(work_order), _text(work_order)])
-    if not start_date and not end_date:
-        # Never whole-table scan on page render.
-        sql += " ORDER BY id DESC LIMIT 3000"
-    else:
-        sql += " ORDER BY id DESC LIMIT 10000"
-    return _safe_df(sql, tuple(params))
+    """Fast bounded record query used by 01/02/05/07/08.
 
+    V89: do not use COALESCE(start_date, substr(start_timestamp,...)) on the
+    main path.  That expression prevents PostgreSQL from using the normal
+    start_date indexes and made 01/02 detail reads spin on large Neon tables.
+    start_date is the maintained authority column; timestamp fallback is only
+    attempted when the indexed query returns no rows.
+    """
+    _ensure_time_runtime_columns()
+
+    def _build_sql(*, timestamp_fallback: bool = False) -> tuple[str, list[Any]]:
+        sql = f"SELECT {_base_cols()} FROM time_records WHERE {_not_deleted_predicate()}"
+        params: list[Any] = []
+        if start_date:
+            if timestamp_fallback:
+                sql += " AND COALESCE(start_date,'')='' AND start_timestamp >= ?"
+                params.append(f"{_text(start_date)[:10]} 00:00:00")
+            else:
+                sql += " AND start_date >= ?"
+                params.append(_text(start_date)[:10])
+        if end_date:
+            if timestamp_fallback:
+                # Exclusive next-day upper bound keeps the old timestamp-only rows
+                # bounded without calling substr()/date() on every row.
+                sql += " AND start_timestamp < ?"
+                params.append(f"{_today_end_text(_text(end_date)[:10])} 00:00:00")
+            else:
+                sql += " AND start_date <= ?"
+                params.append(_text(end_date)[:10])
+        if employee_id:
+            sql += " AND employee_id = ?"
+            params.append(_text(employee_id))
+        if work_order:
+            sql += " AND (work_order = ? OR work_order_no = ?)"
+            params.extend([_text(work_order), _text(work_order)])
+        if not start_date and not end_date:
+            sql += " ORDER BY id DESC LIMIT 1000"
+        else:
+            sql += " ORDER BY start_date DESC, start_time DESC, id DESC LIMIT 3000"
+        return sql, params
+
+    sql, params = _build_sql(timestamp_fallback=False)
+    df = _safe_df(sql, tuple(params))
+    if isinstance(df, pd.DataFrame) and (not df.empty or not (start_date or end_date)):
+        return df
+
+    # Legacy fallback: rows imported before start_date/start_time normalization.
+    if start_date or end_date:
+        fb_sql, fb_params = _build_sql(timestamp_fallback=True)
+        return _safe_df(fb_sql, tuple(fb_params))
+    return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
 
 def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:
     """Fast interactive query for 01 Today Records.

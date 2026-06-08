@@ -789,6 +789,18 @@ def install_column_settings_patch() -> None:
 
     def dataframe_wrapper(data=None, *args, **kwargs):
         _inject_native_header_sort_style()
+        # V89: tables rendered through services.table_ui_service.render_table()
+        # already receive their own column_config/column_order from
+        # table_ui_settings.  Running the global column-settings wrapper again
+        # caused an extra Neon/system-settings read before every 01/02 detail
+        # table render and could make the page spin without showing rows.
+        # Bypass the global wrapper completely for that call path.
+        if _v352_called_from_table_ui_service():
+            try:
+                return original_dataframe(data, *args, **kwargs)
+            except TypeError:
+                kwargs.pop("column_order", None)
+                return original_dataframe(data, *args, **kwargs)
         df = _normalize_df(data)
         if df is not None and len(df.columns) > 0:
             key = kwargs.get("key")
@@ -811,6 +823,12 @@ def install_column_settings_patch() -> None:
 
     def data_editor_wrapper(data=None, *args, **kwargs):
         _inject_native_header_sort_style()
+        if _v352_called_from_table_ui_service():
+            try:
+                return original_data_editor(data, *args, **kwargs)
+            except TypeError:
+                kwargs.pop("column_order", None)
+                return original_data_editor(data, *args, **kwargs)
         df = _normalize_df(data)
         if df is not None and len(df.columns) > 0:
             key = kwargs.get("key")
@@ -1442,11 +1460,17 @@ def _visible_order(df: pd.DataFrame, table_setting: Dict[str, Any], editable: bo
 
 
 def _settings_editor(table_id: str, df: pd.DataFrame, editable: bool) -> Tuple[Dict[str, Any], bool]:  # type: ignore[override]
-    """V360: stable-key settings editor; skip duplicate UI for table_ui_service.render_table()."""
+    """V360/V89: stable-key settings editor.
+
+    When the caller is services.table_ui_service.render_table(), do not read the
+    global column settings authority at all.  table_ui_service owns those tables
+    through table_ui_settings and a second settings authority creates duplicated
+    controls, extra DB reads, and slow 01/02 detail rendering.
+    """
     stable_id = _canonical_table_id(table_id)
-    table_setting = _get_table_setting(stable_id, [str(c) for c in df.columns])
     if _v352_called_from_table_ui_service():
-        return table_setting, False
+        return {"columns": {}}, False
+    table_setting = _get_table_setting(stable_id, [str(c) for c in df.columns])
 
     col_settings = table_setting.get("columns", {})
     with st.expander("欄位設定 / Column Settings（永久保存）", expanded=False):

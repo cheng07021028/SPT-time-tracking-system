@@ -80,7 +80,11 @@ def _add_in_filter(where: list[str], params: list[Any], column: str, values: Any
     if not vals:
         return
     placeholders = ",".join(["?"] * len(vals))
-    where.append(f"COALESCE({column},'') IN ({placeholders})")
+    # V89: keep 02 history predicates index-friendly. COALESCE(column,'') IN (...)
+    # forces PostgreSQL to evaluate an expression and can prevent normal indexes
+    # on work_order/employee_id/process_name/status from being used.  Empty-string
+    # rows are irrelevant when the UI supplies concrete values, so use column IN.
+    where.append(f"{column} IN ({placeholders})")
     params.extend(vals)
 
 
