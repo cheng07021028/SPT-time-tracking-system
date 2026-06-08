@@ -2735,3 +2735,98 @@ def audit_v86_table_ui_reboot_persistence() -> dict[str, Any]:
     }
 
 # =============== END V86 REBOOT-PERSISTENT TABLE UI SETTINGS =================
+
+# ================= V87 DATA_EDITOR TYPE-COMPATIBLE COLUMN CONFIG FIX =================
+# Purpose:
+# Streamlit data_editor is strict about column_config type compatibility.
+# V86 rebuilt table UI settings from Neon but used TextColumn for most fields.
+# When 02 history edit table contains date/time/datetime/numeric columns,
+# TextColumn can raise StreamlitAPIException during _check_type_compatibilities.
+# Keep width/header persistence, but use generic Column for non-boolean fields so
+# Streamlit can infer the correct editor type.  Only true boolean/select columns
+# such as _delete remain CheckboxColumn.
+try:
+    BOOLEAN_COLUMNS.update({
+        "_delete",
+        "刪除 / Delete",
+        "刪除 / delete",
+        "Delete",
+        "delete",
+        "selected",
+        "選取",
+        "選取 / Select",
+    })
+except Exception:
+    pass
+
+
+def _v87_bool_like_series(series: pd.Series | None) -> bool:
+    if series is None:
+        return False
+    try:
+        if pd.api.types.is_bool_dtype(series):
+            return True
+    except Exception:
+        pass
+    try:
+        non_null = series.dropna()
+        if non_null.empty:
+            return False
+        if len(non_null) > 200:
+            non_null = non_null.head(200)
+        values = {str(v).strip().lower() for v in non_null.tolist()}
+        return bool(values) and values.issubset({"true", "false", "1", "0", "yes", "no", "y", "n", "是", "否", "勾選", "啟用", "停用"})
+    except Exception:
+        return False
+
+
+def _v87_generic_column(label: str, width: int | str | None):
+    try:
+        return st.column_config.Column(label=label, width=width or "medium")
+    except Exception:
+        return label
+
+
+def _v87_checkbox_column(label: str, width: int | str | None):
+    try:
+        return st.column_config.CheckboxColumn(label=label, width=width or "small")
+    except Exception:
+        return _v87_generic_column(label, width)
+
+
+def build_column_config(table_key: str, df: pd.DataFrame) -> dict:  # type: ignore[override]
+    """Build Streamlit column_config without forcing incompatible types.
+
+    This intentionally avoids TextColumn/NumberColumn/DateColumn for general
+    fields.  Generic Column preserves label/width settings and lets Streamlit
+    infer datetime/date/time/numeric editing from the dataframe dtype.
+    """
+    widths = load_widths(table_key)
+    config: dict = {}
+    if not isinstance(df, pd.DataFrame):
+        return config
+    for col in list(df.columns):
+        col_key = str(col)
+        label = COLUMN_LABELS.get(col_key, label_for(col_key))
+        width = int(widths.get(col_key, DEFAULT_WIDTHS.get(col_key, 140)))
+        try:
+            series = df[col] if col in df.columns else None
+            if col_key in BOOLEAN_COLUMNS or col_key.lower() in {"_delete", "delete", "selected"} or _v87_bool_like_series(series):
+                config[col] = _v87_checkbox_column(label, width)
+            else:
+                config[col] = _v87_generic_column(label, width)
+        except Exception:
+            config[col] = _v87_generic_column(label, width)
+    return config
+
+
+def audit_v87_data_editor_type_compatibility() -> dict[str, Any]:
+    return {
+        "version": "V87_DATA_EDITOR_TYPE_COMPATIBLE_COLUMN_CONFIG",
+        "fix": "non_boolean_columns_use_generic_column_not_textcolumn",
+        "affected_modules": ["02_history_edit", "01_admin_maintenance", "all_render_table_editable"],
+        "keeps_width_and_order_persistence": True,
+        "boolean_columns_keep_checkbox": True,
+    }
+
+# =============== END V87 DATA_EDITOR TYPE-COMPATIBLE COLUMN CONFIG FIX ===============
