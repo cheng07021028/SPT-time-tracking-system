@@ -115,6 +115,160 @@ def _v259_notice_cached(label: str, ts_key: str) -> None:
         st.caption(f"{label}：顯示快取資料，最後刷新 {ts}。若需最新資料請按重新整理。")
     else:
         st.caption(f"{label}：為避免每次操作卡住，預設不自動載入重表格；請按重新整理載入。")
+def _v84_safe_widget_part(text: str) -> str:
+    return re.sub(r"[^0-9A-Za-z_\-]+", "_", str(text or "")).strip("_")[:90] or "table"
+
+
+def _v84_current_column_order(table_key: str, df: pd.DataFrame) -> list[str]:
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return []
+    current = [str(c) for c in df.columns]
+    current_set = set(current)
+    try:
+        saved = [str(c) for c in load_column_order(table_key)]
+    except Exception:
+        saved = []
+    out: list[str] = []
+    seen: set[str] = set()
+    for col in saved:
+        if col in current_set and col not in seen:
+            out.append(col)
+            seen.add(col)
+    for col in current:
+        if col not in seen:
+            out.append(col)
+            seen.add(col)
+    return out
+
+
+def _v84_render_column_settings_panel(table_key: str, df: pd.DataFrame, title: str) -> None:
+    """Explicit column settings panel for 01 tables.
+
+    V84 restores the missing Apply/Save button without re-enabling the old global
+    column-setting wrapper.  Nothing is auto-saved while the user types; widths and
+    order are written only when the form submit button is pressed.
+    """
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return
+    safe_key = _v84_safe_widget_part(table_key)
+    open_key = f"v84_column_settings_open_{safe_key}"
+    with st.expander(title, expanded=False):
+        st.caption("此區只管理本表格欄位順序與欄寬；不會修改工時資料。設定只會在按下『套用並永久儲存欄位設定』後寫入。")
+        show_editor = st.checkbox("開啟欄位設定面板 / Open column settings", value=False, key=open_key)
+        if not show_editor:
+            st.info("欄位設定面板目前關閉，避免每次開頁都建立大量欄位控制項。")
+            return
+
+        current_cols = [str(c) for c in df.columns]
+        widths = {}
+        try:
+            widths = {str(k): int(v) for k, v in load_widths(table_key).items()}
+        except Exception:
+            widths = {}
+        ordered = _v84_current_column_order(table_key, df)
+        if not ordered:
+            ordered = current_cols
+
+        settings_rows = []
+        for col in ordered:
+            if col not in current_cols:
+                continue
+            settings_rows.append({
+                "欄位 / Column": col,
+                "欄寬 / Width": int(widths.get(col, 140)),
+            })
+        if not settings_rows:
+            settings_rows = [{"欄位 / Column": c, "欄寬 / Width": int(widths.get(c, 140))} for c in current_cols]
+
+        with st.form(f"v84_column_settings_form_{safe_key}", clear_on_submit=False):
+            order_text = st.text_area(
+                "欄位順序 / Column order（每行一個欄位；上方越前面越靠左）",
+                value="\n".join([r["欄位 / Column"] for r in settings_rows]),
+                height=220,
+                key=f"v84_column_order_text_{safe_key}",
+            )
+            try:
+                width_df = _v95_raw_data_editor(
+                    pd.DataFrame(settings_rows),
+                    use_container_width=True,
+                    hide_index=True,
+                    num_rows="fixed",
+                    key=f"v84_width_editor_{safe_key}",
+                    column_config={
+                        "欄位 / Column": st.column_config.TextColumn("欄位 / Column"),
+                        "欄寬 / Width": st.column_config.NumberColumn("欄寬 / Width", min_value=60, max_value=700, step=10),
+                    },
+                    disabled=["欄位 / Column"],
+                    height=300,
+                )
+            except Exception:
+                width_df = pd.DataFrame(settings_rows)
+                for idx, row in enumerate(settings_rows):
+                    c1, c2 = st.columns([2.8, 1.2])
+                    c1.caption(str(row["欄位 / Column"]))
+                    width_df.at[idx, "欄寬 / Width"] = c2.number_input(
+                        "欄寬", min_value=60, max_value=700, value=int(row.get("欄寬 / Width", 140)), step=10,
+                        key=f"v84_width_fallback_{safe_key}_{idx}",
+                    )
+            b1, b2 = st.columns([1.4, 1])
+            apply_settings = b1.form_submit_button("✅ 套用並永久儲存欄位設定 / Apply & Save", type="primary", use_container_width=True)
+            reset_settings = b2.form_submit_button("↺ 恢復預設順序 / Reset order", use_container_width=True)
+
+        if apply_settings:
+            raw_order = [x.strip() for x in str(order_text or "").splitlines() if x.strip()]
+            seen: set[str] = set()
+            clean_order: list[str] = []
+            for col in raw_order:
+                if col in current_cols and col not in seen:
+                    clean_order.append(col)
+                    seen.add(col)
+            for col in current_cols:
+                if col not in seen:
+                    clean_order.append(col)
+                    seen.add(col)
+            clean_widths: dict[str, int] = {}
+            try:
+                for _, row in width_df.iterrows():
+                    col = str(row.get("欄位 / Column", "")).strip()
+                    if not col or col not in current_cols:
+                        continue
+                    try:
+                        w = int(float(row.get("欄寬 / Width", 140)))
+                    except Exception:
+                        w = 140
+                    clean_widths[col] = max(60, min(700, w))
+            except Exception:
+                clean_widths = {c: int(widths.get(c, 140)) for c in current_cols}
+            try:
+                save_widths(table_key, clean_widths)
+                save_column_order(table_key, clean_order)
+                st.success("欄位設定已套用並永久儲存。")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"欄位設定儲存失敗：{exc}")
+        elif reset_settings:
+            try:
+                save_column_order(table_key, current_cols)
+                save_widths(table_key, {c: int(widths.get(c, 140)) for c in current_cols})
+                st.success("已恢復本表格預設欄位順序。")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"恢復預設失敗：{exc}")
+
+
+def _v84_apply_table_layout(table_key: str, df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return df, {}
+    try:
+        out = apply_column_order(table_key, df.copy())
+    except Exception:
+        out = df.copy()
+    try:
+        cfg = build_column_config(table_key, out)
+    except Exception:
+        cfg = {}
+    return out, cfg
+# ===== V84 EXPLICIT FIELD SETTINGS END =====
 # ===== V259 FOREGROUND DISPLAY ISOLATION END =====
 
 from services.theme_service import apply_theme, render_header
@@ -150,7 +304,15 @@ from services.time_record_service import (
     today_records,
 )
 from services.db_service import query_one
-from services.table_ui_service import render_table, render_width_settings
+from services.table_ui_service import (
+    render_table,
+    load_widths,
+    save_widths,
+    load_column_order,
+    save_column_order,
+    apply_column_order,
+    build_column_config,
+)
 from services.time_record_delete_unifier_service import delete_selected_time_records_from_editor
 from services.system_settings_service import get_process_options_by_category_exact, get_default_process_category, load_process_category_choices, get_live_page_reset_time
 from services.timezone_service import today_text
@@ -1390,9 +1552,11 @@ if load_today_clicked:
 df = st.session_state.get(V259_TODAY_TABLE_KEY, pd.DataFrame())
 if isinstance(df, pd.DataFrame) and not df.empty:
     if is_admin:
-        with st.expander("▤ 01 工時紀錄表格欄位位置順序調整 / Admin Column Order Settings", expanded=False):
-            st.caption("此區僅系統管理員可見。可調整今日工時紀錄表格的欄位寬度與欄位位置順序；設定會永久保存。")
-            render_width_settings("01.time_records.main", df, title="01 工時紀錄欄位順序與欄寬設定 / Column Order and Width")
+        _v84_render_column_settings_panel(
+            "01.time_records.main",
+            df,
+            "▤ 今日工時紀錄欄位設定 / Today Records Column Settings",
+        )
     _spt_perf_t = time.perf_counter()
     render_table(df, "01.time_records.main", editable=False, height=420, show_width_settings=False)
     _spt_perf_t = _spt_perf_tick(
@@ -1894,11 +2058,19 @@ if is_admin:
                             st.warning("此表格找不到可用 ID 欄位，刪除/重算按鈕將無法定位正式紀錄。")
 
                         editor_key = f"today_records_admin_editor_v81_{st.session_state[editor_version_key]}"
+                        admin_table_key = "01.time_records.admin_maintenance"
                         display_admin = admin_df.copy()
                         if delete_col in display_admin.columns:
                             display_admin[delete_col] = display_admin[delete_col].map(lambda v: bool(v)).astype(bool)
-                        # V81：維護區使用最小 column_config，避免每次展開都讀取/計算整套欄寬設定。
-                        column_cfg = {delete_col: st.column_config.CheckboxColumn("刪除 / Delete", width=120)}
+
+                        _v84_render_column_settings_panel(
+                            admin_table_key,
+                            display_admin,
+                            "▤ 管理員維護表格欄位設定 / Admin Maintenance Column Settings",
+                        )
+                        display_admin, column_cfg = _v84_apply_table_layout(admin_table_key, display_admin)
+                        column_cfg = dict(column_cfg or {})
+                        column_cfg[delete_col] = st.column_config.CheckboxColumn("刪除 / Delete", width=120)
                         disabled_cols = [c for c in ["id", "ID", "ID / ID", "ID / ID / ID", "record_key", "紀錄鍵 / Record Key", "created_at", "建立時間 / Created At", "updated_at", "更新時間 / Updated At"] if c in display_admin.columns]
 
                         with st.form("v81_today_admin_maintenance_lazy_editor_form", clear_on_submit=False):
