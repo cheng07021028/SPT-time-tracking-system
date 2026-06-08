@@ -360,46 +360,12 @@ def _v105_prepare_live_work_order_keyword_state(key: str = "start_work_order_man
 
 
 def _v105_inject_live_work_order_keyword_sync() -> None:
-    """讓製令關鍵字輸入後自動刷新下方製令下拉，不需 Enter。"""
-    components.html(
-        """
-<script>
-(function(){
-  const PARAM = 'spt_wo_kw';
-  const LABEL = '製令關鍵字';
-  const DEBOUNCE_MS = 420;
-  function bind(){
-    const doc = window.parent && window.parent.document ? window.parent.document : document;
-    const inputs = Array.from(doc.querySelectorAll('input')).filter(function(inp){
-      const aria = inp.getAttribute('aria-label') || '';
-      return aria.indexOf(LABEL) >= 0;
-    });
-    if(!inputs.length){ setTimeout(bind, 300); return; }
-    const input = inputs[0];
-    if(input.dataset.sptWoLiveBound === '1') return;
-    input.dataset.sptWoLiveBound = '1';
-    let timer = null;
-    function sync(){
-      const val = (input.value || '').trim();
-      const url = new URL(window.parent.location.href);
-      const cur = (url.searchParams.get(PARAM) || '').trim();
-      if(cur === val) return;
-      if(val){ url.searchParams.set(PARAM, val); }
-      else { url.searchParams.delete(PARAM); }
-      window.parent.location.replace(url.toString());
-    }
-    input.addEventListener('input', function(){
-      if(timer) clearTimeout(timer);
-      timer = setTimeout(sync, DEBOUNCE_MS);
-    }, true);
-  }
-  bind();
-})();
-</script>
-""",
-        height=0,
-        width=0,
-    )
+    """V77：停用 URL replace 型即時刷新，避免 01 頁在 Streamlit Cloud 反覆整頁 reload。
+
+    製令關鍵字仍保留；使用者按 Enter 或離開輸入框時，Streamlit 會正常 rerun 並篩選下方製令。
+    這比前端強制改網址穩定，不會造成看起來像無限運轉的瀏覽器 reload loop。
+    """
+    return None
 # ===== END V105 WORK ORDER KEYWORD LIVE URL SYNC =====
 
 
@@ -1033,25 +999,49 @@ def _v74_render_start_status(active_df: pd.DataFrame, selected_process: str = ""
     return policy
 
 
-def _v74_select_active_record(active_df: pd.DataFrame, employee_id: str, employee_name: str) -> dict | None:
-    """Render a stable active-work table and return the selected record.
+def _v77_html_table(df: pd.DataFrame, max_rows: int = 12) -> None:
+    """Render small active-work tables as plain HTML, avoiding heavy dataframe components."""
+    try:
+        show = df.head(max_rows).copy()
+        show = show.where(pd.notna(show), "").astype(str)
+        st.markdown(
+            show.to_html(index=False, escape=False, border=0, classes="spt-active-work-table"),
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            """
+<style>
+.spt-active-work-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+.spt-active-work-table th { text-align: left; padding: 0.55rem; background: rgba(255,255,255,0.08); border-bottom: 1px solid rgba(120,220,255,0.22); color: #eaffff; }
+.spt-active-work-table td { padding: 0.5rem; border-bottom: 1px solid rgba(120,220,255,0.12); color: #f2ffff; }
+.spt-active-work-table tr:hover td { background: rgba(96,220,255,0.08); }
+</style>
+""",
+            unsafe_allow_html=True,
+        )
+    except Exception:
+        try:
+            st.table(df.head(max_rows))
+        except Exception:
+            st.write(df.head(max_rows).to_dict("records"))
 
-    V75 keeps the table visible on every Streamlit version.  Row-click selection is
-    unreliable on some Streamlit Cloud builds, so the operator gets a deterministic
-    selectbox below the table.  This prevents the finish buttons from disappearing.
+
+def _v74_select_active_record(active_df: pd.DataFrame, employee_id: str, employee_name: str) -> dict | None:
+    """Render active work and return a selected record.
+
+    V77 finalizes the Active Work panel for field stability:
+    - no st.dataframe/st.data_editor in the live finish panel, so the component cannot spin forever;
+    - always falls back to the first row if selection labels cannot be built;
+    - buttons below this function therefore cannot disappear while active records exist.
     """
     if active_df is None or not isinstance(active_df, pd.DataFrame) or active_df.empty:
         return None
     raw_df = active_df.reset_index(drop=True).copy()
+    raw_df = raw_df.where(pd.notna(raw_df), "")
     display_df = _v72_active_display_df(raw_df)
     if not isinstance(display_df, pd.DataFrame) or display_df.empty:
         display_df = raw_df.copy()
-    try:
-        st.dataframe(display_df, use_container_width=True, hide_index=True, height=280)
-    except TypeError:
-        st.dataframe(display_df, use_container_width=True, height=280)
-    except Exception:
-        render_table(display_df, "v75_active_work_table_fallback", editable=False, height=280)
+    _v77_html_table(display_df, max_rows=12)
 
     options: list[tuple[str, int]] = []
     for idx, row in raw_df.iterrows():
@@ -1063,7 +1053,10 @@ def _v74_select_active_record(active_df: pd.DataFrame, employee_id: str, employe
         label = f"{rid}｜{wo or '未填製令'}｜{proc or '未填工段'}｜{sd} {stime}".strip()
         options.append((label, int(idx)))
     if not options:
-        return None
+        try:
+            return raw_df.iloc[0].fillna("").to_dict()
+        except Exception:
+            return None
     if len(options) == 1:
         st.caption(f"已自動選取開始中作業：{options[0][0]}")
         selected_idx = options[0][1]
@@ -1073,13 +1066,16 @@ def _v74_select_active_record(active_df: pd.DataFrame, employee_id: str, employe
             "選擇要結束的開始中作業｜Select active work",
             labels,
             index=0,
-            key=f"v75_active_work_selectbox_{_v72_safe_key(employee_id, employee_name, len(raw_df))}",
+            key=f"v77_active_work_selectbox_{_v72_safe_key(employee_id, employee_name, len(raw_df))}",
         )
         selected_idx = dict(options).get(selected_label, 0)
     try:
         return raw_df.iloc[int(selected_idx)].fillna("").to_dict()
     except Exception:
-        return None
+        try:
+            return raw_df.iloc[0].fillna("").to_dict()
+        except Exception:
+            return None
 
 
 def _v74_trigger_after_start_prompt(record_id) -> None:
@@ -1132,7 +1128,7 @@ with left:
         "製令關鍵字｜Work Order Keyword（可手動輸入；輸入 25M 會篩選下方製令）",
         value="",
         key="start_work_order_manual_query_v103",
-        placeholder="輸入 2、25M、21M0241、P/N、機型關鍵字；需按 Enter，下方製令會自動篩選",
+        placeholder="輸入 2、25M、21M0241、P/N、機型關鍵字；按 Enter 或離開欄位後篩選",
     )
     _v105_inject_live_work_order_keyword_sync()
     _wo_query = str(wo_manual_query or "").strip()
