@@ -1805,10 +1805,17 @@ tab1, tab2, tab3 = st.tabs(["歷史明細編輯", "Excel 匯入", "貼上資料"
 with tab1:
     st.subheader("歷史明細編輯 / Editable History")
 
-    # V88：02 歷史明細欄位設定。
-    # 既有 render_width_settings() 已在快速模式停用；這裡提供 02 專用、明確可見的
-    # Apply & Save 入口，設定寫入 table_ui_settings，Reboot 後由 table_ui_service 讀回。
-    _history_width_df = _prepare_history_display_df(df.head(1), include_action_cols=False) if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    # V90：02 歷史明細欄位設定。
+    # 刪除 / Delete、重算 / Recalc 是編輯模式才會出現的操作欄位，
+    # 但也必須列入同一份永久欄位順序設定，否則現場無法調整它們的位置。
+    # 因此有編輯權限時，設定面板用 include_action_cols=True 建立欄位清單；
+    # 唯讀表格沒有這兩欄時，table_ui_service 會自動略過不存在欄位，
+    # 編輯表格出現這兩欄時則套用同一份永久順序與欄寬。
+    _history_width_df = (
+        _prepare_history_display_df(df.head(1), include_action_cols=bool(can_edit))
+        if isinstance(df, pd.DataFrame)
+        else pd.DataFrame()
+    )
     if not _history_width_df.empty:
         try:
             _v88_render_history_column_settings(
