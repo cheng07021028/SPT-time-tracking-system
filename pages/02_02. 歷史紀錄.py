@@ -19,7 +19,16 @@ from services.time_record_service import (
     import_time_records,
 )
 from services.master_data_service import load_employees, load_work_orders
-from services.table_ui_service import render_table, label_for, render_width_settings
+from services.table_ui_service import (
+    render_table,
+    label_for,
+    render_width_settings,
+    load_widths,
+    save_widths,
+    load_column_order,
+    save_column_order,
+    apply_column_order,
+)
 from services.time_record_delete_unifier_service import delete_selected_time_records_from_editor
 from services.duration_service import hours_to_hms
 from services.history_filter_service import load_history_filters, save_history_filters, reset_history_filters
@@ -1339,6 +1348,130 @@ def _prepare_history_display_df(view_df: pd.DataFrame, *, include_action_cols: b
     return out
 
 
+
+
+# ===================== V88 02 HISTORY EXPLICIT COLUMN SETTINGS =====================
+def _v88_safe_widget_part(text: str) -> str:
+    return re.sub(r"[^0-9A-Za-z_\u4e00-\u9fff]+", "_", str(text or "table")).strip("_") or "table"
+
+
+def _v88_current_column_order(table_key: str, df: pd.DataFrame) -> list[str]:
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return []
+    current = [str(c) for c in df.columns]
+    current_set = set(current)
+    try:
+        saved = [str(c) for c in load_column_order(table_key)]
+    except Exception:
+        saved = []
+    out: list[str] = []
+    seen: set[str] = set()
+    for col in saved:
+        if col in current_set and col not in seen:
+            out.append(col)
+            seen.add(col)
+    for col in current:
+        if col not in seen:
+            out.append(col)
+            seen.add(col)
+    return out
+
+
+def _v88_render_history_column_settings(table_key: str, df: pd.DataFrame, title: str) -> None:
+    """Explicit 02 history column order/width settings.
+
+    The old render_width_settings() was disabled for hot-path speed, so 02 had
+    persistence support but no clear Apply button.  This panel writes only when
+    Apply is pressed and reads the existing table_ui_settings cache/authority.
+    """
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return
+    safe_key = _v88_safe_widget_part(table_key)
+    current_cols = [str(c) for c in df.columns]
+    try:
+        widths = {str(k): int(v) for k, v in load_widths(table_key).items()}
+    except Exception:
+        widths = {}
+    ordered = _v88_current_column_order(table_key, df) or current_cols
+    settings_rows = []
+    for col in ordered:
+        if col in current_cols:
+            settings_rows.append({"欄位 / Column": col, "欄寬 / Width": int(widths.get(col, 140))})
+    if not settings_rows:
+        settings_rows = [{"欄位 / Column": c, "欄寬 / Width": int(widths.get(c, 140))} for c in current_cols]
+
+    with st.expander(title, expanded=True):
+        st.caption("此區只管理 02 歷史明細表格的欄位順序與欄寬；不會修改工時資料。只有按下『套用並永久儲存欄位設定』才會寫入。")
+        with st.form(f"v88_history_column_settings_form_{safe_key}", clear_on_submit=False):
+            order_text = st.text_area(
+                "欄位順序 / Column order（每行一個欄位；上方越前面越靠左）",
+                value="\n".join([str(r["欄位 / Column"]) for r in settings_rows]),
+                height=190,
+                key=f"v88_history_column_order_text_{safe_key}",
+            )
+            try:
+                width_df = st.data_editor(
+                    pd.DataFrame(settings_rows),
+                    use_container_width=True,
+                    hide_index=True,
+                    num_rows="fixed",
+                    key=f"v88_history_width_editor_{safe_key}",
+                    column_config={
+                        "欄位 / Column": st.column_config.Column("欄位 / Column"),
+                        "欄寬 / Width": st.column_config.NumberColumn("欄寬 / Width", min_value=60, max_value=700, step=10),
+                    },
+                    disabled=["欄位 / Column"],
+                    height=260,
+                )
+            except Exception:
+                width_df = pd.DataFrame(settings_rows)
+                st.caption("欄寬表格暫時無法載入，將沿用目前欄寬。")
+            b1, b2 = st.columns([1.5, 1])
+            apply_settings = b1.form_submit_button("✅ 套用並永久儲存欄位設定 / Apply & Save", type="primary", use_container_width=True)
+            reset_settings = b2.form_submit_button("↺ 恢復預設順序 / Reset order", use_container_width=True)
+
+        if apply_settings:
+            raw_order = [x.strip() for x in str(order_text or "").splitlines() if x.strip()]
+            seen: set[str] = set()
+            clean_order: list[str] = []
+            for col in raw_order:
+                if col in current_cols and col not in seen:
+                    clean_order.append(col)
+                    seen.add(col)
+            for col in current_cols:
+                if col not in seen:
+                    clean_order.append(col)
+                    seen.add(col)
+            clean_widths: dict[str, int] = {}
+            try:
+                for _, row in width_df.iterrows():
+                    col = str(row.get("欄位 / Column", "")).strip()
+                    if col not in current_cols:
+                        continue
+                    try:
+                        width = int(float(row.get("欄寬 / Width", 140)))
+                    except Exception:
+                        width = 140
+                    clean_widths[col] = max(60, min(700, width))
+            except Exception:
+                clean_widths = {c: int(widths.get(c, 140)) for c in current_cols}
+            try:
+                save_widths(table_key, clean_widths)
+                save_column_order(table_key, clean_order)
+                st.success("02 歷史明細欄位設定已套用並永久儲存。")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"欄位設定儲存失敗：{exc}")
+        elif reset_settings:
+            try:
+                save_column_order(table_key, current_cols)
+                save_widths(table_key, {c: int(widths.get(c, 140)) for c in current_cols})
+                st.success("已恢復 02 歷史明細預設欄位順序。")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"恢復預設失敗：{exc}")
+# =================== END V88 02 HISTORY EXPLICIT COLUMN SETTINGS ===================
+
 def _render_history_view_table(view_df: pd.DataFrame, table_key: str = "history_records", height: int = 520) -> None:
     """Read-only history table using the same table engine/settings as edit mode.
 
@@ -1672,19 +1805,19 @@ tab1, tab2, tab3 = st.tabs(["歷史明細編輯", "Excel 匯入", "貼上資料"
 with tab1:
     st.subheader("歷史明細編輯 / Editable History")
 
-    # V131：02 歷史明細編輯欄寬設定。
-    # 只新增欄寬/欄位順序設定入口，沿用 table_ui_service 的權威檔永久讀寫；
-    # 不改 02 儲存、重算、刪除、匯入、01/02 同步等既有功能。
+    # V88：02 歷史明細欄位設定。
+    # 既有 render_width_settings() 已在快速模式停用；這裡提供 02 專用、明確可見的
+    # Apply & Save 入口，設定寫入 table_ui_settings，Reboot 後由 table_ui_service 讀回。
     _history_width_df = _prepare_history_display_df(df.head(1), include_action_cols=False) if isinstance(df, pd.DataFrame) else pd.DataFrame()
     if not _history_width_df.empty:
         try:
-            render_width_settings(
+            _v88_render_history_column_settings(
                 "history_records",
                 _history_width_df,
-                title="02 歷史明細編輯欄寬設定 / Column Width Settings",
+                title="▤ 02 歷史明細欄位設定 / History Records Column Settings",
             )
         except Exception as _history_width_exc:
-            st.caption(f"欄寬設定暫時無法載入：{_history_width_exc}")
+            st.caption(f"欄位設定暫時無法載入：{_history_width_exc}")
 
     if not can_edit:
         st.info("目前帳號只有查詢權限；若需修改或刪除歷史紀錄，請由管理員在權限管理開放 02 歷史紀錄的編輯/刪除權限。")
