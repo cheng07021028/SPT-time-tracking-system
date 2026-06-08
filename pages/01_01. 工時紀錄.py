@@ -151,13 +151,10 @@ def _v84_render_column_settings_panel(table_key: str, df: pd.DataFrame, title: s
     if not isinstance(df, pd.DataFrame) or df.empty:
         return
     safe_key = _v84_safe_widget_part(table_key)
-    open_key = f"v84_column_settings_open_{safe_key}"
-    with st.expander(title, expanded=False):
+    # V85: keep the Apply button visible.  The V84 checkbox hid the form and made
+    # users think the admin column settings did not have an Apply button.
+    with st.expander(title, expanded=True):
         st.caption("此區只管理本表格欄位順序與欄寬；不會修改工時資料。設定只會在按下『套用並永久儲存欄位設定』後寫入。")
-        show_editor = st.checkbox("開啟欄位設定面板 / Open column settings", value=False, key=open_key)
-        if not show_editor:
-            st.info("欄位設定面板目前關閉，避免每次開頁都建立大量欄位控制項。")
-            return
 
         current_cols = [str(c) for c in df.columns]
         widths = {}
