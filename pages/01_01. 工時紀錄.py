@@ -1489,7 +1489,23 @@ with right:
     finished_today_df = st.session_state.get(_finished_key, pd.DataFrame())
     if isinstance(finished_today_df, pd.DataFrame) and not finished_today_df.empty:
         st.caption("只顯示目前選擇人員今日已下班、暫停或完工的紀錄；此區為唯讀查閱，不會寫入、覆蓋或刪除資料。")
-        render_table(finished_today_df, "today_finished_records_for_selected_employee_v148", editable=False, height=260)
+        # V91: Today Finished Records uses its own persistent table UI key.
+        # Column order/width settings only affect display and are saved on explicit Apply;
+        # they do not reload time records, recalculate hours, or touch Neon authority data.
+        _v91_finished_table_key = "01.time_records.today_finished"
+        if is_admin:
+            _v84_render_column_settings_panel(
+                _v91_finished_table_key,
+                finished_today_df,
+                "▤ 今日已結束紀錄欄位設定 / Today Finished Records Column Settings",
+            )
+        render_table(
+            finished_today_df,
+            _v91_finished_table_key,
+            editable=False,
+            height=260,
+            show_width_settings=False,
+        )
     else:
         st.info("此區已改為手動刷新，避免整頁顯示完成被已結束紀錄查詢拖慢。")
 
