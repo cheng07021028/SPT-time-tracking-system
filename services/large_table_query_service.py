@@ -46,6 +46,8 @@ def _date_text(value: Any) -> str:
     if isinstance(value, date):
         return value.strftime("%Y-%m-%d")
     text = str(value).strip().replace("/", "-")
+    if text.lower() in {"none", "nan", "nat", "null", "<na>"}:
+        return ""
     try:
         dt = pd.to_datetime(text, errors="coerce")
         if not pd.isna(dt):
@@ -104,6 +106,22 @@ def _time_record_date_where(start_date: Any, end_date: Any) -> tuple[str, list[A
 
 
 
+
+
+def _v79_default_history_range_if_blank(start_date: Any, end_date: Any) -> tuple[Any, Any]:
+    """Protect interactive 02 queries from accidentally scanning all history rows.
+
+    The page always presents a quick date preset.  If an older saved filter lacks
+    explicit start/end values, use the same default as the UI (last 30 days).
+    """
+    s = _date_text(start_date)
+    e = _date_text(end_date)
+    if s or e:
+        return start_date, end_date
+    today = datetime.now().date()
+    return (today - pd.Timedelta(days=30)).strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d")
+
+
 def _time_records_not_deleted_where() -> str:
     """SQL predicate for rows that are visible in 01/02/05/08 runtime views.
 
@@ -143,6 +161,7 @@ def load_history_records_sql_filtered(filters: dict[str, Any] | None = None, *, 
     f = dict(filters or {})
     s = start_date if start_date is not None else f.get("start_date")
     e = end_date if end_date is not None else f.get("end_date")
+    s, e = _v79_default_history_range_if_blank(s, e)
     where: list[str] = [_time_records_not_deleted_where()]
     params: list[Any] = []
 
@@ -219,6 +238,7 @@ def count_history_records_sql_filtered(filters: dict[str, Any] | None = None, *,
     f = dict(filters or {})
     s = start_date if start_date is not None else f.get("start_date")
     e = end_date if end_date is not None else f.get("end_date")
+    s, e = _v79_default_history_range_if_blank(s, e)
     where: list[str] = [_time_records_not_deleted_where()]
     params: list[Any] = []
     date_clause, date_params = _time_record_date_where(s, e)
@@ -280,6 +300,7 @@ def load_history_filter_options_sql(start_date: Any = None, end_date: Any = None
     options.  This is safe for Neon/PostgreSQL and SQLite fallback because it
     uses the existing query_df abstraction.
     """
+    start_date, end_date = _v79_default_history_range_if_blank(start_date, end_date)
     cols = [
         "work_order", "part_no", "type_name", "assembly_location", "process_name",
         "employee_id", "employee_name", "status",

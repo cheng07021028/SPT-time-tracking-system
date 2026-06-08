@@ -811,6 +811,26 @@ def _date_range_from_preset(preset: str, fallback_start: str, fallback_end: str)
         return today - timedelta(days=30), today
 
 
+def _v79_effective_history_filters(filters: dict | None) -> dict:
+    """Return filters with an explicit bounded date range for the 02 hot query path.
+
+    舊永久篩選檔可能只有 date_preset，沒有 start_date / end_date。
+    這種狀況下按「查詢 / 重新整理歷史明細」會變成沒有日期條件，
+    Neon 需要掃描整張 time_records，現場會看起來一直運轉。
+    
+    這裡不改 UI，也不寫回永久檔；只在查詢當下把快速日期轉成
+    明確日期，讓 SQL 能走 start_date 索引。
+    """
+    f = dict(filters or {})
+    preset = str(f.get("date_preset") or "近30天")
+    start_raw = f.get("start_date")
+    end_raw = f.get("end_date")
+    start_dt, end_dt = _date_range_from_preset(preset, str(start_raw or ""), str(end_raw or ""))
+    f["start_date"] = str(start_dt)
+    f["end_date"] = str(end_dt)
+    return f
+
+
 def _normalize_end_blank(s: pd.Series) -> pd.Series:
     """Normalize blank-like end values.
 
@@ -1382,6 +1402,7 @@ _seed_start, _seed_end = _date_range_from_preset(
 _history_option_values = {}
 base_df = pd.DataFrame()
 _panel_df, history_filters = _render_history_filter_panel(base_df, employees, work_orders, _history_option_values)
+history_filters = _v79_effective_history_filters(history_filters)
 
 hr1, hr2, hr3 = st.columns([1.2, 1.2, 3])
 manual_query_clicked = hr1.button("查詢 / 重新整理歷史明細", type="primary", use_container_width=True, key="v259_history_manual_query")
