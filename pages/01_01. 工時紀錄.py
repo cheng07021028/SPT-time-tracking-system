@@ -1489,11 +1489,271 @@ def _v92_checked_ids(frame: pd.DataFrame, delete_col: str, id_col: str) -> list[
     return ids
 
 
+# ===== V78 ADMIN MAINTENANCE SAVE STABILITY HELPERS =====
+def _v78_cell_text(value) -> str:
+    """Normalize editor values for safe diffing without treating NaN/None as changes."""
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    text = str(value if value is not None else "").strip()
+    if text.lower() in {"nan", "nat", "none", "<na>"}:
+        return ""
+    # Keep business values readable but avoid false positives from 1.0 vs 1.
+    try:
+        if text.endswith(".0"):
+            return str(int(float(text)))
+    except Exception:
+        pass
+    return text
+
+
+def _v78_changed_rows(original_df: pd.DataFrame, edited_df: pd.DataFrame, id_col: str) -> pd.DataFrame:
+    """Return only rows that actually changed in the admin maintenance editor.
+
+    This prevents the Save button from writing every visible row to Neon.  It also
+    keeps the editor responsive because unchanged rows do not trigger recalculation,
+    log writing, or parallel-group checks.
+    """
+    if not isinstance(original_df, pd.DataFrame) or not isinstance(edited_df, pd.DataFrame):
+        return pd.DataFrame()
+    if not id_col or id_col not in original_df.columns or id_col not in edited_df.columns:
+        return edited_df.copy().reset_index(drop=True)
+
+    ignore_cols = {
+        "刪除 / Delete",
+        "updated_at", "更新時間 / Updated At", "建立時間 / Created At", "created_at",
+    }
+    original_map = {}
+    for _, row in original_df.iterrows():
+        rid = _v92_to_int_id(row.get(id_col))
+        if rid is not None:
+            original_map[rid] = row
+
+    changed = []
+    compare_cols = [c for c in edited_df.columns if c in original_df.columns and c not in ignore_cols]
+    for _, row in edited_df.iterrows():
+        rid = _v92_to_int_id(row.get(id_col))
+        if rid is None or rid not in original_map:
+            changed.append(row)
+            continue
+        old = original_map[rid]
+        for col in compare_cols:
+            if _v78_cell_text(row.get(col)) != _v78_cell_text(old.get(col)):
+                changed.append(row)
+                break
+    if not changed:
+        return pd.DataFrame(columns=edited_df.columns)
+    return pd.DataFrame(changed).reset_index(drop=True)
+
+
+def _v80_first_existing_col(df: pd.DataFrame, names: list[str]) -> str | None:
+    if not isinstance(df, pd.DataFrame):
+        return None
+    cols = set(str(c) for c in df.columns)
+    for name in names:
+        if name in cols:
+            return name
+    return None
+
+
+def _v80_text_cell(value) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    return str(value if value is not None else "").strip()
+
+
+def _v80_date_text(value) -> str:
+    text = _v80_text_cell(value)
+    if not text:
+        return ""
+    try:
+        dt = pd.to_datetime(text, errors="coerce")
+        if pd.notna(dt):
+            return dt.strftime("%Y-%m-%d")
+    except Exception:
+        pass
+    return text[:10].replace("/", "-") if len(text) >= 10 else text.replace("/", "-")
+
+
+def _v80_time_text(value) -> str:
+    text = _v80_text_cell(value)
+    if not text:
+        return ""
+    if " " in text:
+        text = text.split()[-1]
+    try:
+        dt = pd.to_datetime(text, errors="coerce")
+        if pd.notna(dt):
+            return dt.strftime("%H:%M:%S")
+    except Exception:
+        pass
+    parts = text.split(":")
+    if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+        return f"{int(parts[0]):02d}:{int(parts[1]):02d}:00"
+    if len(parts) >= 3 and parts[0].isdigit() and parts[1].isdigit():
+        try:
+            return f"{int(parts[0]):02d}:{int(parts[1]):02d}:{int(float(parts[2])):02d}"
+        except Exception:
+            return text
+    return text
+
+
+def _v80_split_timestamp(value) -> tuple[str, str]:
+    text = _v80_text_cell(value)
+    if not text:
+        return "", ""
+    try:
+        dt = pd.to_datetime(text, errors="coerce")
+        if pd.notna(dt):
+            return dt.strftime("%Y-%m-%d"), dt.strftime("%H:%M:%S")
+    except Exception:
+        pass
+    return (text[:10], text[11:19] if len(text) >= 16 else "")
+
+
+def _v80_sync_datetime_editor_columns(edited_df: pd.DataFrame, original_df: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Synchronize visible start/end date/time columns before 01 admin save.
+
+    The authority service also performs this normalization before writing Neon.
+    This lightweight page-side copy keeps the 01 maintenance table and Today
+    Records cache visually consistent immediately after Save/Recalc.
+    """
+    if not isinstance(edited_df, pd.DataFrame) or edited_df.empty:
+        return edited_df.copy() if isinstance(edited_df, pd.DataFrame) else pd.DataFrame()
+    out = edited_df.copy()
+    id_col = _v92_find_id_col(out) if "_v92_find_id_col" in globals() else ("id" if "id" in out.columns else None)
+    original_map = {}
+    if isinstance(original_df, pd.DataFrame) and id_col and id_col in original_df.columns:
+        for _, old_row in original_df.iterrows():
+            rid = _v92_to_int_id(old_row.get(id_col)) if "_v92_to_int_id" in globals() else None
+            if rid is not None:
+                original_map[rid] = old_row
+
+    aliases = {
+        "start": {
+            "ts": ["start_timestamp", "開始時間戳 / Start Timestamp", "開始時間戳"],
+            "date": ["start_date", "開始日期 / Start Date", "開始日期"],
+            "time": ["start_time", "開始時間 / Start Time", "開始時間"],
+        },
+        "end": {
+            "ts": ["end_timestamp", "結束時間戳 / End Timestamp", "結束時間戳"],
+            "date": ["end_date", "結束日期 / End Date", "結束日期"],
+            "time": ["end_time", "結束時間 / End Time", "結束時間"],
+        },
+    }
+    for prefix, m in aliases.items():
+        ts_col = _v80_first_existing_col(out, m["ts"])
+        date_col = _v80_first_existing_col(out, m["date"])
+        time_col = _v80_first_existing_col(out, m["time"])
+        if not any([ts_col, date_col, time_col]):
+            continue
+        for idx, row in out.iterrows():
+            rid = _v92_to_int_id(row.get(id_col)) if id_col and "_v92_to_int_id" in globals() else None
+            old = original_map.get(rid)
+            cur_ts = _v80_text_cell(row.get(ts_col)) if ts_col else ""
+            cur_d = _v80_date_text(row.get(date_col)) if date_col else ""
+            cur_t = _v80_time_text(row.get(time_col)) if time_col else ""
+            old_ts = _v80_text_cell(old.get(ts_col)) if old is not None and ts_col and ts_col in old.index else ""
+            old_d = _v80_date_text(old.get(date_col)) if old is not None and date_col and date_col in old.index else ""
+            old_t = _v80_time_text(old.get(time_col)) if old is not None and time_col and time_col in old.index else ""
+            if old_ts and (not old_d or not old_t):
+                sd, st = _v80_split_timestamp(old_ts)
+                old_d = old_d or sd
+                old_t = old_t or st
+            split_changed = bool(old is not None and ((date_col and cur_d != old_d) or (time_col and cur_t != old_t)))
+            ts_changed = bool(old is not None and ts_col and cur_ts != old_ts)
+            if split_changed and cur_d and cur_t:
+                new_ts = f"{cur_d} {cur_t}"
+                if ts_col:
+                    out.at[idx, ts_col] = new_ts
+                if date_col:
+                    out.at[idx, date_col] = cur_d
+                if time_col:
+                    out.at[idx, time_col] = cur_t
+            elif ts_changed and cur_ts:
+                sd, st = _v80_split_timestamp(cur_ts)
+                if date_col:
+                    out.at[idx, date_col] = sd
+                if time_col:
+                    out.at[idx, time_col] = st
+            elif cur_d and cur_t and ts_col:
+                out.at[idx, ts_col] = f"{cur_d} {cur_t}"
+            elif cur_ts:
+                sd, st = _v80_split_timestamp(cur_ts)
+                if date_col and not cur_d:
+                    out.at[idx, date_col] = sd
+                if time_col and not cur_t:
+                    out.at[idx, time_col] = st
+    return out
+
+
+def _v78_apply_editor_df_to_cache(cache_df: pd.DataFrame, edited_df: pd.DataFrame, id_col: str) -> pd.DataFrame:
+    """Apply edited rows to the session copy so Save can refresh the page without re-querying."""
+    if not isinstance(cache_df, pd.DataFrame) or cache_df.empty:
+        return edited_df.copy().reset_index(drop=True) if isinstance(edited_df, pd.DataFrame) else pd.DataFrame()
+    if not isinstance(edited_df, pd.DataFrame) or edited_df.empty or not id_col:
+        return cache_df.copy().reset_index(drop=True)
+    out = cache_df.copy().reset_index(drop=True)
+    if id_col not in out.columns or id_col not in edited_df.columns:
+        return edited_df.copy().reset_index(drop=True)
+    row_pos = {}
+    for pos, row in out.iterrows():
+        rid = _v92_to_int_id(row.get(id_col))
+        if rid is not None:
+            row_pos[rid] = pos
+    for _, row in edited_df.iterrows():
+        rid = _v92_to_int_id(row.get(id_col))
+        if rid is None:
+            continue
+        if rid in row_pos:
+            pos = row_pos[rid]
+            for col in edited_df.columns:
+                if col in out.columns:
+                    out.at[pos, col] = row.get(col)
+    return out.reset_index(drop=True)
+
+
+def _v78_remove_ids_from_cache(cache_df: pd.DataFrame, id_col: str, ids: list[int]) -> pd.DataFrame:
+    if not isinstance(cache_df, pd.DataFrame) or cache_df.empty or not id_col or id_col not in cache_df.columns or not ids:
+        return cache_df.copy() if isinstance(cache_df, pd.DataFrame) else pd.DataFrame()
+    id_set = {int(x) for x in ids if _v92_to_int_id(x) is not None}
+    return cache_df[~cache_df[id_col].map(lambda x: (_v92_to_int_id(x) in id_set))].reset_index(drop=True)
+
+
+def _v78_refresh_related_page_caches(clean_df: pd.DataFrame | None, *, admin_data_key: str, ts_key: str) -> None:
+    """Synchronize 01 page session tables after admin Save/Recalc/Delete.
+
+    This updates the visible page state immediately and clears only backend query
+    caches.  It avoids the previous expensive pattern: save -> clear cache ->
+    st.rerun -> reload the full maintenance table from Neon.
+    """
+    if isinstance(clean_df, pd.DataFrame):
+        st.session_state[admin_data_key] = clean_df.copy().reset_index(drop=True)
+        if V259_TODAY_TABLE_KEY in st.session_state:
+            st.session_state[V259_TODAY_TABLE_KEY] = clean_df.copy().reset_index(drop=True)
+            st.session_state[V259_TODAY_TABLE_TS_KEY] = _v259_now_label()
+        st.session_state[ts_key] = _v259_now_label()
+    try:
+        clear_today_records_fast_cache()
+    except Exception:
+        pass
+
+
+# ===== V78 ADMIN MAINTENANCE SAVE STABILITY HELPERS END =====
+
+
 if is_admin:
     st.divider()
     with st.expander("▤ 管理員工時紀錄維護｜修改、刪除、存檔", expanded=False):
         st.warning("此區僅管理員可見。V92 起維護按鈕會在同一次畫面立即生效，並同步合併表格最新勾選/編輯狀態。")
         admin_load_key = "today_records_admin_load_v92"
+        admin_data_key = "today_records_admin_data_v78"
+        admin_data_ts_key = "today_records_admin_data_ts_v78"
         admin_select_key = "_spt_select_today_records_admin_delete_ids_v92"
         editor_version_key = "today_records_admin_editor_version_v92"
         if editor_version_key not in st.session_state:
@@ -1511,19 +1771,29 @@ if is_admin:
                 clear_today_records_fast_cache()
             except Exception:
                 pass
+            # V78：只在使用者按「載入維護表格」時讀一次 DB，之後使用 session copy。
+            # 避免每次勾選、編輯、存檔後又重新查整張今日表，造成 01 頁一直運轉。
+            st.session_state[admin_data_key] = today_records(include_finished=not show_unfinished_only, unfinished_only=show_unfinished_only)
+            st.session_state[admin_data_ts_key] = _v259_now_label()
         if unload_clicked:
             st.session_state[admin_load_key] = False
+            st.session_state.pop(admin_data_key, None)
+            st.session_state.pop(admin_data_ts_key, None)
             st.session_state[admin_select_key] = []
             st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
 
         if not st.session_state.get(admin_load_key, False):
             st.info("管理員維護表格尚未載入。平常作業記錄不需要載入此區，避免拖慢 01 工時紀錄。")
         else:
-            try:
-                clear_today_records_fast_cache()
-            except Exception:
-                pass
-            admin_source_df = today_records(include_finished=not show_unfinished_only, unfinished_only=show_unfinished_only)
+            admin_source_df = st.session_state.get(admin_data_key)
+            if not isinstance(admin_source_df, pd.DataFrame):
+                # V78 fallback：若 session 遺失，最多補讀一次，避免空白；正常互動不會走到這裡。
+                admin_source_df = today_records(include_finished=not show_unfinished_only, unfinished_only=show_unfinished_only)
+                st.session_state[admin_data_key] = admin_source_df
+                st.session_state[admin_data_ts_key] = _v259_now_label()
+            _admin_loaded_at = st.session_state.get(admin_data_ts_key, "")
+            if _admin_loaded_at:
+                st.caption(f"維護表格使用前台暫存資料，載入時間：{_admin_loaded_at}。需重新查 DB 時請按『載入維護表格』。")
             if admin_source_df is None or admin_source_df.empty:
                 st.info("今日目前沒有可維護的工時紀錄。")
             else:
@@ -1644,26 +1914,32 @@ if is_admin:
                     st.session_state[admin_select_key] = checked_ids
 
                     if do_save:
-                        save_df = edited_admin.drop(columns=[delete_col], errors="ignore")
-                        count = save_time_records(save_df)
-                        try:
-                            clear_today_records_fast_cache()
-                        except Exception:
-                            pass
-                        st.success(f"已由管理員存檔修改 {count} 筆今日工時紀錄。")
-                        st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
-                        st.rerun()
+                        save_df_all = edited_admin.drop(columns=[delete_col], errors="ignore")
+                        original_display_for_diff = display_admin.drop(columns=[delete_col], errors="ignore")
+                        save_df_all = _v80_sync_datetime_editor_columns(save_df_all, original_display_for_diff)
+                        changed_df = _v78_changed_rows(original_display_for_diff, save_df_all, _id_col)
+                        if changed_df.empty:
+                            st.info("沒有偵測到實際修改；未寫入 Neon，避免無效存檔造成頁面長時間運轉。")
+                        else:
+                            count = save_time_records(changed_df)
+                            updated_cache = _v78_apply_editor_df_to_cache(admin_source_df, save_df_all, _id_col)
+                            _v78_refresh_related_page_caches(updated_cache, admin_data_key=admin_data_key, ts_key=admin_data_ts_key)
+                            st.success(f"已由管理員存檔修改 {count} 筆今日工時紀錄，並同步更新 01 頁面暫存顯示與 02 歷史紀錄權威資料。")
+                            st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
+                            st.rerun()
                     elif do_recalc:
                         if not checked_ids:
                             st.warning("請先在『刪除 / Delete』勾選欄勾選要重新計算的紀錄，或按『勾選全部紀錄』，再按重算。")
                         else:
-                            save_df = edited_admin.drop(columns=[delete_col], errors="ignore")
-                            save_time_records(save_df, recalc_edited_timestamps=True)
+                            save_df_all = edited_admin.drop(columns=[delete_col], errors="ignore")
+                            original_display_for_diff = display_admin.drop(columns=[delete_col], errors="ignore")
+                            save_df_all = _v80_sync_datetime_editor_columns(save_df_all, original_display_for_diff)
+                            changed_df = _v78_changed_rows(original_display_for_diff, save_df_all, _id_col)
+                            if not changed_df.empty:
+                                save_time_records(changed_df, recalc_edited_timestamps=True)
                             count = recalculate_time_records(checked_ids)
-                            try:
-                                clear_today_records_fast_cache()
-                            except Exception:
-                                pass
+                            updated_cache = _v78_apply_editor_df_to_cache(admin_source_df, save_df_all, _id_col)
+                            _v78_refresh_related_page_caches(updated_cache, admin_data_key=admin_data_key, ts_key=admin_data_ts_key)
                             st.success(f"已先同步修改後的開始/結束日期時間，並重新計算 {count} 筆工時，同步更新到 02 歷史紀錄。")
                             st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                             st.rerun()
@@ -1678,11 +1954,9 @@ if is_admin:
                                 except Exception:
                                     pass
                             st.session_state[admin_select_key] = []
-                            try:
-                                clear_today_records_fast_cache()
-                            except Exception:
-                                pass
-                            st.success(f"已由管理員刪除 {count} 筆今日工時紀錄。")
+                            updated_cache = _v78_remove_ids_from_cache(admin_source_df, _id_col, checked_ids)
+                            _v78_refresh_related_page_caches(updated_cache, admin_data_key=admin_data_key, ts_key=admin_data_ts_key)
+                            st.success(f"已由管理員刪除 {count} 筆今日工時紀錄，並同步更新 01 頁面暫存顯示。")
                             st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                             st.rerun()
 

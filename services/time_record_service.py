@@ -135,14 +135,23 @@ def _normalize_df(df: pd.DataFrame | None) -> pd.DataFrame:
     # Common old labels without bilingual text.
     alias = {
         "製令": "work_order", "工號": "employee_id", "姓名": "employee_name", "工段": "process_name",
-        "開始時間戳": "start_timestamp", "結束時間戳": "end_timestamp", "備註": "remark", "工時小計": "work_hours",
+        "開始時間戳": "start_timestamp", "結束時間戳": "end_timestamp",
+        "開始日期": "start_date", "開始時間": "start_time",
+        "結束日期": "end_date", "結束時間": "end_time",
+        "備註": "remark", "工時小計": "work_hours",
         "ID": "id",
     }
     work = work.rename(columns={c: alias.get(str(c), str(c)) for c in work.columns})
+    source_cols = set(str(c) for c in work.columns)
     for c in TIME_RECORD_COLUMNS:
         if c not in work.columns:
             work[c] = ""
-    return work[TIME_RECORD_COLUMNS]
+    out = work[TIME_RECORD_COLUMNS]
+    # Keep track of which columns came from the editor/import source.  This is
+    # important for 01/02 edit-save: missing timestamp/date/time columns must not
+    # be interpreted as the user clearing those fields.
+    out.attrs["_spt_source_columns"] = source_cols
+    return out
 
 
 def _safe_df(sql: str, params: Iterable[Any] | None = None) -> pd.DataFrame:
@@ -257,6 +266,137 @@ def _split_ts(ts: str) -> tuple[str, str]:
     return dt.strftime("%Y-%m-%d"), dt.strftime("%H:%M:%S")
 
 
+def _normalize_date_part(value: Any) -> str:
+    text = _text(value)
+    if not text:
+        return ""
+    dt = _parse_dt(text)
+    if dt:
+        return dt.strftime("%Y-%m-%d")
+    if len(text) >= 10:
+        return text[:10].replace("/", "-")
+    return text.replace("/", "-")
+
+
+def _normalize_time_part(value: Any) -> str:
+    text = _text(value)
+    if not text:
+        return ""
+    if " " in text:
+        text = text.split()[-1]
+    # Pandas / Excel time values may arrive as 1900-01-01 08:30:00; after the
+    # split above only the final time part remains.
+    for fmt in ("%H:%M:%S", "%H:%M"):
+        try:
+            return datetime.strptime(text[:8], fmt).strftime("%H:%M:%S")
+        except Exception:
+            pass
+    parts = text.split(":")
+    if len(parts) == 2 and all(p.strip().isdigit() for p in parts):
+        return f"{int(parts[0]):02d}:{int(parts[1]):02d}:00"
+    if len(parts) >= 3 and parts[0].strip().isdigit() and parts[1].strip().isdigit():
+        try:
+            return f"{int(parts[0]):02d}:{int(parts[1]):02d}:{int(float(parts[2])):02d}"
+        except Exception:
+            return text
+    return text
+
+
+def _merge_date_time_parts(date_value: Any, time_value: Any) -> str:
+    d = _normalize_date_part(date_value)
+    t = _normalize_time_part(time_value)
+    if d and t:
+        return f"{d} {t}"
+    if d:
+        return d
+    return ""
+
+
+def _normalize_timestamp_text(value: Any) -> str:
+    text = _text(value)
+    if not text:
+        return ""
+    dt = _parse_dt(text)
+    if dt:
+        return _fmt_dt(dt)
+    return text
+
+
+def _canonicalize_datetime_pair(
+    row: dict[str, Any],
+    before: dict[str, Any] | None,
+    prefix: str,
+    source_columns: set[str] | None = None,
+) -> tuple[str, str, str]:
+    """Keep timestamp and separate date/time columns in sync for 01/02 edits.
+
+    Priority rules:
+    1. If the editor changed date/time columns, rebuild timestamp from those values.
+    2. If the editor changed timestamp, split it back to date/time.
+    3. If only one side exists, derive the other side.
+    4. If a caller did not provide any timing columns, keep the existing DB values.
+    """
+    source_columns = source_columns or set(row.keys())
+    ts_col = f"{prefix}_timestamp"
+    d_col = f"{prefix}_date"
+    t_col = f"{prefix}_time"
+    has_ts = ts_col in source_columns
+    has_d = d_col in source_columns
+    has_t = t_col in source_columns
+
+    cur_ts = _normalize_timestamp_text(row.get(ts_col))
+    cur_d = _normalize_date_part(row.get(d_col))
+    cur_t = _normalize_time_part(row.get(t_col))
+
+    old_ts = _normalize_timestamp_text((before or {}).get(ts_col))
+    old_d = _normalize_date_part((before or {}).get(d_col))
+    old_t = _normalize_time_part((before or {}).get(t_col))
+    if old_ts and (not old_d or not old_t):
+        sd, st = _split_ts(old_ts)
+        old_d = old_d or sd
+        old_t = old_t or st
+
+    if before is not None and not (has_ts or has_d or has_t):
+        return old_ts, old_d, old_t
+
+    ts_changed = bool(before is not None and has_ts and cur_ts != old_ts)
+    split_changed = bool(
+        before is not None
+        and ((has_d and cur_d != old_d) or (has_t and cur_t != old_t))
+    )
+
+    if split_changed:
+        # If only one split field was supplied, preserve the other one from DB.
+        d = cur_d if has_d else old_d
+        t = cur_t if has_t else old_t
+        if d and t:
+            ts = _merge_date_time_parts(d, t)
+            sd, st = _split_ts(ts)
+            return ts, sd or d, st or t
+        if not d and not t:
+            return "", "", ""
+        return "", d, t
+
+    if ts_changed:
+        ts = cur_ts
+        d, t = _split_ts(ts)
+        return ts, d, t
+
+    # No detected edit.  Prefer complete split fields when provided, otherwise
+    # split timestamp.  This also repairs old rows where only one representation
+    # was stored.
+    if cur_d and cur_t:
+        ts = _merge_date_time_parts(cur_d, cur_t)
+        sd, st = _split_ts(ts)
+        return ts, sd or cur_d, st or cur_t
+    if cur_ts:
+        d, t = _split_ts(cur_ts)
+        return cur_ts, d, t
+    if before is not None:
+        return old_ts, old_d, old_t
+    return "", cur_d, cur_t
+
+
 def _load_rest_periods() -> list[tuple[dt_time, dt_time]]:
     global _REST_PERIODS_CACHE, _REST_PERIODS_CACHE_AT
     now_perf = datetime.now().timestamp()
@@ -324,20 +464,15 @@ def calculate_work_minutes(start_ts: Any, end_ts: Any) -> tuple[float, float]:
     return raw, net
 
 
-def _row_to_payload(row: dict[str, Any], recalc: bool = False) -> dict[str, Any]:
+def _row_to_payload(
+    row: dict[str, Any],
+    recalc: bool = False,
+    before: dict[str, Any] | None = None,
+    source_columns: set[str] | None = None,
+) -> dict[str, Any]:
     now = now_text()
-    start_ts = _text(row.get("start_timestamp"))
-    end_ts = _text(row.get("end_timestamp"))
-    start_date = _text(row.get("start_date")); start_time = _text(row.get("start_time"))
-    end_date = _text(row.get("end_date")); end_time = _text(row.get("end_time"))
-    if start_ts and (not start_date or not start_time):
-        start_date, start_time = _split_ts(start_ts)
-    if end_ts and (not end_date or not end_time):
-        end_date, end_time = _split_ts(end_ts)
-    if not start_ts and start_date and start_time:
-        start_ts = f"{start_date} {start_time}"
-    if not end_ts and end_date and end_time:
-        end_ts = f"{end_date} {end_time}"
+    start_ts, start_date, start_time = _canonicalize_datetime_pair(row, before, "start", source_columns)
+    end_ts, end_date, end_time = _canonicalize_datetime_pair(row, before, "end", source_columns)
     raw_minutes = _num(row.get("raw_minutes"))
     work_minutes = _num(row.get("work_minutes"))
     work_hours = _num(row.get("work_hours"))
@@ -906,6 +1041,7 @@ def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) 
         if rid is not None and rid > 0:
             ids.append(rid)
     existing_map = _load_existing_records_map(sorted(set(ids)))
+    source_columns = set(work.attrs.get("_spt_source_columns", set(work.columns)))
     count = 0
     changed_or_group_seed_ids: list[int] = []
     for _, row in work.iterrows():
@@ -915,12 +1051,12 @@ def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) 
         rid = _int_or_none(rd.get("id"))
         before = existing_map.get(int(rid)) if rid is not None else None
         # 02/01 編輯儲存要遵守重算原則：只要開始/結束日期時間被改，就在前台 Python service 重算，Neon 只做交易寫入。
-        preliminary = _row_to_payload(rd, recalc=False)
+        preliminary = _row_to_payload(rd, recalc=False, before=before, source_columns=source_columns)
         diff0 = _diff_payload(before, preliminary)
         timing_changed = bool(_V73_TIMING_FIELDS.intersection(diff0.keys()))
         group_changed = bool(_V73_GROUP_FIELDS.intersection(diff0.keys()))
         should_recalc = bool(recalc_edited_timestamps or timing_changed)
-        payload = _row_to_payload(rd, recalc=should_recalc)
+        payload = _row_to_payload(rd, recalc=should_recalc, before=before, source_columns=source_columns)
         diff = _diff_payload(before, payload)
         if before and not diff:
             continue
@@ -943,6 +1079,7 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
     _ensure_time_runtime_columns()
     work = _normalize_df(df)
     result = {"inserted": 0, "updated": 0, "skipped": 0, "errors": []}
+    source_columns = set(work.attrs.get("_spt_source_columns", set(work.columns)))
     for idx, row in work.iterrows():
         rd = dict(row)
         if not _text(rd.get("employee_id")) or not _text(rd.get("work_order") or rd.get("work_order_no")) or not _text(rd.get("process_name")) or not _text(rd.get("start_timestamp") or rd.get("start_date")):
@@ -950,7 +1087,7 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
             continue
         try:
             rd["source"] = source
-            payload = _row_to_payload(rd, recalc=bool(recalc))
+            payload = _row_to_payload(rd, recalc=bool(recalc), before=None, source_columns=source_columns)
             rid = _int_or_none(rd.get("id"))
             if not rid and payload.get("record_key"):
                 old = _safe_one("SELECT id FROM time_records WHERE record_key=? AND (deleted_at IS NULL OR deleted_at='') LIMIT 1", (payload["record_key"],))

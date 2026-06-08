@@ -1522,6 +1522,12 @@ with tab1:
 
         def _history_refresh_editor() -> None:
             _history_clear_widget_state("history_editor_v27_", "history_records_commit_form_v27", "history_records")
+            # V80: after Save/Recalc/Delete, force the cached detail table to be
+            # reloaded from the Neon authority on the next rerun.  This keeps
+            # 01/02 linked: start_date/start_time/end_date/end_time edits rebuild
+            # timestamps in the service, then 02 displays the canonical values.
+            st.session_state.pop(V259_HISTORY_DF_KEY, None)
+            st.session_state.pop(V259_HISTORY_TS_KEY, None)
             try:
                 from services.column_settings_service import clear_editor_draft
                 clear_editor_draft("history_editor")
