@@ -1919,37 +1919,45 @@ with tab1:
 
             editor_key = f"history_editor_v27_{st.session_state[editor_version_key]}"
             history_draft_key = "history_records_edited_draft_v58"
-            st.info("V63：歷史紀錄表格與 10｜權限管理同模式；批次按鈕會清除全域 data_editor 草稿，避免 KPI 與 checkbox 畫面不同步。")
-            edited = render_table(
-                edit_df,
-                "history_records",
-                editable=True,
-                disabled=["id", "record_key", "created_at", "updated_at", HISTORY_CROSS_DAY_ALERT_COL, HISTORY_CROSS_DAY_RANGE_COL],
-                key=editor_key,
-                height=560,
+            st.info(
+                "V97：歷史明細編輯已改為表單暫存模式；在表格內編輯不會立即查詢、重算或寫入 Neon，"
+                "只有按下下方『儲存 / 重算 / 刪除』確認按鈕後才會執行。"
             )
-            if isinstance(edited, pd.DataFrame):
-                st.session_state[history_draft_key] = edited.copy()
-            st.markdown("**確認後執行動作 / Confirm Action**")
-            hist_save_col, hist_recalc_col, hist_delete_col = st.columns([1.1, 1.7, 1.2])
-            history_save_clicked = hist_save_col.button(
-                "◈ 儲存編輯 / Save",
-                type="primary",
-                use_container_width=True,
-                key="history_records_save_button_v73",
-            )
-            history_recalc_clicked = hist_recalc_col.button(
-                "◇ 重算勾選工時 / Recalc Selected",
-                type="primary",
-                use_container_width=True,
-                key="history_records_recalc_button_v73",
-            )
-            history_delete_clicked = hist_delete_col.button(
-                "◉ 刪除勾選整列 / Delete Selected",
-                type="primary",
-                use_container_width=True,
-                key="history_records_delete_button_v73",
-            )
+
+            # V97: keep the data_editor inside a Streamlit form.  Without a form,
+            # every cell edit triggers a full Streamlit rerun; this rebuilds the
+            # history table, column settings, metrics and query cache and makes the
+            # page look like it is calculating while the user is still typing.  A
+            # form buffers edits on the frontend and sends the edited dataframe only
+            # when one of the confirm buttons is pressed.
+            form_key = f"history_records_commit_form_v97_{st.session_state[editor_version_key]}"
+            with st.form(form_key, clear_on_submit=False):
+                edited = render_table(
+                    edit_df,
+                    "history_records",
+                    editable=True,
+                    disabled=["id", "record_key", "created_at", "updated_at", HISTORY_CROSS_DAY_ALERT_COL, HISTORY_CROSS_DAY_RANGE_COL],
+                    key=editor_key,
+                    height=560,
+                )
+                st.markdown("**確認後執行動作 / Confirm Action**")
+                hist_save_col, hist_recalc_col, hist_delete_col = st.columns([1.1, 1.7, 1.2])
+                history_save_clicked = hist_save_col.form_submit_button(
+                    "◈ 儲存編輯 / Save",
+                    type="primary",
+                    use_container_width=True,
+                )
+                history_recalc_clicked = hist_recalc_col.form_submit_button(
+                    "◇ 重算勾選工時 / Recalc Selected",
+                    type="primary",
+                    use_container_width=True,
+                )
+                history_delete_clicked = hist_delete_col.form_submit_button(
+                    "◉ 刪除勾選整列 / Delete Selected",
+                    type="primary",
+                    use_container_width=True,
+                )
+
             submitted_history = bool(history_save_clicked or history_recalc_clicked or history_delete_clicked)
             if history_save_clicked:
                 history_action = "儲存編輯"
@@ -1961,8 +1969,11 @@ with tab1:
                 history_action = ""
 
             if submitted_history:
-                edited = st.session_state.get(history_draft_key, edited)
-                if edited is None:
+                if isinstance(edited, pd.DataFrame):
+                    st.session_state[history_draft_key] = edited.copy()
+                else:
+                    edited = st.session_state.get(history_draft_key)
+                if edited is None or not isinstance(edited, pd.DataFrame):
                     _add_history_result("warning", "找不到可儲存的歷史紀錄表格內容，請重新載入後再試。", append=False)
                     rerun()
                 def _checked_ids(frame: pd.DataFrame, col: str) -> list[int]:
