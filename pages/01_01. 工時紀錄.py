@@ -79,8 +79,10 @@ def _v95_raw_data_editor(data=None, *args, **kwargs):
 V259_TODAY_TABLE_KEY = "v259_01_today_records_df"
 V259_TODAY_TABLE_TS_KEY = "v259_01_today_records_loaded_at"
 V259_TODAY_TABLE_META_KEY = "v259_01_today_records_meta_v96"
+V259_TODAY_TABLE_VISIBLE_KEY = "v103_01_today_records_visible"
 V259_FINISHED_KEY_PREFIX = "v259_01_finished_today_df_"
 V259_FINISHED_TS_PREFIX = "v259_01_finished_today_loaded_at_"
+V259_FINISHED_VISIBLE_PREFIX = "v103_01_finished_today_visible_"
 
 
 def _v259_now_label() -> str:
@@ -100,14 +102,19 @@ def _v259_finish_key(employee_id: str, employee_name: str) -> tuple[str, str]:
     return V259_FINISHED_KEY_PREFIX + safe, V259_FINISHED_TS_PREFIX + safe
 
 
+def _v103_finished_visible_key(employee_id: str, employee_name: str) -> str:
+    safe = re.sub(r"[^0-9A-Za-z_\-]+", "_", f"{employee_id}_{employee_name}")[:80]
+    return V259_FINISHED_VISIBLE_PREFIX + safe
+
+
 def _v259_clear_display_cache() -> None:
     for key in list(st.session_state.keys()):
-        if str(key).startswith(V259_FINISHED_KEY_PREFIX) or str(key).startswith(V259_FINISHED_TS_PREFIX):
+        if str(key).startswith(V259_FINISHED_KEY_PREFIX) or str(key).startswith(V259_FINISHED_TS_PREFIX) or str(key).startswith(V259_FINISHED_VISIBLE_PREFIX):
             try:
                 del st.session_state[key]
             except Exception:
                 pass
-    for key in [V259_TODAY_TABLE_KEY, V259_TODAY_TABLE_TS_KEY, V259_TODAY_TABLE_META_KEY]:
+    for key in [V259_TODAY_TABLE_KEY, V259_TODAY_TABLE_TS_KEY, V259_TODAY_TABLE_META_KEY, V259_TODAY_TABLE_VISIBLE_KEY]:
         try:
             st.session_state.pop(key, None)
         except Exception:
@@ -117,9 +124,33 @@ def _v259_clear_display_cache() -> None:
 def _v259_notice_cached(label: str, ts_key: str) -> None:
     ts = st.session_state.get(ts_key)
     if ts:
-        st.caption(f"{label}：顯示快取資料，最後刷新 {ts}。若需最新資料請按重新整理。")
+        st.caption(f"{label}：已有快取資料，最後刷新 {ts}。為加快 01 開頁速度，重表格只在按下顯示/重新整理後渲染。")
     else:
         st.caption(f"{label}：為避免每次操作卡住，預設不自動載入重表格；請按重新整理載入。")
+
+
+def _v103_light_table_controls(prefix: str, visible_key: str, *, has_data: bool) -> tuple[bool, bool]:
+    """Return (show_clicked, hide_clicked) for heavy read-only sections.
+
+    Streamlit reruns the full page on every widget interaction.  If cached tables
+    are rendered automatically after they were once loaded, simply entering 01
+    can rebuild several large table components and make the page appear stuck.
+    These controls keep cached data in memory/permanent storage, but render the
+    heavy component only when the operator explicitly asks to display it.
+    """
+    if not has_data:
+        return False, False
+    c1, c2, c3 = st.columns([1.15, 1.15, 2.7])
+    show_clicked = c1.button(f"顯示{prefix}", use_container_width=True, key=f"v103_show_{_v84_safe_widget_part(prefix)}")
+    hide_clicked = c2.button(f"隱藏{prefix}", use_container_width=True, key=f"v103_hide_{_v84_safe_widget_part(prefix)}")
+    if show_clicked:
+        st.session_state[visible_key] = True
+    if hide_clicked:
+        st.session_state[visible_key] = False
+    c3.caption("資料快取仍保留；隱藏時不建立表格元件，可加快 01 頁完整顯示。")
+    return show_clicked, hide_clicked
+
+
 def _v84_safe_widget_part(text: str) -> str:
     return re.sub(r"[^0-9A-Za-z_\-]+", "_", str(text or "")).strip("_")[:90] or "table"
 
@@ -1724,11 +1755,13 @@ with right:
     fc1, fc2 = st.columns([1, 3])
     load_finished_clicked = fc1.button("重新整理已結束紀錄", use_container_width=True, key=f"v259_load_finished_{emp_id2}")
     _v259_notice_cached("今日已結束紀錄", _finished_ts_key)
+    _finished_visible_key = _v103_finished_visible_key(emp_id2, _emp2_name)
     if load_finished_clicked:
         _spt_perf_t = time.perf_counter()
         finished_today_df = _v148_load_today_finished_records_for_employee(emp_id2, _emp2_name)
         st.session_state[_finished_key] = finished_today_df
         st.session_state[_finished_ts_key] = _v259_now_label()
+        st.session_state[_finished_visible_key] = True
         _spt_perf_t = _spt_perf_tick(
             "01_load_finished_today_for_employee",
             _spt_perf_t,
@@ -1738,23 +1771,27 @@ with right:
     finished_today_df = st.session_state.get(_finished_key, pd.DataFrame())
     if isinstance(finished_today_df, pd.DataFrame) and not finished_today_df.empty:
         st.caption("只顯示目前選擇人員今日已下班、暫停或完工的紀錄；此區為唯讀查閱，不會寫入、覆蓋或刪除資料。")
-        # V91: Today Finished Records uses its own persistent table UI key.
-        # Column order/width settings only affect display and are saved on explicit Apply;
-        # they do not reload time records, recalculate hours, or touch Neon authority data.
-        _v91_finished_table_key = "01.time_records.today_finished"
-        if is_admin:
-            _v84_render_column_settings_panel(
-                _v91_finished_table_key,
+        _v103_light_table_controls("已結束紀錄表格", _finished_visible_key, has_data=True)
+        if bool(st.session_state.get(_finished_visible_key, False)):
+            # V91: Today Finished Records uses its own persistent table UI key.
+            # Column order/width settings only affect display and are saved on explicit Apply;
+            # they do not reload time records, recalculate hours, or touch Neon authority data.
+            _v91_finished_table_key = "01.time_records.today_finished"
+            if is_admin:
+                _v84_render_column_settings_panel(
+                    _v91_finished_table_key,
+                    finished_today_df,
+                    "▤ 今日已結束紀錄欄位設定 / Today Finished Records Column Settings",
+                )
+            render_table(
                 finished_today_df,
-                "▤ 今日已結束紀錄欄位設定 / Today Finished Records Column Settings",
+                _v91_finished_table_key,
+                editable=False,
+                height=260,
+                show_width_settings=False,
             )
-        render_table(
-            finished_today_df,
-            _v91_finished_table_key,
-            editable=False,
-            height=260,
-            show_width_settings=False,
-        )
+        else:
+            st.info(f"已結束紀錄已快取 {len(finished_today_df)} 筆；目前為加速 01 開頁而暫不建立表格，按『顯示已結束紀錄表格』即可查看。")
     else:
         st.info("此區已改為手動刷新，避免整頁顯示完成被已結束紀錄查詢拖慢。")
 
@@ -1794,6 +1831,7 @@ if clear_today_cache_clicked:
     st.session_state.pop(V259_TODAY_TABLE_KEY, None)
     st.session_state.pop(V259_TODAY_TABLE_TS_KEY, None)
     st.session_state.pop(V259_TODAY_TABLE_META_KEY, None)
+    st.session_state.pop(V259_TODAY_TABLE_VISIBLE_KEY, None)
     try:
         clear_today_records_fast_cache()
     except Exception:
@@ -1812,6 +1850,7 @@ if load_today_clicked:
         "include_finished": bool(not show_unfinished_only),
         "unfinished_only": bool(show_unfinished_only),
     }
+    st.session_state[V259_TODAY_TABLE_VISIBLE_KEY] = True
     _spt_perf_t = _spt_perf_tick(
         "01_load_today_records_main_table_data",
         _spt_perf_t,
@@ -1822,20 +1861,24 @@ if load_today_clicked:
         st.caption("今日明細已使用互動查詢上限載入；若需要查完整歷史，請到 02｜歷史紀錄依日期/條件查詢。")
 df = st.session_state.get(V259_TODAY_TABLE_KEY, pd.DataFrame())
 if isinstance(df, pd.DataFrame) and not df.empty:
-    if is_admin:
-        _v84_render_column_settings_panel(
-            "01.time_records.main",
-            df,
-            "▤ 今日工時紀錄欄位設定 / Today Records Column Settings",
+    _v103_light_table_controls("今日明細表格", V259_TODAY_TABLE_VISIBLE_KEY, has_data=True)
+    if bool(st.session_state.get(V259_TODAY_TABLE_VISIBLE_KEY, False)):
+        if is_admin:
+            _v84_render_column_settings_panel(
+                "01.time_records.main",
+                df,
+                "▤ 今日工時紀錄欄位設定 / Today Records Column Settings",
+            )
+        _spt_perf_t = time.perf_counter()
+        render_table(df, "01.time_records.main", editable=False, height=420, show_width_settings=False)
+        _spt_perf_t = _spt_perf_tick(
+            "01_render_today_records_main_table",
+            _spt_perf_t,
+            threshold_ms=500.0,
+            detail={"rows": len(df) if isinstance(df, pd.DataFrame) else 0},
         )
-    _spt_perf_t = time.perf_counter()
-    render_table(df, "01.time_records.main", editable=False, height=420, show_width_settings=False)
-    _spt_perf_t = _spt_perf_tick(
-        "01_render_today_records_main_table",
-        _spt_perf_t,
-        threshold_ms=500.0,
-        detail={"rows": len(df) if isinstance(df, pd.DataFrame) else 0},
-    )
+    else:
+        st.info(f"今日明細已快取 {len(df)} 筆；目前為加速 01 開頁而暫不建立表格，按『顯示今日明細表格』即可查看。")
 else:
     st.info("今日明細表格已改為手動刷新。開始/暫停/完工可先操作；需要看完整表格時再按『重新整理今日明細』。")
 
@@ -2206,6 +2249,11 @@ if is_admin:
         editor_version_key = "today_records_admin_editor_version_v92"
         edit_mode_key = "today_records_admin_edit_mode_v81"
         row_limit_key = "today_records_admin_editor_row_limit_v81"
+        admin_visible_key = "v103_today_records_admin_visible"
+        if admin_visible_key not in st.session_state:
+            # Old sessions may still hold a loaded maintenance dataframe.  Do not
+            # auto-render it on page entry; the operator can show it explicitly.
+            st.session_state[admin_visible_key] = False
         if editor_version_key not in st.session_state:
             st.session_state[editor_version_key] = 0
         if edit_mode_key not in st.session_state:
@@ -2213,15 +2261,23 @@ if is_admin:
         if row_limit_key not in st.session_state:
             st.session_state[row_limit_key] = 200
 
-        ca, cb, cc, cd = st.columns([1.15, 1.15, 1.15, 2.4])
+        ca, cb, cc, ce, cd = st.columns([1.05, 1.05, 1.05, 1.05, 2.2])
         load_clicked = ca.button("▤ 載入維護表格 / Load", use_container_width=True, key="today_records_admin_load_btn_v81")
         refresh_clicked = cb.button("⟳ 重新載入 / Refresh", use_container_width=True, key="today_records_admin_refresh_btn_v81")
         unload_clicked = cc.button("□ 卸載 / Unload", use_container_width=True, key="today_records_admin_unload_btn_v81")
-        cd.caption("展開此區不會自動查 DB，也不會自動建立 data_editor；只有按載入/重新載入時才查詢。")
+        toggle_admin_visible_clicked = ce.button(
+            "隱藏內容" if st.session_state.get(admin_visible_key, False) else "顯示內容",
+            use_container_width=True,
+            key="v103_today_records_admin_toggle_visible",
+        )
+        if toggle_admin_visible_clicked:
+            st.session_state[admin_visible_key] = not bool(st.session_state.get(admin_visible_key, False))
+        cd.caption("展開此區不會自動查 DB；已載入資料也可暫時隱藏，避免每次進 01 都重建預覽/編輯表格。")
 
         if load_clicked or refresh_clicked:
             _load_t0 = time.perf_counter()
             st.session_state[admin_load_key] = True
+            st.session_state[admin_visible_key] = True
             st.session_state[edit_mode_key] = False
             st.session_state[admin_select_key] = []
             st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
@@ -2259,6 +2315,7 @@ if is_admin:
             )
         if unload_clicked:
             st.session_state[admin_load_key] = False
+            st.session_state[admin_visible_key] = False
             st.session_state[edit_mode_key] = False
             st.session_state.pop(admin_data_key, None)
             st.session_state.pop(admin_data_ts_key, None)
@@ -2268,8 +2325,16 @@ if is_admin:
         if not st.session_state.get(admin_load_key, False):
             st.info("管理員維護表格尚未載入。平常進入 01 工時紀錄不會載入此區，避免拖慢現場作業。需要修改/刪除/存檔時，請按『載入維護表格』。")
         else:
-            admin_source_df = st.session_state.get(admin_data_key)
-            if not isinstance(admin_source_df, pd.DataFrame):
+            if not bool(st.session_state.get(admin_visible_key, False)):
+                _cached_admin_df = st.session_state.get(admin_data_key)
+                _cached_rows = len(_cached_admin_df) if isinstance(_cached_admin_df, pd.DataFrame) else 0
+                st.info(f"管理員維護資料已載入 {_cached_rows} 筆，但目前暫時隱藏表格內容以加快 01 頁顯示。需要修改時請按『顯示內容』。")
+                admin_source_df = None
+            else:
+                admin_source_df = st.session_state.get(admin_data_key)
+            if admin_source_df is None:
+                pass
+            elif not isinstance(admin_source_df, pd.DataFrame):
                 st.warning("維護表格暫存已不存在，為避免進頁自動重查造成卡住，請按『重新載入』重新讀取。")
             else:
                 admin_source_df = admin_source_df.copy().reset_index(drop=True)
