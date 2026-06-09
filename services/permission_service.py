@@ -54,7 +54,7 @@ ROLE_DESCRIPTIONS = {
 }
 
 _SCHEMA_READY = False
-_MATRIX_CACHE: dict[str, Any] = {"users_ts": 0.0, "users": None, "perms_ts": 0.0, "perms": None}
+_MATRIX_CACHE: dict[str, Any] = {"users_ts": 0.0, "users": None, "perms_ts": 0.0, "perms": None, "security_ts": 0.0, "security": None}
 
 
 def now_text() -> str:
@@ -135,7 +135,7 @@ def _role_defaults(role: str, module: str) -> dict[str,int]:
 
 
 def _clear_cache() -> None:
-    _MATRIX_CACHE.update({"users_ts": 0.0, "users": None, "perms_ts": 0.0, "perms": None})
+    _MATRIX_CACHE.update({"users_ts": 0.0, "users": None, "perms_ts": 0.0, "perms": None, "security_ts": 0.0, "security": None})
     try:
         _db().clear_query_cache()
     except Exception:
@@ -252,7 +252,7 @@ def get_users() -> list[dict[str,Any]]:
     import time
     now_ts = time.time()
     cached = _MATRIX_CACHE.get("users")
-    if cached is not None and now_ts - float(_MATRIX_CACHE.get("users_ts") or 0) < 20:
+    if cached is not None and now_ts - float(_MATRIX_CACHE.get("users_ts") or 0) < 300:
         return [dict(r) for r in cached]
     df = _db().query_df(
         """
@@ -328,9 +328,32 @@ def _sync_legacy_security_user(username: str, row: dict[str, Any]) -> None:
         pass
 
 
+def _user_row_changed(old: dict[str, Any], row: dict[str, Any], password_changed: bool) -> bool:
+    if not old:
+        return True
+    if password_changed:
+        return True
+    checks = [
+        ("employee_id", ""),
+        ("display_name", ""),
+        ("email", ""),
+        ("role_code", "operator"),
+        ("note", ""),
+    ]
+    for key, default in checks:
+        if str(old.get(key) or default).strip() != str(row.get(key) or default).strip():
+            return True
+    if _norm_bool(old.get("is_active", 1), True) != _norm_bool(row.get("is_active", 1), True):
+        return True
+    if _norm_bool(old.get("force_password_change", 0), False) != _norm_bool(row.get("force_password_change", 0), False):
+        return True
+    return False
+
+
 def save_users(rows: list[dict[str,Any]]) -> dict:
     _ensure_schema()
     saved = 0
+    skipped_unchanged = 0
     skipped: list[str] = []
     for src in rows or []:
         username = str(src.get("username") or src.get("帳號 / Username") or "").strip()
@@ -338,7 +361,8 @@ def save_users(rows: list[dict[str,Any]]) -> dict:
             continue
         old = _db().query_one("SELECT * FROM auth_users WHERE lower(username)=lower(?) LIMIT 1", (username,)) or {}
         new_pwd = str(src.get("new_password") or src.get("password") or src.get("密碼 / Password") or src.get("新密碼 / New Password") or "").strip()
-        if new_pwd and set(new_pwd) != {"*"}:
+        password_changed = bool(new_pwd and set(new_pwd) != {"*"})
+        if password_changed:
             password_hash = hash_password(new_pwd)
         else:
             password_hash = str(old.get("password_hash") or "") or hash_password("Admin@1234" if username.lower()=="admin" else username)
@@ -357,15 +381,19 @@ def save_users(rows: list[dict[str,Any]]) -> dict:
             "created_at": str(old.get("created_at") or now_text()),
             "updated_at": now_text(),
         }
+        if not _user_row_changed(old, row, password_changed=password_changed):
+            skipped_unchanged += 1
+            continue
         try:
             _insert_or_update_auth_user(row)
             _sync_legacy_security_user(username, row)
             saved += 1
         except Exception as exc:
             skipped.append(f"{username}: {exc}")
-    _clear_cache()
-    _log("SAVE_USERS", f"saved={saved}; skipped={len(skipped)}")
-    return {"ok": True, "saved": saved, "skipped": skipped, "backend": "Neon/PostgreSQL"}
+    if saved or skipped:
+        _clear_cache()
+        _log("SAVE_USERS", f"saved={saved}; unchanged={skipped_unchanged}; skipped={len(skipped)}")
+    return {"ok": True, "saved": saved, "skipped_unchanged": skipped_unchanged, "skipped": skipped, "backend": "Neon/PostgreSQL"}
 
 
 def save_account_master(rows: list[dict[str,Any]], delete_usernames: list[str]|None=None) -> dict:
@@ -407,6 +435,11 @@ def delete_users(usernames: list[str]) -> int:
 
 def get_account_permissions() -> list[dict[str,Any]]:
     _ensure_schema()
+    import time
+    now_ts = time.time()
+    cached = _MATRIX_CACHE.get("perms")
+    if cached is not None and now_ts - float(_MATRIX_CACHE.get("perms_ts") or 0) < 300:
+        return [dict(r) for r in cached]
     users = get_users()
     df = _db().query_df(
         """
@@ -447,13 +480,28 @@ def get_account_permissions() -> list[dict[str,Any]]:
             for c in ACTION_COLS:
                 row[c] = bool(_norm_bool(row.get(c), False))
             rows.append(row)
+    _MATRIX_CACHE["perms"] = [dict(r) for r in rows]
+    _MATRIX_CACHE["perms_ts"] = now_ts
     return rows
 
 
 def save_account_permissions(rows: list[dict[str,Any]]) -> dict:
     _ensure_schema()
+    # V104：確認後才寫入，且只寫有變更的權限列。
+    # 舊版會把畫面中所有列全部 UPDATE+INSERT，Neon 上容易造成大量重複寫入。
+    existing_df = _db().query_df(
+        """
+        SELECT username, module_code, can_view, can_create, can_edit, can_delete, can_import, can_export, can_backup, can_restore, can_manage
+        FROM auth_account_permissions
+        """
+    )
+    existing: dict[tuple[str, str], dict[str, Any]] = {}
+    if existing_df is not None and not existing_df.empty:
+        for r in existing_df.to_dict("records"):
+            existing[(str(r.get("username") or "").lower(), _module_no(r.get("module_code")))] = dict(r)
     ops: list[tuple[str, tuple[Any, ...]]] = []
     saved = 0
+    skipped_unchanged = 0
     for src in rows or []:
         username = str(src.get("username") or src.get("帳號 / Username") or "").strip()
         code = _module_no(src.get("module_code") or src.get("模組代碼 / Module") or src.get("Module") or src.get("module"))
@@ -461,6 +509,21 @@ def save_account_permissions(rows: list[dict[str,Any]]) -> dict:
             continue
         meta = _module_meta(code)
         vals = {a[0]: _norm_bool(src.get(a[0], 0), False) for a in ACTIONS}
+        old = existing.get((username.lower(), code))
+        changed = False
+        if old is not None:
+            for key in ACTION_COLS:
+                if _norm_bool(old.get(key), False) != vals[key]:
+                    changed = True
+                    break
+        else:
+            # 沒有實體資料列時，若與角色預設相同，可不用寫入；若不同，才建立永久覆寫。
+            role = str(src.get("role_code") or src.get("角色 / Role") or "operator")
+            defaults = _role_defaults(role, code)
+            changed = any(_norm_bool(defaults.get(key), False) != vals[key] for key in ACTION_COLS)
+        if not changed:
+            skipped_unchanged += 1
+            continue
         params_common = (meta["module_name_zh"], meta["module_name_en"], vals["can_view"], vals["can_create"], vals["can_edit"], vals["can_delete"], vals["can_import"], vals["can_export"], vals["can_backup"], vals["can_restore"], vals["can_manage"], now_text(), username, code)
         ops.append((
             """
@@ -469,7 +532,6 @@ def save_account_permissions(rows: list[dict[str,Any]]) -> dict:
             """,
             params_common,
         ))
-        # INSERT missing rows with a NOT EXISTS guard instead of ON CONFLICT so duplicate legacy data cannot break save.
         ops.append((
             """
             INSERT INTO auth_account_permissions(username, module_code, module_name_zh, module_name_en, can_view, can_create, can_edit, can_delete, can_import, can_export, can_backup, can_restore, can_manage, updated_at)
@@ -483,15 +545,15 @@ def save_account_permissions(rows: list[dict[str,Any]]) -> dict:
         try:
             _db().execute_transaction(ops, mark_changed=True, reason="save_account_permissions", source_sql="SAVE_ACCOUNT_PERMISSIONS")
         except Exception:
-            # Fallback statement by statement; slower but still safe.
             for sql, params in ops:
                 try:
                     _db().execute(sql, params)
                 except Exception:
                     pass
-    _clear_cache()
-    _log("SAVE_ACCOUNT_PERMISSIONS", f"saved={saved}")
-    return {"ok": True, "saved": saved, "backend": "Neon/PostgreSQL"}
+    if saved:
+        _clear_cache()
+        _log("SAVE_ACCOUNT_PERMISSIONS", f"saved={saved}; unchanged={skipped_unchanged}")
+    return {"ok": True, "saved": saved, "skipped_unchanged": skipped_unchanged, "backend": "Neon/PostgreSQL"}
 
 
 def has_permission(username: str, module_code: str, action: str="can_view") -> bool:
@@ -518,6 +580,11 @@ def has_permission(username: str, module_code: str, action: str="can_view") -> b
 
 def get_security_settings() -> dict[str,Any]:
     _ensure_schema()
+    import time
+    now_ts = time.time()
+    cached = _MATRIX_CACHE.get("security")
+    if isinstance(cached, dict) and now_ts - float(_MATRIX_CACHE.get("security_ts") or 0) < 300:
+        return dict(cached)
     df = _db().query_df("SELECT setting_key, setting_value FROM auth_security_settings")
     out: dict[str, Any] = {}
     if df is not None and not df.empty:
@@ -526,22 +593,35 @@ def get_security_settings() -> dict[str,Any]:
     out.setdefault("idle_timeout_minutes", out.get("idle_auto_logout_minutes", 15))
     out.setdefault("idle_auto_logout_minutes", out.get("idle_timeout_minutes", 15))
     out.setdefault("ask_continue_after_record", 1)
+    _MATRIX_CACHE["security"] = dict(out)
+    _MATRIX_CACHE["security_ts"] = now_ts
     return out
 
 
 def save_security_settings(settings: dict[str,Any]) -> dict:
     _ensure_schema()
-    cur = get_security_settings(); cur.update(settings or {})
+    old = get_security_settings()
+    cur = dict(old)
+    cur.update(settings or {})
     minutes = cur.get("idle_timeout_minutes", cur.get("idle_auto_logout_minutes", 15))
     try:
         cur["idle_timeout_minutes"] = int(float(minutes or 15))
     except Exception:
         cur["idle_timeout_minutes"] = 15
     cur["idle_auto_logout_minutes"] = cur["idle_timeout_minutes"]
-    ops: list[tuple[str, tuple[Any, ...]]] = []
+    # V104：只寫入有變更的安全設定，避免每次按套用都重複 UPDATE/INSERT 所有設定。
+    changed_keys = []
     for k, v in cur.items():
+        if str(old.get(k, "")) != str(v):
+            changed_keys.append(str(k))
+    if not changed_keys:
+        return {"ok": True, "saved": 0, "skipped_unchanged": len(cur), "backend": "Neon/PostgreSQL"}
+    ops: list[tuple[str, tuple[Any, ...]]] = []
+    for k in changed_keys:
+        v = cur.get(k, "")
         ops.append(("UPDATE auth_security_settings SET setting_value=?, updated_at=? WHERE setting_key=?", (str(v), now_text(), str(k))))
         ops.append(("INSERT INTO auth_security_settings(setting_key, setting_value, note, updated_at) SELECT ?, ?, '', ? WHERE NOT EXISTS (SELECT 1 FROM auth_security_settings WHERE setting_key=? LIMIT 1)", (str(k), str(v), now_text(), str(k))))
+        # 舊 security_settings 僅做登入流程相容 mirror，不再作獨立權威。
         ops.append(("UPDATE security_settings SET setting_value=?, updated_at=? WHERE setting_key=?", (str(v), now_text(), str(k))))
         ops.append(("INSERT INTO security_settings(setting_key, setting_value, note, updated_at) SELECT ?, ?, '', ? WHERE NOT EXISTS (SELECT 1 FROM security_settings WHERE setting_key=? LIMIT 1)", (str(k), str(v), now_text(), str(k))))
     try:
@@ -553,8 +633,8 @@ def save_security_settings(settings: dict[str,Any]) -> dict:
             except Exception:
                 pass
     _clear_cache()
-    _log("SAVE_SECURITY_SETTINGS", f"saved={len(cur)}")
-    return {"ok": True, "saved": len(cur), "backend": "Neon/PostgreSQL"}
+    _log("SAVE_SECURITY_SETTINGS", f"saved={len(changed_keys)}")
+    return {"ok": True, "saved": len(changed_keys), "skipped_unchanged": len(cur) - len(changed_keys), "backend": "Neon/PostgreSQL"}
 
 
 def add_login_log(username: str, event_type: str, result: str, message: str="", module_code: str="", module_name: str="") -> None:

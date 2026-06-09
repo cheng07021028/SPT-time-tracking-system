@@ -54,6 +54,67 @@ ROLE_OPTIONS = ["admin", "manager", "leader", "operator", "viewer", "auditor"]
 ACTION_COLS = [a[0] for a in ACTIONS]
 
 
+# ===== V104 PERMISSION PAGE LIGHTWEIGHT CACHE =====
+# 10 權限管理是設定頁，帳號、權限矩陣、安全設定都需要永久保存，
+# 但不能在每個 widget rerun 都重複讀 Neon。這裡只做前台 session 快取：
+# - 第一次進入區塊時讀一次
+# - 按重新載入 / 儲存後才刷新
+# - 正式資料仍以 permission_service / Neon 為權威
+def _v104_cache_get(name: str):
+    obj = st.session_state.get(f"v104_perm_cache_{name}")
+    if not isinstance(obj, dict):
+        return None
+    try:
+        age = (datetime.now() - obj.get("ts")).total_seconds()
+    except Exception:
+        return None
+    if age > 300:
+        return None
+    return obj.get("data")
+
+
+def _v104_cache_set(name: str, data):
+    st.session_state[f"v104_perm_cache_{name}"] = {"ts": datetime.now(), "data": data}
+
+
+def _v104_cache_clear(*names: str) -> None:
+    if not names:
+        names = ("users", "permissions", "security")
+    for name in names:
+        st.session_state.pop(f"v104_perm_cache_{name}", None)
+
+
+def _v104_get_users_cached(force: bool = False) -> list[dict]:
+    if not force:
+        cached = _v104_cache_get("users")
+        if cached is not None:
+            return [dict(r) for r in cached]
+    rows = get_users()
+    _v104_cache_set("users", [dict(r) for r in rows])
+    return rows
+
+
+def _v104_get_permissions_cached(force: bool = False) -> list[dict]:
+    if not force:
+        cached = _v104_cache_get("permissions")
+        if cached is not None:
+            return [dict(r) for r in cached]
+    rows = get_account_permissions()
+    _v104_cache_set("permissions", [dict(r) for r in rows])
+    return rows
+
+
+def _v104_get_security_cached(force: bool = False) -> dict:
+    if not force:
+        cached = _v104_cache_get("security")
+        if isinstance(cached, dict):
+            return dict(cached)
+    data = get_security_settings() or {}
+    _v104_cache_set("security", dict(data))
+    return data
+# ===== V104 PERMISSION PAGE LIGHTWEIGHT CACHE END =====
+
+
 # ===== V300.21 PERMISSION MATRIX COLUMN COMPATIBILITY =====
 def _v30021_ensure_permission_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Ensure permission editor has all columns expected by the page.
@@ -251,7 +312,7 @@ def _blank_user_row() -> dict:
 
 
 def _users_for_editor() -> pd.DataFrame:
-    raw = pd.DataFrame(get_users())
+    raw = pd.DataFrame(_v104_get_users_cached())
     if raw.empty:
         return pd.DataFrame([_blank_user_row()]).iloc[0:0]
     out = pd.DataFrame()
@@ -473,7 +534,7 @@ def _v93_bool_text(value) -> str:
 
 
 def _v93_account_export_df() -> pd.DataFrame:
-    raw = pd.DataFrame(get_users())
+    raw = pd.DataFrame(_v104_get_users_cached())
     if raw.empty:
         return pd.DataFrame(columns=[
             "帳號 / Username", "密碼狀態 / Password Status", "新密碼 / New Password",
@@ -499,7 +560,7 @@ def _v93_account_export_df() -> pd.DataFrame:
 
 
 def _v93_permission_export_df() -> pd.DataFrame:
-    raw = pd.DataFrame(get_account_permissions())
+    raw = pd.DataFrame(_v104_get_permissions_cached())
     base_cols = ["username", "display_name", "role_code", "module_code", "module_name_zh", "module_name_en"]
     if raw.empty:
         raw = pd.DataFrame(columns=base_cols + ACTION_COLS)
@@ -522,7 +583,7 @@ def _v93_permission_export_df() -> pd.DataFrame:
 
 
 def _v93_security_export_df() -> pd.DataFrame:
-    settings = get_security_settings() or {}
+    settings = _v104_get_security_cached() or {}
     labels = {
         "idle_timeout_minutes": "閒置自動登出分鐘數 / Idle Auto Logout Minutes",
         "ask_continue_after_record": "工時完成後詢問是否繼續記錄 / Ask Continue After Time Record",
@@ -630,13 +691,23 @@ with st.expander("⟰ 權限管理 Excel 下載 / Permission Management Excel Ex
             st.info("請先按左側產生 Excel。")
 
 
-tab_accounts, tab_perm, tab_sec = st.tabs([
+# V103: Streamlit tabs execute every tab body on each rerun.
+# For 權限管理 this meant account list, permission matrix, and security settings
+# were all read from Neon even when the user only opened one section.
+# Use a lightweight section selector so only the selected section is rendered/read.
+_permission_sections = [
     "帳號密碼總表 / Account Password Master",
     "帳號模組權限 / Account Module Permissions",
     "安全設定 / Security",
-])
+]
+_selected_permission_section = st.radio(
+    "管理區塊 / Management Section",
+    _permission_sections,
+    horizontal=True,
+    key="v103_permission_section_selector",
+)
 
-with tab_accounts:
+if _selected_permission_section == "帳號密碼總表 / Account Password Master":
     st.subheader("帳號密碼總表 / Account & Password Master")
     st.info("V1.76：密碼欄可直接輸入新密碼。若顯示 ******** 代表維持原密碼；系統不會顯示既有密碼明碼。也可使用『新密碼 / New Password』欄。")
     account_tab_edit, account_tab_excel, account_tab_paste = st.tabs([
@@ -808,6 +879,7 @@ with tab_accounts:
                 st.rerun()
         with c6:
             if st.button("⟳ 重新載入 / Reload", use_container_width=True, key="v56_account_reload"):
+                _v104_cache_clear("users")
                 st.session_state["v133_users_df"] = _users_for_editor()
                 _v56_touch_account_editor()
                 st.rerun()
@@ -834,42 +906,48 @@ with tab_accounts:
         account_editor_key = f"v102_account_password_editor_{st.session_state.get('v235_account_editor_rev', 0)}"
         draft_df = _v56_prepare_account_draft()
 
-        # V102：data_editor 放入 form，讓 checkbox / cell edits 留在前端草稿，
-        # 不因每次點擊觸發整頁 rerun；送出時再一次讀回並寫權威檔。
-        with st.form("v102_account_editor_commit_form", clear_on_submit=False):
-            edited_users = _v95_raw_data_editor(
-                draft_df,
-                key=account_editor_key,
-                use_container_width=True,
-                num_rows="fixed",
-                hide_index=True,
-                disabled=not account_edit_enabled,
-                height=360,
-                # V97C：欄位順序保留「刪除」在第一欄，但不可重複加入同名欄位。
-                column_order=list(dict.fromkeys(["刪除 / Delete"] + [c for c in draft_df.columns if c != "刪除 / Delete"])),
-                column_config={
-                    "刪除 / Delete": st.column_config.CheckboxColumn("刪除 / Delete"),
-                    "帳號 / Username": st.column_config.TextColumn("帳號 / Username", required=True),
-                    "密碼狀態 / Password Status": st.column_config.TextColumn("密碼 / Password（輸入修改）", help="可直接輸入新密碼；******** 或提示文字代表維持原密碼"),
-                    "新密碼 / New Password": st.column_config.TextColumn("新密碼 / New Password", help="要改密碼才填寫；新增帳號必填"),
-                    "工號 / Employee ID": st.column_config.TextColumn("工號 / Employee ID"),
-                    "姓名 / Display Name": st.column_config.TextColumn("姓名 / Display Name", required=True),
-                    "Email": st.column_config.TextColumn("Email"),
-                    "角色 / Role": st.column_config.SelectboxColumn("角色 / Role", options=ROLE_OPTIONS, required=True),
-                    "啟用 / Active": st.column_config.CheckboxColumn("啟用 / Active"),
-                    "強制改密碼 / Force Change": st.column_config.CheckboxColumn("強制改密碼 / Force Change"),
-                    "備註 / Note": st.column_config.TextColumn("備註 / Note"),
-                    "最後登入 / Last Login": st.column_config.TextColumn("最後登入 / Last Login", disabled=True),
-                    "更新時間 / Updated At": st.column_config.TextColumn("更新時間 / Updated At", disabled=True),
-                },
-            )
+        # V104：唯讀狀態使用輕量表格預覽，不建立重型 data_editor。
+        # 啟動編輯後才建立 data_editor，且放在 form 內，編輯時不寫 Neon、不重算、不重讀。
+        if account_edit_enabled:
+            with st.form("v102_account_editor_commit_form", clear_on_submit=False):
+                edited_users = _v95_raw_data_editor(
+                    draft_df,
+                    key=account_editor_key,
+                    use_container_width=True,
+                    num_rows="fixed",
+                    hide_index=True,
+                    disabled=False,
+                    height=360,
+                    column_order=list(dict.fromkeys(["刪除 / Delete"] + [c for c in draft_df.columns if c != "刪除 / Delete"])),
+                    column_config={
+                        "刪除 / Delete": st.column_config.CheckboxColumn("刪除 / Delete"),
+                        "帳號 / Username": st.column_config.TextColumn("帳號 / Username", required=True),
+                        "密碼狀態 / Password Status": st.column_config.TextColumn("密碼 / Password（輸入修改）", help="可直接輸入新密碼；******** 或提示文字代表維持原密碼"),
+                        "新密碼 / New Password": st.column_config.TextColumn("新密碼 / New Password", help="要改密碼才填寫；新增帳號必填"),
+                        "工號 / Employee ID": st.column_config.TextColumn("工號 / Employee ID"),
+                        "姓名 / Display Name": st.column_config.TextColumn("姓名 / Display Name", required=True),
+                        "Email": st.column_config.TextColumn("Email"),
+                        "角色 / Role": st.column_config.SelectboxColumn("角色 / Role", options=ROLE_OPTIONS, required=True),
+                        "啟用 / Active": st.column_config.CheckboxColumn("啟用 / Active"),
+                        "強制改密碼 / Force Change": st.column_config.CheckboxColumn("強制改密碼 / Force Change"),
+                        "備註 / Note": st.column_config.TextColumn("備註 / Note"),
+                        "最後登入 / Last Login": st.column_config.TextColumn("最後登入 / Last Login", disabled=True),
+                        "更新時間 / Updated At": st.column_config.TextColumn("更新時間 / Updated At", disabled=True),
+                    },
+                )
 
-            submitted_accounts = st.form_submit_button(
-                "▣ 套用並儲存帳號密碼總表 / Apply and Save Account Master",
-                type="primary",
-                use_container_width=True,
-                disabled=not account_edit_enabled,
-            )
+                submitted_accounts = st.form_submit_button(
+                    "▣ 套用並儲存帳號密碼總表 / Apply and Save Account Master",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=False,
+                )
+        else:
+            preview_cols = [c for c in draft_df.columns if c not in {"新密碼 / New Password", "刪除 / Delete"}]
+            st.dataframe(draft_df[preview_cols].head(200), use_container_width=True, hide_index=True, height=320)
+            st.caption("唯讀輕量預覽：啟動編輯後才建立可編輯表格；避免每次進入 10 頁都重建大型 data_editor。")
+            edited_users = draft_df.copy()
+            submitted_accounts = False
 
         # 未送出時不把 data_editor 回傳值寫回 session_state，避免 widget 前端草稿
         # 在 rerun 時被舊資料蓋掉。統計顯示 session 草稿值，正式送出才更新。
@@ -925,6 +1003,7 @@ with tab_accounts:
                 )
             if result.get("skipped"):
                 st.warning("；".join(result["skipped"]))
+            _v104_cache_clear("users", "permissions")
             st.session_state.pop("v133_users_df", None)
             st.session_state["v166_account_edit_enabled"] = False
             _v56_touch_account_editor()
@@ -956,6 +1035,7 @@ with tab_accounts:
                         st.success(f"帳號已儲存：{result['saved']} 筆 / Accounts saved")
                         if result.get("skipped"):
                             st.warning("；".join(result["skipped"]))
+                        _v104_cache_clear("users", "permissions")
                         st.session_state.pop("v133_users_df", None)
             except Exception as ex:
                 st.error(f"Excel 匯入失敗 / Import failed：{ex}")
@@ -988,14 +1068,31 @@ with tab_accounts:
                         st.success(f"帳號已儲存：{result['saved']} 筆 / Accounts saved")
                         if result.get("skipped"):
                             st.warning("；".join(result["skipped"]))
+                        _v104_cache_clear("users", "permissions")
                         st.session_state.pop("v133_users_df", None)
             except Exception as ex:
                 st.error(f"貼上資料解析失敗 / Paste parse failed：{ex}")
 
-with tab_perm:
+elif _selected_permission_section == "帳號模組權限 / Account Module Permissions":
     st.subheader("帳號模組權限 / Account × Module Permission Matrix")
-    st.info("每個帳號可針對每個模組獨立勾選權限。畫面編輯會即時計算預覽，但只有按『套用並儲存權限』才會生效。")
-    perm_df = pd.DataFrame(get_account_permissions())
+    st.info("每個帳號可針對每個模組獨立勾選權限。V104：唯讀先用輕量預覽；按『啟動權限編輯』才建立大型權限矩陣 editor。")
+    st.session_state.setdefault("v104_permission_edit_enabled", False)
+    pc0, pc1, pc2 = st.columns([1.2, 1.2, 3])
+    with pc0:
+        if st.button("◇ 啟動權限編輯 / Enable Permission Edit", use_container_width=True, disabled=bool(st.session_state.get("v104_permission_edit_enabled")), key="v104_enable_permission_edit"):
+            st.session_state["v104_permission_edit_enabled"] = True
+            st.rerun()
+    with pc1:
+        if st.button("◌ 停止權限編輯 / Lock Permission Edit", use_container_width=True, disabled=not bool(st.session_state.get("v104_permission_edit_enabled")), key="v104_disable_permission_edit"):
+            st.session_state["v104_permission_edit_enabled"] = False
+            st.rerun()
+    with pc2:
+        if st.button("⟳ 重新載入權限矩陣 / Reload Permissions", use_container_width=True, key="v104_reload_permission_matrix"):
+            _v104_cache_clear("permissions")
+            st.session_state["v104_permission_edit_enabled"] = False
+            st.rerun()
+    permission_edit_enabled = bool(st.session_state.get("v104_permission_edit_enabled"))
+    perm_df = pd.DataFrame(_v104_get_permissions_cached())
     if perm_df.empty:
         perm_df = pd.DataFrame(columns=["username", "display_name", "role_code", "module_code", "module_name_zh", "module_name_en"] + ACTION_COLS)
     perm_df = _v30021_ensure_permission_columns(perm_df)
@@ -1020,23 +1117,23 @@ with tab_perm:
     st.markdown("#### 快速勾選 / Quick Toggle")
     b1, b2, b3, b4, b5 = st.columns(5)
     with b1:
-        if st.button("◈ 可進入全選 / Select View", use_container_width=True):
+        if st.button("◈ 可進入全選 / Select View", use_container_width=True, disabled=not permission_edit_enabled):
             view_df["can_view"] = True
             st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
     with b2:
-        if st.button("◌ 可進入取消 / Clear View", use_container_width=True):
+        if st.button("◌ 可進入取消 / Clear View", use_container_width=True, disabled=not permission_edit_enabled):
             view_df["can_view"] = False
             st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
     with b3:
-        if st.button("◈ 編輯全選 / Select Edit", use_container_width=True):
+        if st.button("◈ 編輯全選 / Select Edit", use_container_width=True, disabled=not permission_edit_enabled):
             view_df["can_edit"] = True
             st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
     with b4:
-        if st.button("⟰ 匯出全選 / Select Export", use_container_width=True):
+        if st.button("⟰ 匯出全選 / Select Export", use_container_width=True, disabled=not permission_edit_enabled):
             view_df["can_export"] = True
             st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
     with b5:
-        if st.button("⛨ 管理全選 / Select Manage", use_container_width=True):
+        if st.button("⛨ 管理全選 / Select Manage", use_container_width=True, disabled=not permission_edit_enabled):
             view_df["can_manage"] = True
             st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
     base_cols = ["username", "display_name", "role_code", "module_code", "module_name_zh", "module_name_en"]
@@ -1050,21 +1147,38 @@ with tab_perm:
     }
     for key, zh, en in ACTIONS:
         col_cfg[key] = st.column_config.CheckboxColumn(f"{zh} / {en}")
-    st.info("V1.89：權限表已改成確認後才套用。勾選權限時不會每一下都觸發整頁運算。")
+    st.info("V104：權限表改為輕量預覽 + 確認後才套用。勾選權限時不寫 Neon、不重讀、不重算。")
     view_df = _v30021_ensure_permission_columns(view_df)
-    with st.form("permission_editor_commit_form", clear_on_submit=False):
-        edited_perm = _v95_raw_data_editor(view_df[base_cols + ACTION_COLS], key=f"v189_permission_editor_{st.session_state.get('v235_permission_editor_rev', 0)}", use_container_width=True, hide_index=True, column_config=col_cfg)
-        submitted_perm = st.form_submit_button("▣ 確認套用並儲存權限 / Apply and Save Permissions", type="primary", use_container_width=True)
+    if permission_edit_enabled:
+        with st.form("permission_editor_commit_form", clear_on_submit=False):
+            edited_perm = _v95_raw_data_editor(
+                view_df[base_cols + ACTION_COLS],
+                key=f"v189_permission_editor_{st.session_state.get('v235_permission_editor_rev', 0)}",
+                use_container_width=True,
+                hide_index=True,
+                height=520,
+                column_config=col_cfg,
+            )
+            submitted_perm = st.form_submit_button("▣ 確認套用並儲存權限 / Apply and Save Permissions", type="primary", use_container_width=True)
+    else:
+        st.dataframe(view_df[base_cols + ACTION_COLS].head(300), use_container_width=True, hide_index=True, height=420)
+        st.caption("唯讀輕量預覽：按『啟動權限編輯』後才建立可編輯權限矩陣。")
+        edited_perm = view_df[base_cols + ACTION_COLS].copy()
+        submitted_perm = False
     st.markdown("#### 權限摘要預覽 / Permission Summary Preview")
     st.dataframe(_permission_summary(edited_perm), use_container_width=True, hide_index=True)
     if submitted_perm:
         saved = save_account_permissions(edited_perm.to_dict("records"))
-        st.success(f"權限已套用並儲存：{saved} 筆 / Permissions saved")
+        saved_n = saved.get("saved", saved) if isinstance(saved, dict) else saved
+        skipped_n = saved.get("skipped_unchanged", 0) if isinstance(saved, dict) else 0
+        _v104_cache_clear("permissions")
+        st.session_state["v104_permission_edit_enabled"] = False
+        st.success(f"權限已套用並儲存：{saved_n} 筆；未異動略過：{skipped_n} 筆 / Permissions saved")
         st.rerun()
 
-with tab_sec:
+elif _selected_permission_section == "安全設定 / Security":
     st.subheader("安全設定 / Security Settings")
-    settings = get_security_settings()
+    settings = _v104_get_security_cached()
     idle = int(settings.get("idle_timeout_minutes", "15") or 15)
     with st.form("security_settings_commit_form", clear_on_submit=False):
         new_idle = st.number_input("閒置自動登出分鐘數 / Idle Auto Logout Minutes", min_value=1, max_value=240, value=idle, step=1)
@@ -1072,6 +1186,7 @@ with tab_sec:
         submitted_security = st.form_submit_button("⛨ 確認套用安全設定 / Apply Security Settings", type="primary", use_container_width=True)
     if submitted_security:
         save_security_settings({"idle_timeout_minutes": str(int(new_idle)), "ask_continue_after_record": "1" if confirm_after_record else "0"})
+        _v104_cache_clear("security")
         try:
             from services.security_service import set_idle_timeout_minutes
             set_idle_timeout_minutes(int(new_idle))
