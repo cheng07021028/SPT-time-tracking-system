@@ -1380,28 +1380,48 @@ def _v88_current_column_order(table_key: str, df: pd.DataFrame) -> list[str]:
 def _v88_render_history_column_settings(table_key: str, df: pd.DataFrame, title: str) -> None:
     """Explicit 02 history column order/width settings.
 
-    The old render_width_settings() was disabled for hot-path speed, so 02 had
-    persistence support but no clear Apply button.  This panel writes only when
-    Apply is pressed and reads the existing table_ui_settings cache/authority.
+    V100: this panel must not build the heavy text_area + width data_editor during
+    every history query refresh.  Streamlit executes expander contents even when
+    the expander is collapsed, so the old implementation rebuilt the column
+    settings editor immediately after the user pressed 「查詢 / 重新整理歷史明細」.
+    That made the page look like the data query was still running.
+
+    The new implementation shows a lightweight header by default and creates the
+    settings editor only when the user explicitly checks 「開啟欄位設定編輯器」.
+    Permanent settings are still read by table_ui_service when rendering the table
+    and are still written only when Apply is pressed.
     """
     if not isinstance(df, pd.DataFrame) or df.empty:
         return
     safe_key = _v88_safe_widget_part(table_key)
     current_cols = [str(c) for c in df.columns]
-    try:
-        widths = {str(k): int(v) for k, v in load_widths(table_key).items()}
-    except Exception:
-        widths = {}
-    ordered = _v88_current_column_order(table_key, df) or current_cols
-    settings_rows = []
-    for col in ordered:
-        if col in current_cols:
-            settings_rows.append({"欄位 / Column": col, "欄寬 / Width": int(widths.get(col, 140))})
-    if not settings_rows:
-        settings_rows = [{"欄位 / Column": c, "欄寬 / Width": int(widths.get(c, 140))} for c in current_cols]
 
-    with st.expander(title, expanded=True):
+    with st.expander(title, expanded=False):
         st.caption("此區只管理 02 歷史明細表格的欄位順序與欄寬；不會修改工時資料。只有按下『套用並永久儲存欄位設定』才會寫入。")
+        open_editor = st.checkbox(
+            "開啟欄位設定編輯器 / Open column settings editor",
+            value=False,
+            key=f"v100_history_column_settings_open_{safe_key}",
+        )
+        if not open_editor:
+            st.caption(f"目前表格共有 {len(current_cols)} 個欄位。為避免查詢歷史明細時重建欄位設定編輯器，請需要調整時再開啟。")
+            return
+
+        # Only load the persisted order/widths after the user explicitly opens the
+        # settings editor.  The table itself still applies cached/persisted settings
+        # through table_ui_service, so Reboot persistence is not affected.
+        try:
+            widths = {str(k): int(v) for k, v in load_widths(table_key).items()}
+        except Exception:
+            widths = {}
+        ordered = _v88_current_column_order(table_key, df) or current_cols
+        settings_rows = []
+        for col in ordered:
+            if col in current_cols:
+                settings_rows.append({"欄位 / Column": col, "欄寬 / Width": int(widths.get(col, 140))})
+        if not settings_rows:
+            settings_rows = [{"欄位 / Column": c, "欄寬 / Width": int(widths.get(c, 140))} for c in current_cols]
+
         with st.form(f"v88_history_column_settings_form_{safe_key}", clear_on_submit=False):
             order_text = st.text_area(
                 "欄位順序 / Column order（每行一個欄位；上方越前面越靠左）",
@@ -1708,6 +1728,8 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
             st.session_state[V259_HISTORY_QUERY_REQUESTED_KEY] = True
             st.session_state.pop(V259_HISTORY_DF_KEY, None)
             st.session_state.pop(V259_HISTORY_TS_KEY, None)
+            st.session_state.pop("v100_history_current_export_bytes", None)
+            st.session_state.pop("v100_history_current_export_name", None)
             _add_history_result("success", "已套用篩選條件，正在載入本次查詢結果。", append=False)
             rerun()
 
@@ -1747,12 +1769,16 @@ if clear_history_cache_clicked:
     st.session_state[V259_HISTORY_QUERY_REQUESTED_KEY] = False
     st.session_state.pop(V259_HISTORY_DF_KEY, None)
     st.session_state.pop(V259_HISTORY_TS_KEY, None)
+    st.session_state.pop("v100_history_current_export_bytes", None)
+    st.session_state.pop("v100_history_current_export_name", None)
     _add_history_result("success", "已清除歷史查詢快取。", append=False)
     rerun()
 if manual_query_clicked:
     st.session_state[V259_HISTORY_QUERY_REQUESTED_KEY] = True
     st.session_state.pop(V259_HISTORY_DF_KEY, None)
     st.session_state.pop(V259_HISTORY_TS_KEY, None)
+    st.session_state.pop("v100_history_current_export_bytes", None)
+    st.session_state.pop("v100_history_current_export_name", None)
 
 df = st.session_state.get(V259_HISTORY_DF_KEY, pd.DataFrame())
 _query_requested = bool(st.session_state.get(V259_HISTORY_QUERY_REQUESTED_KEY))
@@ -2071,18 +2097,32 @@ with tab2:
         st.warning("目前帳號沒有 02 歷史紀錄編輯權限，不能匯入歷史資料。")
     else:
         dl1, dl2 = st.columns(2)
+        # V100: Streamlit executes all tab bodies, even when the Excel tab is not
+        # selected.  The old code generated the current-list xlsx on every history
+        # query refresh, so pressing 「查詢 / 重新整理歷史明細」 also paid the Excel
+        # export cost before the table appeared.  Build the file only when the user
+        # explicitly asks for it.
+        export_cache_key = "v100_history_current_export_bytes"
+        export_name_key = "v100_history_current_export_name"
         with dl1:
-            export_bio = BytesIO()
-            export_df = df.copy()
-            with pd.ExcelWriter(export_bio, engine="xlsxwriter") as writer:
-                export_df.to_excel(writer, index=False, sheet_name="歷史紀錄")
-            st.download_button(
-                "下載目前清單 / Download Current List",
-                data=export_bio.getvalue(),
-                file_name=f"SPT_歷史紀錄_{start}_{end}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-            )
+            if st.button("準備目前清單下載 / Prepare Current List", use_container_width=True, key="v100_prepare_history_current_export"):
+                export_bio = BytesIO()
+                export_df = df.copy()
+                with pd.ExcelWriter(export_bio, engine="xlsxwriter") as writer:
+                    export_df.to_excel(writer, index=False, sheet_name="歷史紀錄")
+                st.session_state[export_cache_key] = export_bio.getvalue()
+                st.session_state[export_name_key] = f"SPT_歷史紀錄_{start}_{end}.xlsx"
+                _add_history_result("success", "已準備目前清單下載檔。", append=False)
+            if st.session_state.get(export_cache_key):
+                st.download_button(
+                    "下載目前清單 / Download Current List",
+                    data=st.session_state.get(export_cache_key),
+                    file_name=st.session_state.get(export_name_key, f"SPT_歷史紀錄_{start}_{end}.xlsx"),
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
+            else:
+                st.caption("需匯出時請先按『準備目前清單下載』，避免查詢歷史明細時同步產生 Excel。")
         with dl2:
             st.download_button(
                 "下載歷史紀錄匯入範本 / Download Template",
