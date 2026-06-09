@@ -217,9 +217,12 @@ _REST_PERIODS_TTL_SECONDS = 300.0
 
 def _ensure_time_runtime_columns() -> None:
     global _TIME_RUNTIME_READY
-    ensure_database()
+    # V300.22：這個函式位在 01/02 熱路徑。舊版即使 runtime 欄位已確認，
+    # 仍會先呼叫 ensure_database()，在 Neon 上可能觸發 schema/index 檢查並拖慢
+    # 「載入維護表格 / 今日明細 / 刪除 / 存檔」。先檢查記憶體旗標，已完成就直接返回。
     if _TIME_RUNTIME_READY:
         return
+    ensure_database()
     cols = [
         "record_id TEXT", "record_key TEXT", "operation_id TEXT", "work_date TEXT", "work_order_no TEXT", "process_code TEXT",
         "work_minutes REAL DEFAULT 0", "raw_minutes REAL DEFAULT 0", "average_minutes REAL DEFAULT 0", "assembly_location TEXT",

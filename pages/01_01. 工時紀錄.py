@@ -2278,7 +2278,13 @@ if is_admin:
             _load_t0 = time.perf_counter()
             st.session_state[admin_load_key] = True
             st.session_state[admin_visible_key] = True
+            # V300.22：載入維護表格只讀資料並顯示輕量預覽；不要沿用上一輪編輯模式或 800 筆 row_limit，
+            # 避免一按 Load 就立即建立大型 data_editor，造成管理員維護區一直運轉。
             st.session_state[edit_mode_key] = False
+            try:
+                st.session_state[row_limit_key] = min(int(st.session_state.get(row_limit_key, 200) or 200), 200)
+            except Exception:
+                st.session_state[row_limit_key] = 200
             st.session_state[admin_select_key] = []
             st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
 

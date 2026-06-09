@@ -517,10 +517,12 @@ def save_account_permissions(rows: list[dict[str,Any]]) -> dict:
                     changed = True
                     break
         else:
-            # 沒有實體資料列時，若與角色預設相同，可不用寫入；若不同，才建立永久覆寫。
-            role = str(src.get("role_code") or src.get("角色 / Role") or "operator")
-            defaults = _role_defaults(role, code)
-            changed = any(_norm_bool(defaults.get(key), False) != vals[key] for key in ACTION_COLS)
+            # V300.22：使用者在 10｜帳號模組權限按下「套用並儲存」時，
+            # 畫面上的矩陣必須成為 Neon/PostgreSQL 的永久紀錄。
+            # 舊版若值剛好等於角色預設就不建立實體列，會讓設定仍停留在「隱含預設」，
+            # 之後角色預設或帳號角色異動時可能看起來像沒有永久保存。
+            # 因此：不存在的列一律 INSERT；已存在且未變更的列才略過，避免重複 UPDATE。
+            changed = True
         if not changed:
             skipped_unchanged += 1
             continue

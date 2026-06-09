@@ -48,7 +48,7 @@ if not st.session_state.get("_spt_v67_permission_bootstrap_ready", False):
         pass
     st.session_state["_spt_v67_permission_bootstrap_ready"] = True
 
-st.caption("V1.78 loaded｜權限管理頁已受 can_manage 管制；帳號、權限、安全設定會永久保存到 GitHub 設定檔。")
+st.caption("V300.22 loaded｜權限管理頁已受 can_manage 管制；帳號、權限、安全設定會永久保存到 Neon/PostgreSQL 權威資料表；GitHub/local 檔案僅作備份或 fallback。")
 
 ROLE_OPTIONS = ["admin", "manager", "leader", "operator", "viewer", "auditor"]
 ACTION_COLS = [a[0] for a in ACTIONS]
@@ -77,11 +77,25 @@ def _v104_cache_set(name: str, data):
     st.session_state[f"v104_perm_cache_{name}"] = {"ts": datetime.now(), "data": data}
 
 
+def _v30022_clear_permission_drafts() -> None:
+    """Clear editable permission matrix drafts when authority data changes.
+
+    Permission edits are kept as front-end drafts until the explicit Apply button.
+    When accounts/permissions are saved or reloaded, stale drafts must be removed
+    so the next edit starts from the latest Neon authority data.
+    """
+    for key in list(st.session_state.keys()):
+        if str(key).startswith("v30022_permission_draft_"):
+            st.session_state.pop(key, None)
+
+
 def _v104_cache_clear(*names: str) -> None:
     if not names:
         names = ("users", "permissions", "security")
     for name in names:
         st.session_state.pop(f"v104_perm_cache_{name}", None)
+        if name in {"users", "permissions"}:
+            _v30022_clear_permission_drafts()
 
 
 def _v104_get_users_cached(force: bool = False) -> list[dict]:
@@ -139,6 +153,26 @@ def _v30021_ensure_permission_columns(df: pd.DataFrame) -> pd.DataFrame:
     other_cols = [c for c in df.columns if c not in ordered]
     return df[ordered + other_cols]
 # ===== V300.21 PERMISSION MATRIX COLUMN COMPATIBILITY END =====
+
+
+# ===== V300.22 PERMISSION MATRIX FRONTEND DRAFT =====
+def _v30022_permission_draft_key(selected_user: str, selected_module: str, selected_role: str) -> str:
+    raw = f"{selected_user}|{selected_module}|{selected_role}"
+    safe = "".join(ch if ch.isalnum() else "_" for ch in raw)[:160]
+    return f"v30022_permission_draft_{safe}"
+
+
+def _v30022_permission_get_draft(key: str, base_df: pd.DataFrame, *, force_reset: bool = False) -> pd.DataFrame:
+    if force_reset or key not in st.session_state or not isinstance(st.session_state.get(key), pd.DataFrame):
+        st.session_state[key] = pd.DataFrame(base_df).copy().reset_index(drop=True)
+    return pd.DataFrame(st.session_state[key]).copy().reset_index(drop=True)
+
+
+def _v30022_permission_set_draft(key: str, df: pd.DataFrame) -> pd.DataFrame:
+    work = _v30021_ensure_permission_columns(pd.DataFrame(df).copy())
+    st.session_state[key] = work.copy().reset_index(drop=True)
+    return work.copy().reset_index(drop=True)
+# ===== V300.22 PERMISSION MATRIX FRONTEND DRAFT END =====
 
 ACCOUNT_HEADER_ALIASES = {
     "username": ["帳號", "登入帳號", "使用者", "使用者帳號", "username", "user", "account", "login id", "login_id"],
@@ -781,6 +815,7 @@ if _selected_permission_section == "帳號密碼總表 / Account Password Master
                 }])
                 if result.get("saved", 0) > 0:
                     st.success(f"帳號已建立 / Account created：{username}")
+                    _v104_cache_clear("users", "permissions")
                     st.session_state["v133_users_df"] = _users_for_editor()
                     try:
                         from services.column_settings_service import clear_editor_draft
@@ -1114,27 +1149,39 @@ elif _selected_permission_section == "帳號模組權限 / Account Module Permis
         view_df = view_df[view_df["module_code"] == selected_module.split(" ", 1)[0]]
     if selected_role != "全部 / All":
         view_df = view_df[view_df["role_code"] == selected_role]
+    permission_draft_key = _v30022_permission_draft_key(selected_user, selected_module, selected_role)
+    if permission_edit_enabled:
+        view_df = _v30022_permission_get_draft(permission_draft_key, view_df)
+    else:
+        # 唯讀預覽永遠顯示權威快取，不建立/污染編輯草稿。
+        view_df = view_df.copy().reset_index(drop=True)
+
     st.markdown("#### 快速勾選 / Quick Toggle")
     b1, b2, b3, b4, b5 = st.columns(5)
     with b1:
         if st.button("◈ 可進入全選 / Select View", use_container_width=True, disabled=not permission_edit_enabled):
             view_df["can_view"] = True
+            view_df = _v30022_permission_set_draft(permission_draft_key, view_df)
             st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
     with b2:
         if st.button("◌ 可進入取消 / Clear View", use_container_width=True, disabled=not permission_edit_enabled):
             view_df["can_view"] = False
+            view_df = _v30022_permission_set_draft(permission_draft_key, view_df)
             st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
     with b3:
         if st.button("◈ 編輯全選 / Select Edit", use_container_width=True, disabled=not permission_edit_enabled):
             view_df["can_edit"] = True
+            view_df = _v30022_permission_set_draft(permission_draft_key, view_df)
             st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
     with b4:
         if st.button("⟰ 匯出全選 / Select Export", use_container_width=True, disabled=not permission_edit_enabled):
             view_df["can_export"] = True
+            view_df = _v30022_permission_set_draft(permission_draft_key, view_df)
             st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
     with b5:
         if st.button("⛨ 管理全選 / Select Manage", use_container_width=True, disabled=not permission_edit_enabled):
             view_df["can_manage"] = True
+            view_df = _v30022_permission_set_draft(permission_draft_key, view_df)
             st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
     base_cols = ["username", "display_name", "role_code", "module_code", "module_name_zh", "module_name_en"]
     col_cfg = {
@@ -1168,10 +1215,12 @@ elif _selected_permission_section == "帳號模組權限 / Account Module Permis
     st.markdown("#### 權限摘要預覽 / Permission Summary Preview")
     st.dataframe(_permission_summary(edited_perm), use_container_width=True, hide_index=True)
     if submitted_perm:
+        edited_perm = _v30022_permission_set_draft(permission_draft_key, edited_perm)
         saved = save_account_permissions(edited_perm.to_dict("records"))
         saved_n = saved.get("saved", saved) if isinstance(saved, dict) else saved
         skipped_n = saved.get("skipped_unchanged", 0) if isinstance(saved, dict) else 0
         _v104_cache_clear("permissions")
+        _v30022_clear_permission_drafts()
         st.session_state["v104_permission_edit_enabled"] = False
         st.success(f"權限已套用並儲存：{saved_n} 筆；未異動略過：{skipped_n} 筆 / Permissions saved")
         st.rerun()
