@@ -392,7 +392,7 @@ from services.table_ui_service import (
 )
 from services.time_record_delete_unifier_service import delete_selected_time_records_from_editor
 from services.system_settings_service import get_process_options_by_category_exact, get_default_process_category, load_process_category_choices, get_live_page_reset_time
-from services.timezone_service import today_text
+from services.timezone_service import now_text, today_text
 
 st.set_page_config(page_title="01. 工時紀錄", page_icon="⏱", layout="wide")
 apply_theme()
@@ -1066,37 +1066,69 @@ def _v72_clear_active_cache(employee_id: str = "", employee_name: str = "") -> N
             st.session_state.pop(k, None)
 
 
+def _v99_elapsed_minutes_from_start(start_series: pd.Series) -> pd.Series:
+    """Calculate active elapsed minutes using Taiwan app time, not Streamlit server UTC.
+
+    Streamlit Cloud servers may run in UTC.  Active work timestamps are stored as
+    Asia/Taipei local text from services.timezone_service.now_text().  Using
+    pd.Timestamp.now() directly makes current time about 8 hours earlier than the
+    start timestamp and produces values such as -480 minutes.
+    """
+    try:
+        now_dt = pd.to_datetime(now_text(), errors="coerce")
+    except Exception:
+        now_dt = pd.Timestamp.now()
+    st_dt = pd.to_datetime(start_series, errors="coerce")
+    elapsed = ((now_dt - st_dt).dt.total_seconds() / 60.0).round(1)
+    try:
+        # Active work should never show negative elapsed minutes.  If a record has
+        # a future timestamp because of legacy timezone data, display 0.0 instead
+        # of a confusing negative value while keeping the raw timestamp visible.
+        elapsed = elapsed.mask(elapsed < 0, 0.0)
+    except Exception:
+        pass
+    return elapsed
+
+
+def _v99_label_active_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Use the same bilingual labels as Today Records while keeping lightweight HTML."""
+    labels = {
+        "id": "ID / ID",
+        "status": "狀態 / Status",
+        "employee_id": "工號 / Employee ID",
+        "employee_name": "姓名 / Name",
+        "work_order": "製令 / Work Order",
+        "work_order_no": "製令號碼 / Work Order No.",
+        "part_no": "P/N / Part No.",
+        "type_name": "機型 / Type",
+        "process_name": "工段名稱 / Process",
+        "start_action": "開始動作 / Start Action",
+        "start_date": "開始日期 / Start Date",
+        "start_time": "開始時間 / Start Time",
+        "start_timestamp": "開始時間戳 / Start Timestamp",
+        "已進行分鐘 / Elapsed Min": "已進行分鐘 / Elapsed Min",
+        "remark": "備註 / Remark",
+    }
+    return df.rename(columns={k: v for k, v in labels.items() if k in df.columns})
+
+
 def _v72_active_display_df(active_df: pd.DataFrame) -> pd.DataFrame:
     if not isinstance(active_df, pd.DataFrame) or active_df.empty:
         return pd.DataFrame()
     df = active_df.copy()
-    now_dt = pd.Timestamp.now()
     if "start_timestamp" in df.columns:
-        st_dt = pd.to_datetime(df["start_timestamp"], errors="coerce")
-        df["已進行分鐘 / Elapsed Min"] = ((now_dt - st_dt).dt.total_seconds() / 60.0).round(1)
+        df["已進行分鐘 / Elapsed Min"] = _v99_elapsed_minutes_from_start(df["start_timestamp"])
     columns = [
-        "id", "employee_id", "employee_name", "work_order", "work_order_no", "part_no", "type_name",
-        "process_name", "start_date", "start_time", "start_timestamp", "已進行分鐘 / Elapsed Min", "remark",
+        "id", "status", "employee_id", "employee_name",
+        "work_order", "work_order_no", "part_no", "type_name",
+        "process_name", "start_action", "start_date", "start_time",
+        "start_timestamp", "已進行分鐘 / Elapsed Min", "remark",
     ]
     keep = [c for c in columns if c in df.columns]
     if not keep:
         return df.head(20)
     out = df[keep].head(20).copy()
-    rename = {
-        "id": "ID",
-        "employee_id": "工號",
-        "employee_name": "姓名",
-        "work_order": "製令",
-        "work_order_no": "製令號碼",
-        "part_no": "P/N",
-        "type_name": "機型",
-        "process_name": "工段",
-        "start_date": "開始日期",
-        "start_time": "開始時間",
-        "start_timestamp": "開始時間戳",
-        "remark": "備註",
-    }
-    return out.rename(columns=rename)
+    return _v99_label_active_columns(out)
 
 
 def _v72_render_active_guard(employee_id: str, employee_name: str) -> tuple[pd.DataFrame, bool]:
