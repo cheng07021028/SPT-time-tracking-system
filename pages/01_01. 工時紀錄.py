@@ -280,6 +280,71 @@ def _v84_apply_table_layout(table_key: str, df: pd.DataFrame) -> tuple[pd.DataFr
     except Exception:
         cfg = {}
     return out, cfg
+
+
+# ===== V98 01 HOT-PATH READ DEDUP / EDIT-CONFIRM ONLY HELPERS =====
+V98_LIGHT_CACHE_TTL_SECONDS = 300.0
+
+
+def _v98_cache_get(key: str, ttl_seconds: float = V98_LIGHT_CACHE_TTL_SECONDS):
+    try:
+        item = st.session_state.get(key)
+        if not isinstance(item, dict):
+            return None
+        ts = float(item.get("ts", 0.0) or 0.0)
+        if ts and (time.perf_counter() - ts) <= ttl_seconds:
+            return item.get("value")
+    except Exception:
+        pass
+    return None
+
+
+def _v98_cache_set(key: str, value) -> None:
+    try:
+        st.session_state[key] = {"ts": time.perf_counter(), "value": value}
+    except Exception:
+        pass
+
+
+def _v98_load_process_category_bundle_cached() -> tuple[list[str], str]:
+    cached = _v98_cache_get("v98_01_process_category_bundle")
+    if isinstance(cached, tuple) and len(cached) == 2:
+        return list(cached[0] or []), str(cached[1] or "")
+    try:
+        choices = list(load_process_category_choices(include_common=True))
+    except Exception:
+        choices = []
+    try:
+        default = str(get_default_process_category() or "")
+    except Exception:
+        default = ""
+    _v98_cache_set("v98_01_process_category_bundle", (choices, default))
+    return choices, default
+
+
+def _v98_get_process_options_cached(category: str) -> list[str]:
+    cache_key = "v98_01_process_options_" + _v84_safe_widget_part(category or "blank")
+    cached = _v98_cache_get(cache_key)
+    if isinstance(cached, list):
+        return list(cached)
+    try:
+        options = list(get_process_options_by_category_exact(category))
+    except Exception:
+        options = []
+    _v98_cache_set(cache_key, options)
+    return options
+
+
+def _v98_admin_editor_should_parse(*flags: bool) -> bool:
+    """Only parse the editable maintenance dataframe when a confirm button was pressed.
+
+    Streamlit reruns while the editor is visible for unrelated controls such as row-limit,
+    selection buttons, or column settings.  The 01 maintenance editor must behave like 02:
+    editing is foreground draft state only; comparison, timestamp sync, recalculation and
+    Neon writes happen only on explicit Save/Recalc/Delete submit buttons.
+    """
+    return any(bool(x) for x in flags)
+# ===== V98 01 HOT-PATH READ DEDUP / EDIT-CONFIRM ONLY HELPERS END =====
 # ===== V84 EXPLICIT FIELD SETTINGS END =====
 # ===== V259 FOREGROUND DISPLAY ISOLATION END =====
 
@@ -915,27 +980,22 @@ def _v148_dedupe_records(df: pd.DataFrame) -> pd.DataFrame:
 def _v148_load_today_finished_records_for_employee(employee_id: str, employee_name: str = "") -> pd.DataFrame:
     """Read-only list for operators to verify today's completed records.
 
-    It never writes authority files, never recalculates, and never deletes. It only
-    combines 02 history plus the current 01 display source so a just-finished row
-    remains visible even when GitHub upload is running in the background.
+    V98: avoid duplicate reads.  The previous implementation queried both
+    load_records(today) and today_records(), then merged/deduped them.  That made
+    pressing 「重新整理已結束紀錄」 do two Neon reads for the same date.  Prefer the
+    already-loaded Today Records session table when present; otherwise do a single
+    bounded history query.
     """
     target_date = today_text()
-    frames: list[pd.DataFrame] = []
-    try:
-        df_hist = load_records(start_date=target_date, end_date=target_date)
-        if isinstance(df_hist, pd.DataFrame) and not df_hist.empty:
-            frames.append(df_hist)
-    except Exception:
-        pass
-    try:
-        df_today = today_records(include_finished=True, unfinished_only=False)
-        if isinstance(df_today, pd.DataFrame) and not df_today.empty:
-            frames.append(df_today)
-    except Exception:
-        pass
-    if not frames:
+    source_df = st.session_state.get(V259_TODAY_TABLE_KEY)
+    if not isinstance(source_df, pd.DataFrame) or source_df.empty:
+        try:
+            source_df = load_records(start_date=target_date, end_date=target_date)
+        except Exception:
+            source_df = pd.DataFrame()
+    if not isinstance(source_df, pd.DataFrame) or source_df.empty:
         return pd.DataFrame()
-    merged = _v148_dedupe_records(pd.concat(frames, ignore_index=True, sort=False))
+    merged = _v148_dedupe_records(source_df.copy().reset_index(drop=True))
     keep: list[dict] = []
     for _, row in merged.iterrows():
         row_dict = row.to_dict()
@@ -1050,7 +1110,7 @@ def _v72_render_active_guard(employee_id: str, employee_name: str) -> tuple[pd.D
     has_active = isinstance(active_df, pd.DataFrame) and not active_df.empty
     if has_active:
         st.warning("此人員已有開始中的作業。請先在右側按『暫停 / 完工 / 下班』結束後，才可開始新作業。")
-        render_table(_v72_active_display_df(active_df), "v72_start_guard_active_work_table", editable=False, height=210)
+        _v77_html_table(_v72_active_display_df(active_df), max_rows=8)
     else:
         st.success("此人員目前沒有開始中的作業，可以開始新作業。")
     return active_df, has_active
@@ -1323,12 +1383,11 @@ with left:
         st.caption(f"已依『{_wo_query}』篩選出 {matched_count} 筆相關製令，目前使用：{wo_no}")
 
     _spt_perf_t = time.perf_counter()
-    category_choices = load_process_category_choices(include_common=True)
-    default_category = get_default_process_category()
+    category_choices, default_category = _v98_load_process_category_bundle_cached()
     _spt_perf_t = _spt_perf_tick(
-        "01_load_process_categories_default",
+        "01_load_process_categories_default_cached",
         _spt_perf_t,
-        threshold_ms=500.0,
+        threshold_ms=300.0,
         detail={"category_count": len(category_choices)},
     )
     if default_category not in category_choices:
@@ -1352,11 +1411,11 @@ with left:
         selected_category = ""
         st.error("13｜系統設定目前沒有任何啟用類別，請先建立類別並永久儲存。")
     _spt_perf_t = time.perf_counter()
-    PROCESS_OPTIONS = get_process_options_by_category_exact(selected_category)
+    PROCESS_OPTIONS = _v98_get_process_options_cached(selected_category)
     _spt_perf_t = _spt_perf_tick(
-        "01_load_process_options_for_category",
+        "01_load_process_options_for_category_cached",
         _spt_perf_t,
-        threshold_ms=500.0,
+        threshold_ms=300.0,
         detail={"category": selected_category, "process_count": len(PROCESS_OPTIONS)},
     )
     st.caption(f"目前工段類別 / Current Category：{selected_category or '未設定'}")
@@ -2174,12 +2233,7 @@ if is_admin:
                             with b3:
                                 do_delete = st.form_submit_button("🗑 刪除勾選整列 / Delete", use_container_width=True)
 
-                        edited_admin = _v92_editor_state_to_df(display_admin, edited_admin_return, editor_key)
-                        manual_ids = _v92_checked_ids(edited_admin, delete_col, _id_col)
-                        if manual_ids or clear_clicked:
-                            st.session_state[admin_select_key] = manual_ids
-
-                        if do_save or do_recalc or do_delete:
+                        if _v98_admin_editor_should_parse(do_save, do_recalc, do_delete):
                             edited_admin = _v92_editor_state_to_df(display_admin, edited_admin_return, editor_key)
                             checked_ids = _v92_checked_ids(edited_admin, delete_col, _id_col)
                             if not checked_ids:
