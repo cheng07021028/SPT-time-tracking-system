@@ -328,6 +328,25 @@ def _sync_legacy_security_user(username: str, row: dict[str, Any]) -> None:
         pass
 
 
+
+
+def _value_from_src(src: dict[str, Any], key: str, display_key: str, old: dict[str, Any], default: Any = "") -> Any:
+    """Read an account field without treating an explicit blank edit as missing.
+
+    The old V300.22 code used ``src.get(field) or old.get(field)``.  That made
+    blank edits impossible to save: if an admin cleared employee_id/email/note,
+    the service silently restored the old value and the Account Editor appeared
+    to revert after rerun.  Presence of a key now means the user submitted that
+    value, even when it is an empty string.
+    """
+    if key in src:
+        return src.get(key)
+    if display_key and display_key in src:
+        return src.get(display_key)
+    if key in old:
+        return old.get(key)
+    return default
+
 def _user_row_changed(old: dict[str, Any], row: dict[str, Any], password_changed: bool) -> bool:
     if not old:
         return True
@@ -366,18 +385,23 @@ def save_users(rows: list[dict[str,Any]]) -> dict:
             password_hash = hash_password(new_pwd)
         else:
             password_hash = str(old.get("password_hash") or "") or hash_password("Admin@1234" if username.lower()=="admin" else username)
+        employee_id = str(_value_from_src(src, "employee_id", "工號 / Employee ID", old, "") or "").strip()
+        display_name = str(_value_from_src(src, "display_name", "姓名 / Display Name", old, username) or "").strip() or username
+        email = str(_value_from_src(src, "email", "Email", old, "") or "").strip()
+        role_code = str(_value_from_src(src, "role_code", "角色 / Role", old, "operator") or "operator").strip() or "operator"
+        note = str(_value_from_src(src, "note", "備註 / Note", old, "") or "").strip()
         row = {
             "username": username,
             "password_hash": password_hash,
-            "password_hint": str(src.get("password_hint") or old.get("password_hint") or ""),
-            "employee_id": str(src.get("employee_id") or src.get("工號 / Employee ID") or old.get("employee_id") or ""),
-            "display_name": str(src.get("display_name") or src.get("姓名 / Display Name") or old.get("display_name") or username),
-            "email": str(src.get("email") or src.get("Email") or old.get("email") or ""),
-            "role_code": str(src.get("role_code") or src.get("角色 / Role") or old.get("role_code") or "operator"),
+            "password_hint": str(_value_from_src(src, "password_hint", "", old, "") or ""),
+            "employee_id": employee_id,
+            "display_name": display_name,
+            "email": email,
+            "role_code": role_code,
             "is_active": _norm_bool(src.get("is_active", src.get("啟用 / Active", old.get("is_active", 1))), True),
             "force_password_change": _norm_bool(src.get("force_password_change", src.get("強制改密碼 / Force Change", old.get("force_password_change", 0))), False),
             "last_login_at": str(old.get("last_login_at") or ""),
-            "note": str(src.get("note") or src.get("備註 / Note") or old.get("note") or ""),
+            "note": note,
             "created_at": str(old.get("created_at") or now_text()),
             "updated_at": now_text(),
         }

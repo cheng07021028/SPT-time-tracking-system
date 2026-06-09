@@ -48,7 +48,7 @@ if not st.session_state.get("_spt_v67_permission_bootstrap_ready", False):
         pass
     st.session_state["_spt_v67_permission_bootstrap_ready"] = True
 
-st.caption("V300.22 loaded｜權限管理頁已受 can_manage 管制；帳號、權限、安全設定會永久保存到 Neon/PostgreSQL 權威資料表；GitHub/local 檔案僅作備份或 fallback。")
+st.caption("V300.23 loaded｜權限管理頁已受 can_manage 管制；Account Editor 儲存會合併 data_editor 前端草稿後再寫入 Neon/PostgreSQL 權威資料表。")
 
 ROLE_OPTIONS = ["admin", "manager", "leader", "operator", "viewer", "auditor"]
 ACTION_COLS = [a[0] for a in ACTIONS]
@@ -326,6 +326,79 @@ def _selected_delete_usernames(df: pd.DataFrame, editor_key: str) -> list[str]:
                     selected.add(username)
     return sorted(selected)
 
+
+
+def _v30023_apply_account_editor_delta(base_df: pd.DataFrame, returned_df: pd.DataFrame, editor_key: str) -> pd.DataFrame:
+    """Merge Streamlit data_editor widget deltas into the submitted dataframe.
+
+    Some Streamlit builds can show edited cells in the browser while the dataframe
+    returned from a data_editor inside a form is still the pre-edit value on the
+    submit rerun.  V300.22 only compensated for the Delete checkbox.  Account
+    Editor must also preserve text/selectbox/active/force-change edits before
+    calling save_users(), otherwise the page appears to save, reruns, and then
+    reloads the old authority values.
+    """
+    if isinstance(returned_df, pd.DataFrame):
+        work = returned_df.copy().reset_index(drop=True)
+    elif isinstance(base_df, pd.DataFrame):
+        work = base_df.copy().reset_index(drop=True)
+    else:
+        work = pd.DataFrame()
+
+    # Ensure the submitted dataframe has the same visible columns as the current draft.
+    if isinstance(base_df, pd.DataFrame) and not base_df.empty:
+        for col in base_df.columns:
+            if col not in work.columns:
+                work[col] = base_df[col].values[: len(work)] if len(base_df) >= len(work) else ""
+
+    state = st.session_state.get(editor_key, {})
+    if isinstance(state, dict):
+        edited_rows = state.get("edited_rows", {}) or {}
+        for row_idx, changes in edited_rows.items():
+            if not isinstance(changes, dict):
+                continue
+            try:
+                idx = int(row_idx)
+            except Exception:
+                continue
+            if idx < 0:
+                continue
+            # data_editor num_rows is fixed here, but be defensive for future compatibility.
+            while idx >= len(work):
+                work = pd.concat([work, pd.DataFrame([_blank_user_row()])], ignore_index=True)
+            for col, value in changes.items():
+                if col not in work.columns:
+                    work[col] = ""
+                work.at[idx, col] = value
+
+        deleted_rows = state.get("deleted_rows", []) or []
+        if deleted_rows:
+            try:
+                drop_idx = {int(x) for x in deleted_rows}
+                work = work.loc[[i for i in range(len(work)) if i not in drop_idx]].reset_index(drop=True)
+            except Exception:
+                pass
+
+        added_rows = state.get("added_rows", []) or []
+        for row in added_rows:
+            if isinstance(row, dict):
+                new_row = _blank_user_row()
+                new_row.update(row)
+                work = pd.concat([work, pd.DataFrame([new_row])], ignore_index=True)
+
+    try:
+        work = work.loc[:, ~pd.Index(work.columns).duplicated()].copy()
+    except Exception:
+        pass
+    for _col, _default in [
+        ("刪除 / Delete", False),
+        ("啟用 / Active", True),
+        ("強制改密碼 / Force Change", False),
+    ]:
+        if _col not in work.columns:
+            work[_col] = _default
+        work[_col] = _to_bool_series(work, _col).fillna(bool(_default)).astype(bool)
+    return work.reset_index(drop=True)
 
 def _blank_user_row() -> dict:
     return {
@@ -998,7 +1071,7 @@ if _selected_permission_section == "帳號密碼總表 / Account Password Master
         m3.metric("密碼異動 / Password Changes", new_password_count)
 
         if submitted_accounts:
-            df = edited_users.copy() if isinstance(edited_users, pd.DataFrame) else draft_df.copy()
+            df = _v30023_apply_account_editor_delta(draft_df, edited_users, account_editor_key)
             try:
                 df = df.loc[:, ~pd.Index(df.columns).duplicated()].copy()
             except Exception:
