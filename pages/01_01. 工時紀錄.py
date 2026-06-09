@@ -1265,22 +1265,97 @@ def _v74_render_start_status(active_df: pd.DataFrame, selected_process: str = ""
     return policy
 
 
-def _v77_html_table(df: pd.DataFrame, max_rows: int = 12) -> None:
-    """Render small active-work tables as plain HTML, avoiding heavy dataframe components."""
+V101_ACTIVE_WORK_TABLE_KEY = "01.time_records.active_work"
+
+
+def _v101_active_work_widths(table_key: str, columns: list[str]) -> dict[str, int]:
+    """Load saved widths for Active Work without touching the time-record query path."""
     try:
-        show = df.head(max_rows).copy()
+        raw = load_widths(table_key)
+        if isinstance(raw, dict):
+            return {str(k): max(60, min(700, int(float(v)))) for k, v in raw.items() if str(k) in columns}
+    except Exception:
+        pass
+    return {}
+
+
+def _v101_apply_active_work_layout(df: pd.DataFrame, table_key: str = V101_ACTIVE_WORK_TABLE_KEY) -> pd.DataFrame:
+    """Apply persisted Active Work column order only on the in-memory display frame.
+
+    This keeps the right-side Active Work table close to Today Records behavior
+    without using st.dataframe/data_editor.  It does not query time records,
+    recalculate hours, or write Neon data during render.
+    """
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return df
+    try:
+        return apply_column_order(table_key, df.copy())
+    except Exception:
+        return df.copy()
+
+
+def _v77_html_table(df: pd.DataFrame, max_rows: int = 12, *, table_key: str = V101_ACTIVE_WORK_TABLE_KEY) -> None:
+    """Render small active-work tables as compact HTML, avoiding heavy dataframe components.
+
+    V101 keeps the speed benefit of the lightweight HTML table, but makes the
+    table visually closer to Today Records: smaller type, shorter rows, sticky
+    header, horizontal scroll, and persisted column order/widths.
+    """
+    try:
+        show = _v101_apply_active_work_layout(df, table_key).head(max_rows).copy()
         show = show.where(pd.notna(show), "").astype(str)
+        widths = _v101_active_work_widths(table_key, [str(c) for c in show.columns])
+        colgroup = "".join(
+            f'<col style="width:{int(widths.get(str(col), 112))}px; min-width:{int(widths.get(str(col), 112))}px;">'
+            for col in show.columns
+        )
+        html = show.to_html(index=False, escape=False, border=0, classes="spt-active-work-table")
+        html = html.replace('<table border="0" class="dataframe spt-active-work-table">', f'<table border="0" class="dataframe spt-active-work-table">{colgroup}', 1)
         st.markdown(
-            show.to_html(index=False, escape=False, border=0, classes="spt-active-work-table"),
+            f'<div class="spt-active-work-table-wrap">{html}</div>',
             unsafe_allow_html=True,
         )
         st.markdown(
             """
 <style>
-.spt-active-work-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
-.spt-active-work-table th { text-align: left; padding: 0.55rem; background: rgba(255,255,255,0.08); border-bottom: 1px solid rgba(120,220,255,0.22); color: #eaffff; }
-.spt-active-work-table td { padding: 0.5rem; border-bottom: 1px solid rgba(120,220,255,0.12); color: #f2ffff; }
-.spt-active-work-table tr:hover td { background: rgba(96,220,255,0.08); }
+.spt-active-work-table-wrap {
+  width: 100%;
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid rgba(120,220,255,0.20);
+  border-radius: 10px;
+  background: rgba(6, 22, 38, 0.35);
+}
+.spt-active-work-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.78rem;
+  line-height: 1.22;
+}
+.spt-active-work-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  padding: 0.38rem 0.42rem;
+  background: rgba(20, 43, 61, 0.96);
+  border-bottom: 1px solid rgba(120,220,255,0.26);
+  color: #eaffff;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.spt-active-work-table tbody td {
+  padding: 0.34rem 0.42rem;
+  border-bottom: 1px solid rgba(120,220,255,0.12);
+  color: #f2ffff;
+  vertical-align: middle;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.spt-active-work-table tbody tr:hover td { background: rgba(96,220,255,0.08); }
+.spt-active-work-table td:nth-child(1), .spt-active-work-table th:nth-child(1) { text-align: right; }
 </style>
 """,
             unsafe_allow_html=True,
@@ -1307,7 +1382,21 @@ def _v74_select_active_record(active_df: pd.DataFrame, employee_id: str, employe
     display_df = _v72_active_display_df(raw_df)
     if not isinstance(display_df, pd.DataFrame) or display_df.empty:
         display_df = raw_df.copy()
-    _v77_html_table(display_df, max_rows=12)
+
+    # V101: Active Work needs the same persistent column order/width control as
+    # Today Records, but must not use the heavy render_table/data_editor path.
+    # The settings editor is lazy-loaded behind a toggle, and saved settings only
+    # affect this in-memory display table.
+    try:
+        if bool(_v207_current_user_is_admin()):
+            _v84_render_column_settings_panel(
+                V101_ACTIVE_WORK_TABLE_KEY,
+                display_df,
+                "▤ 開始中的作業欄位設定 / Active Work Column Settings",
+            )
+    except Exception:
+        pass
+    _v77_html_table(display_df, max_rows=12, table_key=V101_ACTIVE_WORK_TABLE_KEY)
 
     options: list[tuple[str, int]] = []
     for idx, row in raw_df.iterrows():
