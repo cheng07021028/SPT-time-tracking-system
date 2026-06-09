@@ -1090,6 +1090,42 @@ def _v99_elapsed_minutes_from_start(start_series: pd.Series) -> pd.Series:
     return elapsed
 
 
+def _v102_active_work_subtotal_from_start(start_series: pd.Series) -> pd.Series:
+    """Return active-work subtotal as HH:MM:SS for display only.
+
+    This replaces the previous decimal-minute display in the Active Work panel.
+    It is intentionally a lightweight in-memory calculation and does not query or
+    write Neon.  The value is capped at 00:00:00 for future/invalid timestamps so
+    operators never see negative running time.
+    """
+    try:
+        now_dt = pd.to_datetime(now_text(), errors="coerce")
+    except Exception:
+        now_dt = pd.Timestamp.now()
+    st_dt = pd.to_datetime(start_series, errors="coerce")
+    seconds = (now_dt - st_dt).dt.total_seconds()
+    try:
+        seconds = seconds.mask(seconds < 0, 0)
+        seconds = seconds.fillna(0)
+    except Exception:
+        pass
+
+    def _fmt(value) -> str:
+        try:
+            total = int(max(0, float(value)))
+        except Exception:
+            total = 0
+        hours = total // 3600
+        minutes = (total % 3600) // 60
+        secs = total % 60
+        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+    try:
+        return seconds.apply(_fmt)
+    except Exception:
+        return pd.Series(["00:00:00"] * len(start_series), index=start_series.index)
+
+
 def _v99_label_active_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Use the same bilingual labels as Today Records while keeping lightweight HTML."""
     labels = {
@@ -1106,7 +1142,8 @@ def _v99_label_active_columns(df: pd.DataFrame) -> pd.DataFrame:
         "start_date": "開始日期 / Start Date",
         "start_time": "開始時間 / Start Time",
         "start_timestamp": "開始時間戳 / Start Timestamp",
-        "已進行分鐘 / Elapsed Min": "已進行分鐘 / Elapsed Min",
+        "工時小計 / Work Subtotal": "工時小計 / Work Subtotal",
+        "已進行分鐘 / Elapsed Min": "工時小計 / Work Subtotal",
         "remark": "備註 / Remark",
     }
     return df.rename(columns={k: v for k, v in labels.items() if k in df.columns})
@@ -1117,12 +1154,12 @@ def _v72_active_display_df(active_df: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame()
     df = active_df.copy()
     if "start_timestamp" in df.columns:
-        df["已進行分鐘 / Elapsed Min"] = _v99_elapsed_minutes_from_start(df["start_timestamp"])
+        df["工時小計 / Work Subtotal"] = _v102_active_work_subtotal_from_start(df["start_timestamp"])
     columns = [
         "id", "status", "employee_id", "employee_name",
         "work_order", "work_order_no", "part_no", "type_name",
         "process_name", "start_action", "start_date", "start_time",
-        "start_timestamp", "已進行分鐘 / Elapsed Min", "remark",
+        "start_timestamp", "工時小計 / Work Subtotal", "remark",
     ]
     keep = [c for c in columns if c in df.columns]
     if not keep:
@@ -1273,7 +1310,16 @@ def _v101_active_work_widths(table_key: str, columns: list[str]) -> dict[str, in
     try:
         raw = load_widths(table_key)
         if isinstance(raw, dict):
-            return {str(k): max(60, min(700, int(float(v)))) for k, v in raw.items() if str(k) in columns}
+            out = {str(k): max(60, min(700, int(float(v)))) for k, v in raw.items() if str(k) in columns}
+            # V102: keep old saved width useful after renaming Elapsed Min to Work Subtotal.
+            old_key = "已進行分鐘 / Elapsed Min"
+            new_key = "工時小計 / Work Subtotal"
+            if new_key in columns and new_key not in out and old_key in raw:
+                try:
+                    out[new_key] = max(60, min(700, int(float(raw.get(old_key)))))
+                except Exception:
+                    out[new_key] = 112
+            return out
     except Exception:
         pass
     return {}
