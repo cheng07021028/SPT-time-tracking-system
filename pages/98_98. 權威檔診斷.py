@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""V300.15.1 all-module authority-file diagnostic page.
+"""V300.41 authority-file diagnostic page.
 
-Admin-only diagnostic page. It inspects all 15 module authority paths and legacy
-sources. It does not modify 01/02 logic and does not overwrite production data.
+Admin-only diagnostic page. It inspects authority paths and legacy sources.
+It does not modify 01/02 logic and does not overwrite production data.
 """
 from __future__ import annotations
 
@@ -45,6 +45,7 @@ _admin_guard()
 
 from services.authority_trace_service import (  # noqa: E402
     MODULES_TO_TRACE,
+    clear_authority_trace_cache,
     render_markdown_report,
     save_snapshot,
 )
@@ -53,6 +54,74 @@ ROOT = Path(__file__).resolve().parents[1]
 TRACE_DIR = ROOT / "data" / "permanent_store" / "authority_trace"
 SNAPSHOT_PATH = TRACE_DIR / "v30015_latest_snapshot.json"
 REPORT_PATH = TRACE_DIR / "V300_15_AUTHORITY_TRACE_REPORT.md"
+
+V30041_SNAPSHOT_KEY = "v30041_authority_snapshot"
+V30041_REPORT_KEY = "v30041_authority_report"
+V30041_SOURCE_KEY = "v30041_authority_source_sig"
+V30041_JSON_BYTES_KEY = "v30041_authority_json_bytes"
+V30041_MD_BYTES_KEY = "v30041_authority_md_bytes"
+
+
+def _snapshot_file_sig() -> str:
+    try:
+        if not SNAPSHOT_PATH.exists():
+            return "missing"
+        stt = SNAPSHOT_PATH.stat()
+        return f"{stt.st_size}:{int(stt.st_mtime)}"
+    except Exception:
+        return "unknown"
+
+
+def _clear_page_cache() -> None:
+    for key in (
+        V30041_SNAPSHOT_KEY,
+        V30041_REPORT_KEY,
+        V30041_SOURCE_KEY,
+        V30041_JSON_BYTES_KEY,
+        V30041_MD_BYTES_KEY,
+    ):
+        st.session_state.pop(key, None)
+
+
+def _load_latest_snapshot_cached() -> tuple[Dict[str, Any] | None, str]:
+    sig = _snapshot_file_sig()
+    if sig != "missing" and st.session_state.get(V30041_SOURCE_KEY) == sig:
+        cached_snapshot = st.session_state.get(V30041_SNAPSHOT_KEY)
+        cached_report = st.session_state.get(V30041_REPORT_KEY, "")
+        if isinstance(cached_snapshot, dict):
+            return cached_snapshot, str(cached_report or "")
+    if not SNAPSHOT_PATH.exists():
+        return None, ""
+    snapshot = json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))
+    if REPORT_PATH.exists():
+        report_text = REPORT_PATH.read_text(encoding="utf-8")
+    else:
+        report_text = render_markdown_report(snapshot)
+    st.session_state[V30041_SOURCE_KEY] = sig
+    st.session_state[V30041_SNAPSHOT_KEY] = snapshot
+    st.session_state[V30041_REPORT_KEY] = report_text
+    st.session_state.pop(V30041_JSON_BYTES_KEY, None)
+    st.session_state.pop(V30041_MD_BYTES_KEY, None)
+    return snapshot, report_text
+
+
+def _download_json_bytes(snapshot: Dict[str, Any]) -> bytes:
+    cached = st.session_state.get(V30041_JSON_BYTES_KEY)
+    if isinstance(cached, bytes):
+        return cached
+    data = json.dumps(snapshot, ensure_ascii=False, indent=2).encode("utf-8-sig")
+    st.session_state[V30041_JSON_BYTES_KEY] = data
+    return data
+
+
+def _download_md_bytes(report_text: str) -> bytes:
+    cached = st.session_state.get(V30041_MD_BYTES_KEY)
+    if isinstance(cached, bytes):
+        return cached
+    data = (report_text or "").encode("utf-8-sig")
+    st.session_state[V30041_MD_BYTES_KEY] = data
+    return data
+
 
 render_header(
     "98",
@@ -69,7 +138,7 @@ except Exception:
 
 module_count = len(MODULES_TO_TRACE)
 render_kpi_cards([
-    ("診斷版本 / Version", "V300.15.1"),
+    ("診斷版本 / Version", "V300.41"),
     ("盤點模組 / Modules", str(module_count)),
     ("執行模式 / Mode", "Read Only"),
     ("資料保護 / Safety", "No overwrite"),
@@ -80,48 +149,58 @@ st.warning(
     icon="⚠️",
 )
 
-col_run, col_open = st.columns([1, 1])
+st.caption(
+    "V300.41：預設使用淺層盤點，只檢查檔案存在、大小與修改時間，不解析大型 JSON / JSONL 內容；需要最新結果時請手動載入或執行。"
+)
+
+col_run, col_open, col_clear = st.columns([1, 1, 1])
 with col_run:
     run_trace = st.button("▶ 執行全模組權威檔盤點", type="primary", use_container_width=True)
 with col_open:
     open_latest = st.button("📄 載入最新盤點結果", use_container_width=True)
+with col_clear:
+    clear_cache = st.button("🧹 清除本頁快取", use_container_width=True)
 
-snapshot: Dict[str, Any] | None = None
-report_text = ""
+if clear_cache:
+    clear_authority_trace_cache()
+    _clear_page_cache()
+    st.success("已清除本頁診斷快取。")
+
+snapshot: Dict[str, Any] | None = st.session_state.get(V30041_SNAPSHOT_KEY)
+report_text = str(st.session_state.get(V30041_REPORT_KEY, "") or "")
 
 if run_trace:
-    with st.spinner("正在盤點 15 個模組的權威檔與舊來源..."):
-        snapshot = save_snapshot(ROOT)
+    with st.spinner("正在盤點各模組權威檔與舊來源（淺層模式，不解析大型 JSON）..."):
+        clear_authority_trace_cache()
+        snapshot = save_snapshot(ROOT, parse_json=False, use_cache=False)
         report_text = render_markdown_report(snapshot)
         TRACE_DIR.mkdir(parents=True, exist_ok=True)
         REPORT_PATH.write_text(report_text, encoding="utf-8")
+        st.session_state[V30041_SOURCE_KEY] = _snapshot_file_sig()
+        st.session_state[V30041_SNAPSHOT_KEY] = snapshot
+        st.session_state[V30041_REPORT_KEY] = report_text
+        st.session_state.pop(V30041_JSON_BYTES_KEY, None)
+        st.session_state.pop(V30041_MD_BYTES_KEY, None)
     st.success("全模組權威檔盤點完成，已產生報告。")
 elif open_latest:
-    if SNAPSHOT_PATH.exists():
-        try:
-            snapshot = json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))
-            if REPORT_PATH.exists():
-                report_text = REPORT_PATH.read_text(encoding="utf-8")
-            else:
-                report_text = render_markdown_report(snapshot)
-            st.success("已載入最新盤點結果。")
-        except Exception as exc:
-            st.error(f"讀取最新盤點結果失敗：{exc}")
-    else:
-        st.info("尚未有盤點結果，請先按『執行全模組權威檔盤點』。")
-
-if snapshot is None and SNAPSHOT_PATH.exists():
     try:
-        snapshot = json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))
-        report_text = REPORT_PATH.read_text(encoding="utf-8") if REPORT_PATH.exists() else render_markdown_report(snapshot)
-    except Exception:
-        snapshot = None
+        snapshot, report_text = _load_latest_snapshot_cached()
+        if snapshot is None:
+            st.info("尚未有盤點結果，請先按『執行全模組權威檔盤點』。")
+        else:
+            st.success("已載入最新盤點結果。")
+    except Exception as exc:
+        st.error(f"讀取最新盤點結果失敗：{exc}")
 
 st.divider()
 
 if snapshot is None:
     st.subheader("待執行")
-    st.write("請按上方『執行全模組權威檔盤點』。系統會產生 JSON 與 Markdown 報告供下載。")
+    st.write("請按上方『執行全模組權威檔盤點』或『載入最新盤點結果』。系統不會在進入頁面時自動讀取大型 snapshot。")
+    try:
+        _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
+    except Exception:
+        pass
     st.stop()
 
 modules = snapshot.get("modules", {}) or {}
@@ -155,6 +234,8 @@ for key, info in sorted(modules.items(), key=lambda kv: str(kv[1].get("module_no
             for count_key, val in finfo.items():
                 if count_key.endswith("_count") or count_key.endswith("_keys_count") or count_key == "row_count":
                     counts.append(f"{count_key}={val}")
+            if finfo.get("json_summary_mode"):
+                counts.append(str(finfo.get("json_summary_mode")))
             file_lines.append(
                 f"| `{name}` | {finfo.get('exists')} | {finfo.get('size_bytes', '')} | {'<br>'.join(counts)} | {finfo.get('modified_at', '')} |"
             )
@@ -180,16 +261,17 @@ col_json, col_md = st.columns(2)
 with col_json:
     st.download_button(
         "⬇ 下載 JSON snapshot",
-        data=json.dumps(snapshot, ensure_ascii=False, indent=2),
-        file_name="v30015_latest_snapshot.json",
+        data=_download_json_bytes(snapshot),
+        file_name="v30041_latest_snapshot.json",
         mime="application/json",
         use_container_width=True,
     )
 with col_md:
+    report_text = report_text or render_markdown_report(snapshot)
     st.download_button(
         "⬇ 下載 Markdown report",
-        data=report_text or render_markdown_report(snapshot),
-        file_name="V300_15_AUTHORITY_TRACE_REPORT.md",
+        data=_download_md_bytes(report_text),
+        file_name="V300_41_AUTHORITY_TRACE_REPORT.md",
         mime="text/markdown",
         use_container_width=True,
     )
@@ -201,4 +283,3 @@ try:
     _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
 except Exception:
     pass
-

@@ -11,7 +11,7 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 MODULES_TO_TRACE: Dict[str, Dict[str, Any]] = {
     "01_time_records": {
@@ -153,15 +153,31 @@ TRACE_FILE = TRACE_DIR / "v30015_authority_trace.jsonl"
 SNAPSHOT_FILE = TRACE_DIR / "v30015_latest_snapshot.json"
 REPORT_FILE = TRACE_DIR / "V300_15_AUTHORITY_TRACE_REPORT.md"
 
+# V300.41: 98 權威檔診斷快速路徑。
+# 這是診斷頁用的 process-level 短快取，只保留盤點摘要，
+# 不作任何正式資料權威，也不寫回 01~15 模組資料。
+_V30041_INSPECT_CACHE: Dict[Tuple[str, str, bool, int], Tuple[float, Dict[str, Any]]] = {}
+
+
+def clear_authority_trace_cache() -> None:
+    _V30041_INSPECT_CACHE.clear()
+
 
 def _now() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-def _safe_json_load(path: Path) -> Any:
+def _safe_json_load(path: Path, max_bytes: Optional[int] = None) -> Any:
     try:
         if not path.exists() or not path.is_file():
             return None
+        if max_bytes is not None:
+            try:
+                size = path.stat().st_size
+            except Exception:
+                size = 0
+            if size > max_bytes:
+                return {"_skipped_large_json": True, "size_bytes": size, "max_bytes": max_bytes}
         text = path.read_text(encoding="utf-8")
         if not text.strip():
             return None
@@ -180,8 +196,7 @@ def _safe_json_load(path: Path) -> Any:
     except Exception as exc:
         return {"_read_error": str(exc)}
 
-
-def _summarize_file(path: Path) -> Dict[str, Any]:
+def _summarize_file(path: Path, parse_json: bool = True, max_json_bytes: int = 2_000_000) -> Dict[str, Any]:
     info: Dict[str, Any] = {
         "path": str(path).replace("\\", "/"),
         "exists": path.exists(),
@@ -198,7 +213,14 @@ def _summarize_file(path: Path) -> Dict[str, Any]:
         except Exception as exc:
             info["stat_error"] = str(exc)
     if path.exists() and path.is_file() and path.suffix.lower() in {".json", ".jsonl"}:
-        data = _safe_json_load(path)
+        if not parse_json:
+            info["json_summary_mode"] = "metadata_only"
+            return info
+        data = _safe_json_load(path, max_bytes=max_json_bytes)
+        if isinstance(data, dict) and data.get("_skipped_large_json"):
+            info["json_summary_mode"] = "skipped_large_file"
+            info["json_summary_max_bytes"] = max_json_bytes
+            return info
         if isinstance(data, dict):
             info["json_type"] = "object"
             info["top_keys"] = list(data.keys())[:50]
@@ -219,9 +241,23 @@ def _summarize_file(path: Path) -> Dict[str, Any]:
             info["json_type"] = type(data).__name__
     return info
 
-
-def inspect_module_authority(project_root: str | os.PathLike[str] = ".", module_key: Optional[str] = None) -> Dict[str, Any]:
+def inspect_module_authority(
+    project_root: str | os.PathLike[str] = ".",
+    module_key: Optional[str] = None,
+    *,
+    parse_json: bool = True,
+    max_json_bytes: int = 2_000_000,
+    use_cache: bool = False,
+    cache_ttl_seconds: int = 30,
+) -> Dict[str, Any]:
     root = Path(project_root).resolve()
+    cache_key = (str(root), module_key or "__all__", bool(parse_json), int(max_json_bytes))
+    if use_cache:
+        cached = _V30041_INSPECT_CACHE.get(cache_key)
+        if cached:
+            ts, payload = cached
+            if (datetime.now().timestamp() - ts) <= cache_ttl_seconds:
+                return payload
     if module_key:
         selected = {module_key: MODULES_TO_TRACE[module_key]}
     else:
@@ -230,6 +266,7 @@ def inspect_module_authority(project_root: str | os.PathLike[str] = ".", module_
         "generated_at": _now(),
         "project_root": str(root).replace("\\", "/"),
         "module_count": len(selected),
+        "scan_mode": "metadata_only" if not parse_json else "json_summary",
         "modules": {},
     }
     for key, cfg in selected.items():
@@ -239,15 +276,23 @@ def inspect_module_authority(project_root: str | os.PathLike[str] = ".", module_
             "module_no": cfg["module_no"],
             "title": cfg["title"],
             "expected_mode": cfg["expected_mode"],
-            "authority_dir": _summarize_file(authority_dir),
+            "authority_dir": _summarize_file(authority_dir, parse_json=False, max_json_bytes=max_json_bytes),
             "authority_files": {},
             "legacy_candidates": {},
             "warnings": [],
         }
         for filename in cfg["preferred_records"]:
-            module_info["authority_files"][filename] = _summarize_file(authority_dir / filename)
+            module_info["authority_files"][filename] = _summarize_file(
+                authority_dir / filename,
+                parse_json=parse_json,
+                max_json_bytes=max_json_bytes,
+            )
         for rel in cfg["legacy_candidates"]:
-            module_info["legacy_candidates"][rel] = _summarize_file(root / rel)
+            module_info["legacy_candidates"][rel] = _summarize_file(
+                root / rel,
+                parse_json=False,
+                max_json_bytes=max_json_bytes,
+            )
 
         has_authority = any(v.get("exists") for v in module_info["authority_files"].values())
         has_records_like = any(
@@ -264,8 +309,9 @@ def inspect_module_authority(project_root: str | os.PathLike[str] = ".", module_
         if key in {"06_log_query", "11_login_records"} and not (authority_dir / "records.jsonl").exists():
             module_info["warnings"].append("Append-only module should prefer records.jsonl for event logs.")
         result["modules"][key] = module_info
+    if use_cache:
+        _V30041_INSPECT_CACHE[cache_key] = (datetime.now().timestamp(), result)
     return result
-
 
 def _preview_value(value: Any, limit: int = 500) -> Any:
     if value is None:
@@ -309,9 +355,15 @@ def write_authority_trace_event(
     return event
 
 
-def save_snapshot(project_root: str | os.PathLike[str] = ".") -> Dict[str, Any]:
+def save_snapshot(
+    project_root: str | os.PathLike[str] = ".",
+    *,
+    parse_json: bool = True,
+    max_json_bytes: int = 2_000_000,
+    use_cache: bool = False,
+) -> Dict[str, Any]:
     root = Path(project_root).resolve()
-    snapshot = inspect_module_authority(root)
+    snapshot = inspect_module_authority(root, parse_json=parse_json, max_json_bytes=max_json_bytes, use_cache=use_cache)
     trace_dir = root / TRACE_DIR
     trace_dir.mkdir(parents=True, exist_ok=True)
     (root / SNAPSHOT_FILE).write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -368,3 +420,15 @@ def render_markdown_report(snapshot: Dict[str, Any]) -> str:
                 lines.append(f"- {warning}")
         lines.append("")
     return "\n".join(lines)
+
+
+
+def audit_v30041_98_authority_trace_compute_fastpath() -> Dict[str, Any]:
+    return {
+        "version": "V300.41",
+        "module": "98_authority_diagnostic",
+        "metadata_only_supported": True,
+        "process_cache_supported": True,
+        "large_json_guard_bytes": 2_000_000,
+        "authority_write_safe": True,
+    }
