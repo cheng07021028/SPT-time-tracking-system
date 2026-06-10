@@ -96,6 +96,45 @@ def _safe_log_export_filename(filters: dict) -> str:
     return f"SPT_LOG查詢_{s}_{e}_page{p}.xlsx"
 
 
+def _v30031_log_result_signature(raw_df, display_df, filters: dict) -> tuple:
+    raw = raw_df if isinstance(raw_df, pd.DataFrame) else pd.DataFrame()
+    disp = display_df if isinstance(display_df, pd.DataFrame) else pd.DataFrame()
+    ids = []
+    try:
+        if "id" in raw.columns:
+            ids = [str(x) for x in raw["id"].head(5).tolist()] + [str(x) for x in raw["id"].tail(5).tolist()]
+        elif "ID / ID" in disp.columns:
+            ids = [str(x) for x in disp["ID / ID"].head(5).tolist()] + [str(x) for x in disp["ID / ID"].tail(5).tolist()]
+    except Exception:
+        ids = []
+    return (
+        str(filters.get("start_date", "")),
+        str(filters.get("end_date", "")),
+        str(filters.get("action_type", "")),
+        str(filters.get("level", "")),
+        str(filters.get("keyword", "")),
+        int(filters.get("page", 1) or 1),
+        int(filters.get("page_size", filters.get("limit", 500)) or 500),
+        len(raw),
+        tuple(ids),
+    )
+
+
+def _v30031_log_excel_bytes_cached(raw_df, display_df, filters: dict) -> bytes:
+    sig = _v30031_log_result_signature(raw_df, display_df, filters)
+    cache = st.session_state.get("_v30031_log_excel_cache")
+    if isinstance(cache, dict) and cache.get("sig") == sig and isinstance(cache.get("bytes"), (bytes, bytearray)):
+        return bytes(cache.get("bytes"))
+    data = _make_logs_excel_bytes(raw_df, display_df, filters)
+    st.session_state["_v30031_log_excel_cache"] = {"sig": sig, "bytes": data}
+    return data
+
+
+def _v30031_clear_log_output_cache() -> None:
+    st.session_state.pop("_v30031_log_excel_cache", None)
+    st.session_state.pop("_v30031_log_delete_preview", None)
+
+
 def _default_filters() -> dict:
     today = today_date()
     return {
@@ -174,6 +213,7 @@ with st.form("log_query_filter_form", clear_on_submit=False):
         clear_filter = st.form_submit_button("↺ 清除條件 / Clear", use_container_width=True)
 if clear_filter:
     st.session_state["log_query_filters"] = _default_filters()
+    _v30031_clear_log_output_cache()
     st.session_state.pop("_spt_v67_log_query_result", None)
     st.session_state.pop("_spt_v67_log_query_signature", None)
     st.session_state["_spt_v67_log_query_loaded"] = False
@@ -183,6 +223,7 @@ if apply_filter:
     if start_date > end_date:
         st.error("開始日期不可大於結束日期。")
         st.stop()
+    _v30031_clear_log_output_cache()
     st.session_state["log_query_filters"] = {
         "start_date": start_date,
         "end_date": end_date,
@@ -256,7 +297,7 @@ if not df.empty:
 
     st.download_button(
         "▣ 下載目前頁 LOG Excel / Download Current Page Excel",
-        data=_make_logs_excel_bytes(df, display_df, filters),
+        data=_v30031_log_excel_bytes_cached(df, display_df, filters),
         file_name=_safe_log_export_filename(filters),
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
@@ -272,13 +313,27 @@ if check_permission("06_logs", "can_delete") or check_permission("06_logs", "can
     d1, d2 = st.columns(2)
     delete_start = d1.date_input("刪除開始日期 / Delete Start", value=filters.get("start_date") or today_date(), key="log_delete_start")
     delete_end = d2.date_input("刪除結束日期 / Delete End", value=filters.get("end_date") or today_date(), key="log_delete_end")
-    preview_count = 0
-    if callable(query_logs_backend_page) and delete_start <= delete_end:
+    preview_sig = (str(delete_start), str(delete_end))
+    preview_state = st.session_state.get("_v30031_log_delete_preview")
+    preview_count = None
+    if isinstance(preview_state, dict) and preview_state.get("sig") == preview_sig:
         try:
-            preview_count = int(query_logs_backend_page(start_date=delete_start, end_date=delete_end, page=1, page_size=1).get("total_rows", 0) or 0)
+            preview_count = int(preview_state.get("count", 0) or 0)
         except Exception:
-            preview_count = 0
-    st.info(f"此區間目前符合刪除條件的 LOG 筆數：約 {preview_count}")
+            preview_count = None
+    pc1, pc2 = st.columns([1, 3])
+    if pc1.button("計算刪除筆數", use_container_width=True, disabled=delete_start > delete_end):
+        preview_count = 0
+        if callable(query_logs_backend_page):
+            try:
+                preview_count = int(query_logs_backend_page(start_date=delete_start, end_date=delete_end, page=1, page_size=1).get("total_rows", 0) or 0)
+            except Exception:
+                preview_count = 0
+        st.session_state["_v30031_log_delete_preview"] = {"sig": preview_sig, "count": int(preview_count or 0)}
+    if preview_count is None:
+        pc2.info("此區間刪除筆數不在頁面 rerun 時自動查詢；需要確認時請按『計算刪除筆數』，以節省 Neon Compute。")
+    else:
+        pc2.info(f"此區間目前符合刪除條件的 LOG 筆數：約 {preview_count}")
     delete_token = int(st.session_state.get("log_delete_confirm_token", 0))
     confirm_key = f"confirm_delete_log_range_{delete_token}"
     confirm_delete = st.checkbox(
@@ -292,6 +347,7 @@ if check_permission("06_logs", "can_delete") or check_permission("06_logs", "can
             username = st.session_state.get("auth_username", st.session_state.get("username", "SYSTEM"))
             deleted = _delete_logs_safely(delete_start, delete_end, username=username)
             st.session_state["log_delete_confirm_token"] = delete_token + 1
+            _v30031_clear_log_output_cache()
             st.session_state.pop("_spt_v67_log_query_result", None)
             st.session_state.pop("_spt_v67_log_query_signature", None)
             st.session_state["_spt_v67_log_query_loaded"] = False

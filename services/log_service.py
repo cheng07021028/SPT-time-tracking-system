@@ -3001,3 +3001,133 @@ def write_log_many(rows: list[dict[str, Any]], *, default_target_table: str = ""
 def audit_v59_nonblocking_log() -> dict:
     return {"version":"V59_NONBLOCKING_FRONTEND_LOG_BUFFER","system_logs_insert_removed_from_page_hotpath":True}
 # =================== END V59 NON-BLOCKING FRONTEND LOG BUFFER =====================
+
+# ===================== V300.31 06 LOG COMPUTE FASTPATH =====================
+# 目標：06 LOG 查詢維持 Neon/PostgreSQL 權威讀取，但減少頁面查詢與顯示重複成本。
+# - LOG 分頁查詢用 COUNT(*) OVER()，避免同一篩選條件先 COUNT 再 SELECT。
+# - 帳號 -> 姓名顯示對照加短 TTL cache，避免每次 render 都重查 10 權限資料。
+try:
+    _v30031_time
+except NameError:  # pragma: no cover
+    import time as _v30031_time
+
+try:
+    _v30031_prev_user_display_name_map = _user_display_name_map
+except Exception:  # pragma: no cover
+    _v30031_prev_user_display_name_map = None
+
+_V30031_LOG_NAME_MAP_CACHE: dict[str, Any] = {"ts": 0.0, "data": {}}
+_V30031_LOG_NAME_MAP_TTL_SEC = 120.0
+_V30031_LOG_SCHEMA_READY = False
+
+
+def _v30031_ensure_log_schema_once() -> None:
+    global _V30031_LOG_SCHEMA_READY
+    if _V30031_LOG_SCHEMA_READY:
+        return
+    try:
+        from services.db_service import ensure_database
+        ensure_database()
+    except Exception:
+        pass
+    _V30031_LOG_SCHEMA_READY = True
+
+
+def _user_display_name_map() -> dict[str, str]:  # type: ignore[override]
+    now = _v30031_time.time()
+    try:
+        cached = _V30031_LOG_NAME_MAP_CACHE.get("data")
+        ts = float(_V30031_LOG_NAME_MAP_CACHE.get("ts", 0.0) or 0.0)
+        if isinstance(cached, dict) and cached and (now - ts) < _V30031_LOG_NAME_MAP_TTL_SEC:
+            return dict(cached)
+    except Exception:
+        pass
+    mapping: dict[str, str] = {}
+    try:
+        if callable(_v30031_prev_user_display_name_map):
+            mapping = dict(_v30031_prev_user_display_name_map() or {})
+    except Exception:
+        mapping = {}
+    try:
+        _V30031_LOG_NAME_MAP_CACHE["ts"] = now
+        _V30031_LOG_NAME_MAP_CACHE["data"] = dict(mapping)
+    except Exception:
+        pass
+    return mapping
+
+
+def clear_log_display_cache() -> None:
+    """Clear lightweight 06 LOG display caches after account/name changes."""
+    try:
+        _V30031_LOG_NAME_MAP_CACHE["ts"] = 0.0
+        _V30031_LOG_NAME_MAP_CACHE["data"] = {}
+    except Exception:
+        pass
+
+
+def load_logs_page(start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None, page: int = 1, page_size: int = 500) -> dict[str, Any]:  # type: ignore[override]
+    """V300.31: backend pagination with one SELECT instead of COUNT + SELECT.
+
+    Uses Neon/PostgreSQL system_logs as authority.  The page still queries only the
+    requested page; COUNT(*) OVER() returns total_rows with the same SQL pass.
+    """
+    started = _v30031_time.perf_counter()
+    _v30031_ensure_log_schema_once()
+    from services.db_service import query_df
+    p = max(1, int(page or 1))
+    size = max(20, min(int(page_size or 500), 1000))
+    offset = (p - 1) * size
+    where, params = _v32_log_where(start_date, end_date, action_type, level, keyword)
+    df = query_df(
+        f"""
+        SELECT id, log_time, user_name, action_type, target_table, target_id, message, detail, level,
+               COUNT(*) OVER() AS __total_rows
+        FROM system_logs
+        WHERE {where}
+        ORDER BY log_time DESC, id DESC
+        LIMIT ? OFFSET ?
+        """,
+        tuple(params + [size, offset]),
+    )
+    total = 0
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        try:
+            total = int(df.iloc[0].get("__total_rows") or 0)
+        except Exception:
+            total = len(df)
+        try:
+            if "__total_rows" in df.columns:
+                df = df.drop(columns=["__total_rows"])
+        except Exception:
+            pass
+    rows = df.where(pd.notna(df), "").to_dict("records") if isinstance(df, pd.DataFrame) else []
+    return {
+        "ok": True,
+        "rows": rows,
+        "data": rows,
+        "df": pd.DataFrame(rows),
+        "total_rows": int(total),
+        "page": p,
+        "page_size": size,
+        "total_pages": max(1, (int(total) + size - 1) // size) if size else 1,
+        "elapsed_seconds": round(_v30031_time.perf_counter() - started, 4),
+        "source": "neon_system_logs_v30031_onepass",
+        "onepass_count": True,
+    }
+
+
+def load_logs(limit: int = 500, start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None):  # type: ignore[override]
+    res = load_logs_page(start_date=start_date, end_date=end_date, action_type=action_type, level=level, keyword=keyword, page=1, page_size=limit)
+    return res.get("df") if isinstance(res, dict) else pd.DataFrame()
+
+
+def audit_v30031_log_compute_fastpath() -> dict[str, Any]:
+    return {
+        "version": "V300.31_06_LOG_COMPUTE_FASTPATH",
+        "neon_authority": "system_logs",
+        "count_select_merged": True,
+        "display_name_map_ttl_seconds": _V30031_LOG_NAME_MAP_TTL_SEC,
+        "write_path_changed": False,
+        "ui_theme_changed": False,
+    }
+# =================== END V300.31 06 LOG COMPUTE FASTPATH =====================
