@@ -28,6 +28,7 @@ from services.system_settings_service import (
     get_live_page_reset_time,
     save_live_page_reset_time,
     export_system_settings_permanent,
+    clear_13_system_settings_front_cache,
 )
 
 from services.auto_backup_service import (
@@ -84,6 +85,140 @@ def _excel_bytes(sheets: dict[str, pd.DataFrame]) -> bytes:
         for name, data in sheets.items():
             (data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)).to_excel(writer, index=False, sheet_name=str(name)[:31] or "Sheet1")
     return bio.getvalue()
+
+
+
+# ===================== V300.38 13 page compute fastpath helpers =====================
+# 只做頁面層短快取與輸出失效，不改 UI / CSS / theme，也不改 Neon 權威寫入規則。
+_V30038_PAGE_CACHE_TTL = 30.0
+
+
+def _v30038_now_s() -> float:
+    try:
+        import time
+        return float(time.time())
+    except Exception:
+        return 0.0
+
+
+def _v30038_cache_get(key: str):
+    try:
+        item = st.session_state.get(key)
+        if isinstance(item, dict) and (_v30038_now_s() - float(item.get("ts") or 0.0)) <= _V30038_PAGE_CACHE_TTL:
+            return item.get("value")
+    except Exception:
+        pass
+    return None
+
+
+def _v30038_cache_set(key: str, value) -> None:
+    try:
+        st.session_state[key] = {"ts": _v30038_now_s(), "value": value}
+    except Exception:
+        pass
+
+
+def _v30038_clear_page_cache(reason: str = "manual") -> None:
+    prefixes = (
+        "v30038_13_",
+        "v41_system_settings_excel_",
+        "system_settings_excel_import_preview_v30038",
+    )
+    for k in list(st.session_state.keys()):
+        sk = str(k)
+        if sk.startswith(prefixes):
+            st.session_state.pop(k, None)
+    try:
+        clear_13_system_settings_front_cache(f"page_cache_clear_{reason}")
+    except Exception:
+        pass
+
+
+def _v30038_cached_category_choices(include_common: bool = True) -> list[str]:
+    key = f"v30038_13_category_choices:{bool(include_common)}"
+    cached = _v30038_cache_get(key)
+    if isinstance(cached, list):
+        return list(cached)
+    value = load_process_category_choices(include_common=include_common)
+    _v30038_cache_set(key, list(value or []))
+    return list(value or [])
+
+
+def _v30038_cached_default_process_category() -> str:
+    key = "v30038_13_default_process_category"
+    cached = _v30038_cache_get(key)
+    if isinstance(cached, str):
+        return cached
+    value = str(get_default_process_category() or "")
+    _v30038_cache_set(key, value)
+    return value
+
+
+def _v30038_cached_live_page_reset_time() -> str:
+    key = "v30038_13_live_page_reset_time"
+    cached = _v30038_cache_get(key)
+    if isinstance(cached, str):
+        return cached
+    value = str(get_live_page_reset_time() or "")
+    _v30038_cache_set(key, value)
+    return value
+
+
+def _v30038_file_signature(uploaded) -> tuple:
+    try:
+        name = str(getattr(uploaded, "name", "") or "")
+        pos = uploaded.tell() if hasattr(uploaded, "tell") else None
+        data = uploaded.getvalue()
+        if pos is not None and hasattr(uploaded, "seek"):
+            uploaded.seek(pos)
+        import hashlib
+        return (name, len(data), hashlib.md5(data).hexdigest())
+    except Exception:
+        return (str(getattr(uploaded, "name", "") or ""), 0, "error")
+
+
+def _v30038_read_excel_cached(uploaded) -> dict[str, pd.DataFrame]:
+    sig = _v30038_file_signature(uploaded)
+    key = "system_settings_excel_import_preview_v30038"
+    cached = st.session_state.get(key)
+    if isinstance(cached, dict) and cached.get("sig") == sig and isinstance(cached.get("sheets"), dict):
+        return {str(k): v.copy() for k, v in cached["sheets"].items() if isinstance(v, pd.DataFrame)}
+    sheets = pd.read_excel(uploaded, sheet_name=None)
+    safe_sheets = {str(k): (v.copy() if isinstance(v, pd.DataFrame) else pd.DataFrame(v)) for k, v in sheets.items()}
+    st.session_state[key] = {"sig": sig, "sheets": {k: v.copy() for k, v in safe_sheets.items()}}
+    return {k: v.copy() for k, v in safe_sheets.items()}
+
+
+def _v30038_prepare_excel_export() -> bytes:
+    # 按按鈕才執行；同一組設定未變動前不重建 Excel bytes。
+    key = "v30038_13_system_settings_excel_export"
+    cached = st.session_state.get(key)
+    if isinstance(cached, dict) and cached.get("bytes"):
+        return cached["bytes"]
+    current_process_export = load_process_options_df(active_only=False)
+    current_rest_export = load_rest_periods_df(active_only=False)
+    app_settings_export = pd.DataFrame([{
+        "setting_key": "live_page_reset_time",
+        "setting_value": _v30038_cached_live_page_reset_time(),
+        "note": "01 工時紀錄每日重新整理時間 HH:MM",
+    }])
+    data = _excel_bytes({"process_options": current_process_export, "rest_periods": current_rest_export, "app_settings": app_settings_export})
+    st.session_state[key] = {"ts": _v30038_now_s(), "bytes": data}
+    return data
+
+
+def _v30038_validate_backup_destination_cached(mode: str, folder: str, create: bool = False) -> dict:
+    # create=True 仍直接執行；只有顯示用 create=False 做短快取。
+    if create:
+        return validate_backup_destination(mode, folder, create=True)
+    key = f"v30038_13_backup_destination:{mode}:{folder}"
+    cached = _v30038_cache_get(key)
+    if isinstance(cached, dict):
+        return dict(cached)
+    res = validate_backup_destination(mode, folder, create=False)
+    _v30038_cache_set(key, dict(res or {}))
+    return dict(res or {})
+# =================== END V300.38 13 page compute fastpath helpers =====================
 
 def _bool_from_any(v, default=True):
     text = str(v).strip().lower() if v is not None else ""
@@ -552,7 +687,7 @@ def _render_system_settings_health_center() -> None:
     with st.expander("系統設定永久保存健康檢查 / System Settings Persistence Health", expanded=False):
         h1, h2, h3 = st.columns(3)
         h1.metric("永久檔存在 / Existing Files", f"{ok_count}/{len(quick_rows)}")
-        h2.metric("目前工時頁重置時間", get_live_page_reset_time())
+        h2.metric("目前工時頁重置時間", _v30038_cached_live_page_reset_time())
         h3.metric("完整檢查", "按需執行")
         st.dataframe(pd.DataFrame(quick_rows), use_container_width=True, hide_index=True, height=180)
 
@@ -641,6 +776,7 @@ def _refresh_after_apply(message: str, *edit_mode_keys: str) -> None:
     for k in edit_mode_keys:
         if k:
             st.session_state[k] = False
+    _v30038_clear_page_cache("after_apply")
     _clear_editor_state(
         "system_process_options_editor_v192",
         "system_process_options_editor_v144",
@@ -799,7 +935,7 @@ def _render_external_auto_backup_center() -> None:
                 st.text_input("GitHub 備份目標", value="GitHub Contents API：data/permanent_store/persistent_state / data/permanent_store/persistent_modules", disabled=True, key="spt_v305_github_target")
                 st.caption("需在 Secrets 設定 GITHUB_TOKEN、GITHUB_REPOSITORY、GITHUB_BRANCH。")
 
-        validation = validate_backup_destination(selected_mode, target_folder, create=False)
+        validation = _v30038_validate_backup_destination_cached(selected_mode, target_folder, create=False)
         if validation.get("ok"):
             st.success(validation.get("message", "備份目的地可用。"))
         else:
@@ -942,11 +1078,11 @@ if section == "總覽 / Quick Overview":
     st.markdown("### 快速總覽 / Quick Overview")
     s1, s2, s3, s4 = st.columns(4)
     try:
-        s1.metric("預設類別", get_default_process_category())
+        s1.metric("預設類別", _v30038_cached_default_process_category())
     except Exception:
         s1.metric("預設類別", "讀取失敗")
     try:
-        s2.metric("01 每日重整時間", get_live_page_reset_time())
+        s2.metric("01 每日重整時間", _v30038_cached_live_page_reset_time())
     except Exception:
         s2.metric("01 每日重整時間", "讀取失敗")
     s3.metric("資料權威", "Neon / PostgreSQL")
@@ -969,10 +1105,7 @@ if section == "Excel 匯入匯出 / Excel Import Export":
     exp1, exp2 = st.columns(2)
     with exp1:
         if st.button("⟰ 產生並下載全部系統設定 Excel / Prepare Export", use_container_width=True, key="v41_prepare_system_settings_excel"):
-            current_process_export = load_process_options_df(active_only=False)
-            current_rest_export = load_rest_periods_df(active_only=False)
-            app_settings_export = pd.DataFrame([{"setting_key": "live_page_reset_time", "setting_value": get_live_page_reset_time(), "note": "01 工時紀錄每日重新整理時間 HH:MM"}])
-            st.session_state["v41_system_settings_excel_bytes"] = _excel_bytes({"process_options": current_process_export, "rest_periods": current_rest_export, "app_settings": app_settings_export})
+            st.session_state["v41_system_settings_excel_bytes"] = _v30038_prepare_excel_export()
             st.session_state["v41_system_settings_excel_ready"] = True
     if st.session_state.get("v41_system_settings_excel_ready"):
         st.download_button(
@@ -987,7 +1120,7 @@ if section == "Excel 匯入匯出 / Excel Import Export":
             setting_file = st.file_uploader("上傳系統設定 Excel / Upload System Settings", type=["xlsx", "xlsm", "xls"], key="system_settings_excel_upload_v41")
             if setting_file is not None:
                 try:
-                    sheets = pd.read_excel(setting_file, sheet_name=None)
+                    sheets = _v30038_read_excel_cached(setting_file)
                     st.success("已讀取系統設定 Excel，請確認後按下方按鈕套用。")
                     for nm, dfp in sheets.items():
                         with st.expander(f"預覽：{nm}", expanded=False):
@@ -1013,8 +1146,8 @@ if section == "類別與工段設定 / Category & Process":
     st.subheader("一、類別與工段名稱設定 / Category & Process Options")
     st.caption("類別與工段採按需載入。工段表只查目前套用的類別，不再進頁時讀取全部工段。")
 
-    category_choices = load_process_category_choices(include_common=True)
-    current_default_category = get_default_process_category()
+    category_choices = _v30038_cached_category_choices(include_common=True)
+    current_default_category = _v30038_cached_default_process_category()
     if current_default_category not in category_choices:
         current_default_category = category_choices[0] if category_choices else ""
     if not category_choices:
@@ -1103,7 +1236,7 @@ if section == "類別與工段設定 / Category & Process":
         render_table(cat_view.drop(columns=[SYSTEM_DELETE_COL, "刪除"], errors="ignore"), "system_process_categories", editable=False, height=260)
 
     st.markdown("#### 類別對應工段設定 / Category-specific Process Options")
-    all_category_choices = load_process_category_choices(include_common=True)
+    all_category_choices = _v30038_cached_category_choices(include_common=True)
     if current_default_category not in all_category_choices:
         current_default_category = all_category_choices[0] if all_category_choices else ""
     _applied_process_category = st.session_state.get("system_process_category_filter_applied_v41", current_default_category)

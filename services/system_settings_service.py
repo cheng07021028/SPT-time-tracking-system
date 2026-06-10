@@ -6459,3 +6459,190 @@ def get_process_options_by_category_exact(category_name: str) -> list[str]:  # t
 def audit_v59_system_settings_page_hotpath() -> dict:
     return {"version":"V59_FAST_CATEGORY_READS_WITHOUT_DDL","load_process_category_choices_no_ddl":True,"get_process_options_by_category_exact_no_ddl":True}
 # =================== END V59 FAST CATEGORY READS WITHOUT DDL =====================
+
+# ===================== V300.38 13 SYSTEM SETTINGS COMPUTE FASTPATH =====================
+# Purpose:
+# - Reduce Neon Compute on module 13 hot paths without changing current read/write rules.
+# - Keep Neon/PostgreSQL as authority.
+# - Add short TTL caches for read-only category/default lookups used by 01/13 dropdowns.
+# - Clear caches after every explicit save/delete path.
+try:
+    import time as _v30038_time
+except Exception:  # pragma: no cover
+    _v30038_time = None  # type: ignore
+
+_V30038_SYS_LOOKUP_CACHE_SECONDS = 45.0
+_V30038_SYS_LOOKUP_CACHE: dict[str, tuple[float, object]] = {}
+
+
+def _v30038_now() -> float:
+    try:
+        if _v30038_time is not None:
+            return float(_v30038_time.time())
+    except Exception:
+        pass
+    return 0.0
+
+
+def _v30038_cache_get(key: str):
+    try:
+        item = _V30038_SYS_LOOKUP_CACHE.get(key)
+        if item and (_v30038_now() - float(item[0])) <= _V30038_SYS_LOOKUP_CACHE_SECONDS:
+            return item[1]
+    except Exception:
+        pass
+    return None
+
+
+def _v30038_cache_set(key: str, value) -> None:
+    try:
+        _V30038_SYS_LOOKUP_CACHE[key] = (_v30038_now(), value)
+    except Exception:
+        pass
+
+
+def _v30038_clear_lookup_cache(reason: str = "manual") -> None:
+    try:
+        _V30038_SYS_LOOKUP_CACHE.clear()
+    except Exception:
+        pass
+
+
+try:
+    _v30038_prev_clear_system_settings_cache = _v38_clear_system_settings_cache  # type: ignore[name-defined]
+except Exception:
+    _v30038_prev_clear_system_settings_cache = None
+
+
+def _v38_clear_system_settings_cache() -> None:  # type: ignore[override]
+    if callable(_v30038_prev_clear_system_settings_cache):
+        try:
+            _v30038_prev_clear_system_settings_cache()
+        except Exception:
+            pass
+    _v30038_clear_lookup_cache("v38_clear_system_settings_cache")
+
+
+try:
+    _v30038_prev_load_process_category_choices = load_process_category_choices  # type: ignore[name-defined]
+except Exception:
+    _v30038_prev_load_process_category_choices = None
+
+
+def load_process_category_choices(include_common: bool = False) -> list[str]:  # type: ignore[override]
+    key = f"category_choices:{bool(include_common)}"
+    cached = _v30038_cache_get(key)
+    if isinstance(cached, list):
+        return list(cached)
+    if callable(_v30038_prev_load_process_category_choices):
+        out = _v30038_prev_load_process_category_choices(include_common=include_common)
+    else:
+        out = []
+    out = list(out or [])
+    _v30038_cache_set(key, list(out))
+    return list(out)
+
+
+try:
+    _v30038_prev_get_default_process_category = get_default_process_category  # type: ignore[name-defined]
+except Exception:
+    _v30038_prev_get_default_process_category = None
+
+
+def get_default_process_category() -> str:  # type: ignore[override]
+    cached = _v30038_cache_get("default_process_category")
+    if isinstance(cached, str):
+        return cached
+    value = ""
+    if callable(_v30038_prev_get_default_process_category):
+        try:
+            value = str(_v30038_prev_get_default_process_category() or "")
+        except Exception:
+            value = ""
+    _v30038_cache_set("default_process_category", value)
+    return value
+
+
+try:
+    _v30038_prev_get_live_page_reset_time = get_live_page_reset_time  # type: ignore[name-defined]
+except Exception:
+    _v30038_prev_get_live_page_reset_time = None
+
+
+def get_live_page_reset_time() -> str:  # type: ignore[override]
+    cached = _v30038_cache_get("live_page_reset_time")
+    if isinstance(cached, str):
+        return cached
+    value = "02:00"
+    if callable(_v30038_prev_get_live_page_reset_time):
+        try:
+            value = str(_v30038_prev_get_live_page_reset_time() or "02:00")
+        except Exception:
+            value = "02:00"
+    _v30038_cache_set("live_page_reset_time", value)
+    return value
+
+
+try:
+    _v30038_prev_get_process_options_by_category_exact = get_process_options_by_category_exact  # type: ignore[name-defined]
+except Exception:
+    _v30038_prev_get_process_options_by_category_exact = None
+
+
+def get_process_options_by_category_exact(category_name: str) -> list[str]:  # type: ignore[override]
+    cat = str(category_name or "").strip()
+    if not cat:
+        return []
+    key = f"process_options_exact:{cat}"
+    cached = _v30038_cache_get(key)
+    if isinstance(cached, list):
+        return list(cached)
+    if callable(_v30038_prev_get_process_options_by_category_exact):
+        out = _v30038_prev_get_process_options_by_category_exact(cat)
+    else:
+        out = []
+    out = list(out or [])
+    _v30038_cache_set(key, list(out))
+    return list(out)
+
+
+# Wrap public save/delete functions so the V300.38 lookup cache cannot show stale dropdowns after explicit writes.
+for _v30038_name in [
+    "save_process_categories_df",
+    "delete_process_categories",
+    "save_process_options_df",
+    "delete_process_options",
+    "save_rest_periods_df",
+    "delete_rest_periods",
+    "save_default_process_category",
+    "save_live_page_reset_time",
+]:
+    try:
+        _v30038_old = globals().get(_v30038_name)
+        if callable(_v30038_old):
+            def _v30038_make_wrapper(_fn, _name):
+                def _wrapped(*args, **kwargs):
+                    _v30038_clear_lookup_cache(f"before_{_name}")
+                    res = _fn(*args, **kwargs)
+                    _v30038_clear_lookup_cache(f"after_{_name}")
+                    return res
+                _wrapped.__name__ = getattr(_fn, "__name__", _name)
+                _wrapped.__doc__ = getattr(_fn, "__doc__", "")
+                return _wrapped
+            globals()[_v30038_name] = _v30038_make_wrapper(_v30038_old, _v30038_name)
+    except Exception:
+        pass
+
+
+def audit_v30038_13_system_settings_compute_fastpath() -> dict[str, object]:
+    return {
+        "version": "V300.38_13_SYSTEM_SETTINGS_COMPUTE_FASTPATH",
+        "module": "13_system_settings",
+        "neon_authority_unchanged": True,
+        "ui_css_theme_unchanged": True,
+        "lookup_cache_seconds": _V30038_SYS_LOOKUP_CACHE_SECONDS,
+        "cached_lookup_keys": list(_V30038_SYS_LOOKUP_CACHE.keys()),
+        "save_delete_clears_lookup_cache": True,
+        "no_github_or_local_json_foreground_authority": True,
+    }
+# =================== END V300.38 13 SYSTEM SETTINGS COMPUTE FASTPATH =====================
