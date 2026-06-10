@@ -101,6 +101,15 @@ def _excel_bytes(sheets: dict[str, pd.DataFrame]) -> bytes:
             df.to_excel(writer, index=False, sheet_name=str(name)[:31] or "Sheet1")
     return bio.getvalue()
 
+
+def _v30029_employee_template_bytes() -> bytes:
+    """Cache the static Excel import template in session_state to avoid rebuilding it on every rerun."""
+    key = "v30029_employee_template_bytes"
+    if key not in st.session_state:
+        tpl = pd.DataFrame(columns=["工號", "姓名", "單位", "職稱", "啟用", "在廠", "今日出勤", "備註"])
+        st.session_state[key] = _excel_bytes({"template": tpl})
+    return st.session_state[key]
+
 def rerun():
     try:
         st.rerun()
@@ -430,8 +439,7 @@ with tab1:
     if "v68_employee_export_bytes" in st.session_state:
         e1.download_button("下載目前人員名單 / Download Employees", data=st.session_state["v68_employee_export_bytes"], file_name="SPT_人員名單.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="v68_download_employee_export")
         e1.caption(f"已準備 {st.session_state.get('v68_employee_export_rows', 0)} 筆。")
-    tpl = pd.DataFrame(columns=["工號", "姓名", "單位", "職稱", "啟用", "在廠", "今日出勤", "備註"])
-    e2.download_button("⟰ 下載人員匯入範本 / Download Template", data=_excel_bytes({"template": tpl}), file_name="SPT_人員匯入範本.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+    e2.download_button("⟰ 下載人員匯入範本 / Download Template", data=_v30029_employee_template_bytes(), file_name="SPT_人員匯入範本.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
     st.info("V68：唯讀模式改用輕量表格顯示；按『啟動編輯』後才載入可編輯 data_editor，避免每次選擇都重繪大型編輯器。")
     if employee_edit_enabled:

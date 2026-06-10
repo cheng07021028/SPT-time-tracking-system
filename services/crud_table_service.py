@@ -335,58 +335,114 @@ def save_work_orders(df: pd.DataFrame) -> dict[str, Any]:
 
 
 def save_employees(df: pd.DataFrame) -> dict[str, Any]:
+    """Persist 04 employee master data through the Neon/PostgreSQL authority table.
+
+    V300.29: mirror the 03 work-order fast path for employees. The old path did
+    one SELECT plus one write per row, so large paste/Excel saves could issue
+    hundreds of Neon calls and increase the chance of repeated-submit symptoms.
+    The new path reads existing employee keys once, prepares all insert/update/
+    soft-delete operations in memory, then writes them in one transaction. UI,
+    soft-delete behavior, reboot durability, and last-row-wins semantics are
+    preserved.
+    """
     _ensure_runtime_columns()
     work = _normalize(df, EMPLOYEE_COLS, EMP_DISPLAY_TO_INTERNAL)
     now = now_text()
     result = {"inserted": 0, "updated": 0, "deleted": 0, "skipped": 0}
+
+    try:
+        existing_df = query_df("SELECT id, employee_id FROM employees", ())
+    except Exception:
+        existing_df = pd.DataFrame()
+    if not isinstance(existing_df, pd.DataFrame):
+        existing_df = pd.DataFrame()
+
+    existing_by_emp: dict[str, int] = {}
+    existing_by_id: set[int] = set()
+    if not existing_df.empty:
+        for _, old in existing_df.iterrows():
+            old_id = _int_or_none(old.get("id"))
+            old_emp = _text(old.get("employee_id"))
+            if old_id is not None:
+                existing_by_id.add(old_id)
+            if old_emp and old_id is not None and old_emp not in existing_by_emp:
+                existing_by_emp[old_emp] = old_id
+
+    operations: list[tuple[str, Iterable[Any]]] = []
     for _, row in work.iterrows():
-        emp_id = _text(row.get("employee_id")); name = _text(row.get("employee_name"))
+        emp_id = _text(row.get("employee_id"))
+        name = _text(row.get("employee_name"))
         if not emp_id or not name:
             result["skipped"] += 1
             continue
         rid = _int_or_none(row.get("id"))
+
         if _bool(row.get("_delete")):
             if rid:
-                result["deleted"] += execute("UPDATE employees SET deleted_at=?, deleted_by='admin', delete_reason='04 人員名單刪除', updated_at=? WHERE id=? AND (deleted_at IS NULL OR deleted_at='')", (now, now, rid))
+                operations.append((
+                    "UPDATE employees SET deleted_at=?, deleted_by='admin', delete_reason='04 人員名單刪除', updated_at=? WHERE id=? AND (deleted_at IS NULL OR deleted_at='')",
+                    (now, now, rid),
+                ))
+                if rid in existing_by_id:
+                    result["deleted"] += 1
             else:
-                result["deleted"] += execute("UPDATE employees SET deleted_at=?, deleted_by='admin', delete_reason='04 人員名單刪除', updated_at=? WHERE employee_id=? AND (deleted_at IS NULL OR deleted_at='')", (now, now, emp_id))
+                operations.append((
+                    "UPDATE employees SET deleted_at=?, deleted_by='admin', delete_reason='04 人員名單刪除', updated_at=? WHERE employee_id=? AND (deleted_at IS NULL OR deleted_at='')",
+                    (now, now, emp_id),
+                ))
+                if emp_id in existing_by_emp:
+                    result["deleted"] += 1
             continue
-        vals = (
-            emp_id, name, _text(row.get("department")), _text(row.get("title")),
-            1 if _bool(row.get("is_active"), True) else 0,
-            1 if _bool(row.get("is_in_factory"), True) else 0,
-            1 if _bool(row.get("is_today_attendance"), True) else 0,
-            _text(row.get("note")), now,
-        )
+
+        department = _text(row.get("department"))
+        title = _text(row.get("title"))
+        active_val = 1 if _bool(row.get("is_active"), True) else 0
+        factory_val = 1 if _bool(row.get("is_in_factory"), True) else 0
+        today_val = 1 if _bool(row.get("is_today_attendance"), True) else 0
+        note = _text(row.get("note"))
+
         if rid:
-            execute(
+            operations.append((
                 """
                 UPDATE employees SET employee_id=?, employee_name=?, department=?, title=?, is_active=?, active=?, is_in_factory=?, is_today_attendance=?, note=?, updated_at=?, deleted_at='', deleted_by='', delete_reason=''
                 WHERE id=?
                 """,
-                (vals[0], vals[1], vals[2], vals[3], vals[4], vals[4], vals[5], vals[6], vals[7], vals[8], rid),
-            )
+                (emp_id, name, department, title, active_val, active_val, factory_val, today_val, note, now, rid),
+            ))
             result["updated"] += 1
+            existing_by_emp[emp_id] = rid
+            existing_by_id.add(rid)
             continue
-        existing = query_one("SELECT id FROM employees WHERE employee_id=? LIMIT 1", (emp_id,))
-        if existing:
-            execute(
-            """
-            UPDATE employees SET employee_name=?, department=?, title=?, is_active=?, active=?, is_in_factory=?, is_today_attendance=?, note=?, updated_at=?, deleted_at='', deleted_by='', delete_reason=''
-            WHERE employee_id=?
-            """,
-            (vals[1], vals[2], vals[3], vals[4], vals[4], vals[5], vals[6], vals[7], vals[8], emp_id),
-        )
+
+        if emp_id in existing_by_emp:
+            operations.append((
+                """
+                UPDATE employees SET employee_name=?, department=?, title=?, is_active=?, active=?, is_in_factory=?, is_today_attendance=?, note=?, updated_at=?, deleted_at='', deleted_by='', delete_reason=''
+                WHERE employee_id=?
+                """,
+                (name, department, title, active_val, active_val, factory_val, today_val, note, now, emp_id),
+            ))
             result["updated"] += 1
         else:
-            execute(
+            operations.append((
                 """
                 INSERT INTO employees(employee_id, employee_name, department, title, is_active, active, is_in_factory, is_today_attendance, note, created_at, updated_at, deleted_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
                 """,
-                (vals[0], vals[1], vals[2], vals[3], vals[4], vals[4], vals[5], vals[6], vals[7], now, now),
-            )
+                (emp_id, name, department, title, active_val, active_val, factory_val, today_val, note, now, now),
+            ))
             result["inserted"] += 1
+            # Preserve old row-order semantics for duplicated employee_id values
+            # in the same paste/import: first row inserts, later rows update it.
+            existing_by_emp[emp_id] = -1
+
+    if operations:
+        execute_transaction(
+            operations,
+            mark_changed=True,
+            reason="04 人員名單批次儲存",
+            source_sql="SAVE_EMPLOYEES_BATCH",
+        )
     _save_log("SAVE_EMPLOYEES", "employees", f"人員儲存 inserted={result['inserted']} updated={result['updated']} deleted={result['deleted']}")
     clear_query_cache()
     clear_master_data_cache()
