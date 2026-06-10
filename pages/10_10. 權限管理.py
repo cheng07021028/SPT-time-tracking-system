@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from io import StringIO, BytesIO
 from datetime import datetime
+import hashlib
 import pandas as pd
 import streamlit as st
 
@@ -48,7 +49,7 @@ if not st.session_state.get("_spt_v67_permission_bootstrap_ready", False):
         pass
     st.session_state["_spt_v67_permission_bootstrap_ready"] = True
 
-st.caption("V300.23 loaded｜權限管理頁已受 can_manage 管制；Account Editor 儲存會合併 data_editor 前端草稿後再寫入 Neon/PostgreSQL 權威資料表。")
+st.caption("V300.35 loaded｜權限管理頁：Account Editor 保留 V300.23 前端草稿合併；本版新增批次帳號儲存、匯入解析快取、權限 Excel 變更失效，降低 Neon/Streamlit 重複負擔。")
 
 ROLE_OPTIONS = ["admin", "manager", "leader", "operator", "viewer", "auditor"]
 ACTION_COLS = [a[0] for a in ACTIONS]
@@ -94,6 +95,11 @@ def _v104_cache_clear(*names: str) -> None:
         names = ("users", "permissions", "security")
     for name in names:
         st.session_state.pop(f"v104_perm_cache_{name}", None)
+        if name in {"users", "permissions", "security"}:
+            # V300.35：權限資料已變更時，手動產生的 Excel 匯出也必須失效，
+            # 避免下載到儲存前的舊權限檔；只清 session bytes，不碰正式資料。
+            st.session_state.pop("v95_permission_management_excel_bytes", None)
+            st.session_state.pop("v95_permission_management_excel_ts", None)
         if name in {"users", "permissions"}:
             _v30022_clear_permission_drafts()
 
@@ -126,6 +132,48 @@ def _v104_get_security_cached(force: bool = False) -> dict:
     data = get_security_settings() or {}
     _v104_cache_set("security", dict(data))
     return data
+
+
+# ===== V300.35 ACCOUNT IMPORT PARSE CACHE =====
+def _v30035_digest_bytes(data: bytes) -> str:
+    try:
+        return hashlib.sha1(data or b"").hexdigest()
+    except Exception:
+        return str(len(data or b""))
+
+
+def _v30035_parse_account_excel_cached(uploaded_file, has_header: bool) -> pd.DataFrame:
+    """Parse uploaded account Excel once per identical file/header setting.
+
+    Streamlit tabs execute all tab bodies on rerun.  Without this cache, a loaded
+    Excel file is parsed again whenever the Account Editor reruns, even when the
+    user is only editing cells.  The cache is session-local and keyed by file
+    digest + header flag, so it never changes formal Neon authority data.
+    """
+    data = uploaded_file.getvalue() if uploaded_file is not None else b""
+    sig = ("excel", _v30035_digest_bytes(data), bool(has_header))
+    cached = st.session_state.get("v30035_account_excel_parse_cache")
+    if isinstance(cached, dict) and cached.get("sig") == sig and isinstance(cached.get("df"), pd.DataFrame):
+        return pd.DataFrame(cached["df"]).copy()
+    raw_excel = pd.read_excel(BytesIO(data), header=None, dtype=str).fillna("")
+    import_df = _normalize_account_import_df(raw_excel, has_header=has_header)
+    st.session_state["v30035_account_excel_parse_cache"] = {"sig": sig, "df": import_df.copy()}
+    return import_df
+
+
+def _v30035_parse_account_paste_cached(paste_text: str, has_header: bool) -> pd.DataFrame:
+    data = str(paste_text or "").encode("utf-8", errors="ignore")
+    sig = ("paste", _v30035_digest_bytes(data), bool(has_header))
+    cached = st.session_state.get("v30035_account_paste_parse_cache")
+    if isinstance(cached, dict) and cached.get("sig") == sig and isinstance(cached.get("df"), pd.DataFrame):
+        return pd.DataFrame(cached["df"]).copy()
+    raw_paste = pd.read_csv(StringIO(str(paste_text or "")), sep="\t", header=None, dtype=str, engine="python").fillna("")
+    if raw_paste.shape[1] <= 1:
+        raw_paste = pd.read_csv(StringIO(str(paste_text or "")), sep=r"\s{2,}|,", header=None, dtype=str, engine="python").fillna("")
+    import_df = _normalize_account_import_df(raw_paste, has_header=has_header)
+    st.session_state["v30035_account_paste_parse_cache"] = {"sig": sig, "df": import_df.copy()}
+    return import_df
+# ===== V300.35 ACCOUNT IMPORT PARSE CACHE END =====
 # ===== V104 PERMISSION PAGE LIGHTWEIGHT CACHE END =====
 
 
@@ -1127,8 +1175,7 @@ if _selected_permission_section == "帳號密碼總表 / Account Password Master
         excel_has_header = st.checkbox("Excel 第一列為標題列 / First row is header", value=True, key="v136_account_excel_header")
         if uploaded is not None:
             try:
-                raw_excel = pd.read_excel(uploaded, header=None, dtype=str).fillna("")
-                import_df = _normalize_account_import_df(raw_excel, has_header=excel_has_header)
+                import_df = _v30035_parse_account_excel_cached(uploaded, excel_has_header)
                 st.success(f"解析完成：{len(import_df)} 筆 / Parsed {len(import_df)} accounts")
                 st.dataframe(import_df, use_container_width=True, hide_index=True)
                 e1, e2 = st.columns(2)
@@ -1158,10 +1205,7 @@ if _selected_permission_section == "帳號密碼總表 / Account Password Master
         paste_has_header = st.checkbox("貼上資料第一列為標題列 / First row is header", value=True, key="v136_account_paste_header")
         if paste_text.strip():
             try:
-                raw_paste = pd.read_csv(StringIO(paste_text), sep="\t", header=None, dtype=str, engine="python").fillna("")
-                if raw_paste.shape[1] <= 1:
-                    raw_paste = pd.read_csv(StringIO(paste_text), sep=r"\s{2,}|,", header=None, dtype=str, engine="python").fillna("")
-                import_df = _normalize_account_import_df(raw_paste, has_header=paste_has_header)
+                import_df = _v30035_parse_account_paste_cached(paste_text, paste_has_header)
                 st.success(f"解析完成：{len(import_df)} 筆 / Parsed {len(import_df)} accounts")
                 st.dataframe(import_df, use_container_width=True, hide_index=True)
                 p1, p2 = st.columns(2)

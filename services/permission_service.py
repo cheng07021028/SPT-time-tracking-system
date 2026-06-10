@@ -369,16 +369,68 @@ def _user_row_changed(old: dict[str, Any], row: dict[str, Any], password_changed
     return False
 
 
+def _fetch_existing_users_by_username(usernames: list[str]) -> dict[str, dict[str, Any]]:
+    keys = sorted({str(u or "").strip().lower() for u in usernames if str(u or "").strip()})
+    if not keys:
+        return {}
+    placeholders = ",".join(["?"] * len(keys))
+    df = _db().query_df(
+        f"SELECT * FROM auth_users WHERE lower(username) IN ({placeholders})",
+        tuple(keys),
+    )
+    if df is None or df.empty:
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for r in df.to_dict("records"):
+        uname = str(r.get("username") or "").strip().lower()
+        if uname:
+            out[uname] = dict(r)
+    return out
+
+
+def _auth_user_upsert_ops(row: dict[str, Any]) -> list[tuple[str, tuple[Any, ...]]]:
+    username = str(row.get("username") or "").strip()
+    if not username:
+        return []
+    return [
+        (
+            """
+            UPDATE auth_users SET
+                password_hash=?, password_hint=?, employee_id=?, display_name=?, email=?, role_code=?, is_active=?,
+                force_password_change=?, note=?, updated_at=?, deleted_at='', deleted_by='', delete_reason=''
+            WHERE lower(username)=lower(?)
+            """,
+            (row["password_hash"], row["password_hint"], row["employee_id"], row["display_name"], row["email"], row["role_code"], row["is_active"], row["force_password_change"], row["note"], row["updated_at"], username),
+        ),
+        (
+            """
+            INSERT INTO auth_users(username, password_hash, password_hint, employee_id, display_name, email, role_code, is_active,
+                force_password_change, last_login_at, note, created_at, updated_at, deleted_at, deleted_by, delete_reason)
+            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '', ''
+            WHERE NOT EXISTS (SELECT 1 FROM auth_users WHERE lower(username)=lower(?) LIMIT 1)
+            """,
+            (username, row["password_hash"], row["password_hint"], row["employee_id"], row["display_name"], row["email"], row["role_code"], row["is_active"], row["force_password_change"], row.get("last_login_at", ""), row["note"], row["created_at"], row["updated_at"], username),
+        ),
+    ]
+
+
 def save_users(rows: list[dict[str,Any]]) -> dict:
     _ensure_schema()
+    # V300.35：Account Editor / Excel / Paste 可能一次送出多筆帳號。
+    # 舊版每筆帳號都先 SELECT 舊值，再 UPDATE/INSERT，500 筆可能造成 500+ 次 Neon SELECT。
+    # 現在先一次讀出本批帳號的現有資料，再只把有異動的列批次寫入 transaction。
+    input_rows = [dict(r) for r in (rows or []) if isinstance(r, dict)]
+    usernames = [str(r.get("username") or r.get("帳號 / Username") or "").strip() for r in input_rows]
+    existing_by_user = _fetch_existing_users_by_username(usernames)
+    changed_rows: list[dict[str, Any]] = []
     saved = 0
     skipped_unchanged = 0
     skipped: list[str] = []
-    for src in rows or []:
+    for src in input_rows:
         username = str(src.get("username") or src.get("帳號 / Username") or "").strip()
         if not username:
             continue
-        old = _db().query_one("SELECT * FROM auth_users WHERE lower(username)=lower(?) LIMIT 1", (username,)) or {}
+        old = existing_by_user.get(username.lower(), {}) or {}
         new_pwd = str(src.get("new_password") or src.get("password") or src.get("密碼 / Password") or src.get("新密碼 / New Password") or "").strip()
         password_changed = bool(new_pwd and set(new_pwd) != {"*"})
         if password_changed:
@@ -408,16 +460,34 @@ def save_users(rows: list[dict[str,Any]]) -> dict:
         if not _user_row_changed(old, row, password_changed=password_changed):
             skipped_unchanged += 1
             continue
+        changed_rows.append(row)
+    ops: list[tuple[str, tuple[Any, ...]]] = []
+    for row in changed_rows:
+        ops.extend(_auth_user_upsert_ops(row))
+    if ops:
         try:
-            _insert_or_update_auth_user(row)
-            _sync_legacy_security_user(username, row)
-            saved += 1
-        except Exception as exc:
-            skipped.append(f"{username}: {exc}")
+            _db().execute_transaction(ops, mark_changed=True, reason="save_users", source_sql="SAVE_USERS")
+            saved = len(changed_rows)
+        except Exception:
+            # Safety fallback: keep the old per-row path if a deployment has an unusual DB adapter.
+            saved = 0
+            for row in changed_rows:
+                try:
+                    _insert_or_update_auth_user(row)
+                    saved += 1
+                except Exception as exc:
+                    skipped.append(f"{row.get('username')}: {exc}")
+    # Legacy security tables are compatibility mirrors only.  Sync after authority
+    # writes succeed; failures are swallowed inside _sync_legacy_security_user.
+    for row in changed_rows:
+        try:
+            _sync_legacy_security_user(str(row.get("username") or ""), row)
+        except Exception:
+            pass
     if saved or skipped:
         _clear_cache()
         _log("SAVE_USERS", f"saved={saved}; unchanged={skipped_unchanged}; skipped={len(skipped)}")
-    return {"ok": True, "saved": saved, "skipped_unchanged": skipped_unchanged, "skipped": skipped, "backend": "Neon/PostgreSQL"}
+    return {"ok": True, "saved": saved, "skipped_unchanged": skipped_unchanged, "skipped": skipped, "backend": "Neon/PostgreSQL", "batch_fastpath": True}
 
 
 def save_account_master(rows: list[dict[str,Any]], delete_usernames: list[str]|None=None) -> dict:
@@ -512,25 +582,36 @@ def get_account_permissions() -> list[dict[str,Any]]:
 def save_account_permissions(rows: list[dict[str,Any]]) -> dict:
     _ensure_schema()
     # V104：確認後才寫入，且只寫有變更的權限列。
-    # 舊版會把畫面中所有列全部 UPDATE+INSERT，Neon 上容易造成大量重複寫入。
-    existing_df = _db().query_df(
-        """
-        SELECT username, module_code, can_view, can_create, can_edit, can_delete, can_import, can_export, can_backup, can_restore, can_manage
-        FROM auth_account_permissions
-        """
-    )
+    # V300.35：只讀本次送出的帳號/模組既有權限，不再每次儲存都 SELECT 全矩陣。
+    normalized_rows: list[tuple[str, str, dict[str, Any]]] = []
+    for src in rows or []:
+        if not isinstance(src, dict):
+            continue
+        username = str(src.get("username") or src.get("帳號 / Username") or "").strip()
+        code = _module_no(src.get("module_code") or src.get("模組代碼 / Module") or src.get("Module") or src.get("module"))
+        if username and code:
+            normalized_rows.append((username, code, src))
     existing: dict[tuple[str, str], dict[str, Any]] = {}
-    if existing_df is not None and not existing_df.empty:
-        for r in existing_df.to_dict("records"):
-            existing[(str(r.get("username") or "").lower(), _module_no(r.get("module_code")))] = dict(r)
+    if normalized_rows:
+        users = sorted({u.lower() for u, _, _ in normalized_rows})
+        codes = sorted({c for _, c, _ in normalized_rows})
+        user_ph = ",".join(["?"] * len(users))
+        code_ph = ",".join(["?"] * len(codes))
+        existing_df = _db().query_df(
+            f"""
+            SELECT username, module_code, can_view, can_create, can_edit, can_delete, can_import, can_export, can_backup, can_restore, can_manage
+            FROM auth_account_permissions
+            WHERE lower(username) IN ({user_ph}) AND module_code IN ({code_ph})
+            """,
+            tuple(users + codes),
+        )
+        if existing_df is not None and not existing_df.empty:
+            for r in existing_df.to_dict("records"):
+                existing[(str(r.get("username") or "").lower(), _module_no(r.get("module_code")))] = dict(r)
     ops: list[tuple[str, tuple[Any, ...]]] = []
     saved = 0
     skipped_unchanged = 0
-    for src in rows or []:
-        username = str(src.get("username") or src.get("帳號 / Username") or "").strip()
-        code = _module_no(src.get("module_code") or src.get("模組代碼 / Module") or src.get("Module") or src.get("module"))
-        if not username or not code:
-            continue
+    for username, code, src in normalized_rows:
         meta = _module_meta(code)
         vals = {a[0]: _norm_bool(src.get(a[0], 0), False) for a in ACTIONS}
         old = existing.get((username.lower(), code))
