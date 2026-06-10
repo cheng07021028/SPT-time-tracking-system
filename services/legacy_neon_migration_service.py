@@ -146,6 +146,22 @@ def _sqlite_tables(db_path: Path) -> set[str]:
     return {str(r[0]) for r in rows}
 
 
+def _sqlite_table_counts(db_path: Path, tables: list[str]) -> dict[str, int]:
+    """Return per-table row counts for preview without loading table contents."""
+    counts: dict[str, int] = {}
+    with sqlite3.connect(db_path) as conn:
+        available = _sqlite_tables(db_path)
+        for table in tables:
+            if table not in available:
+                continue
+            try:
+                row = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
+                counts[table] = int(row[0] if row else 0)
+            except Exception:
+                counts[table] = -1
+    return counts
+
+
 def _sqlite_read_rows(db_path: Path, table: str) -> list[dict[str, Any]]:
     with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
@@ -211,14 +227,24 @@ def _normalize_aliases(table: str, row: dict[str, Any]) -> dict[str, Any]:
 
 
 def _upsert_rows(cur, table: str, rows: list[dict[str, Any]]) -> tuple[int, int]:
+    """Batch upsert legacy rows into one Neon table.
+
+    V300.40: keep the original upsert semantics, but group rows by the final
+    column signature and use executemany. This avoids a SAVEPOINT + execute for
+    every single row during large legacy imports. If a batch fails because a
+    legacy row has incompatible data, the code falls back to the old row-level
+    savepoint behavior for that column group so one bad row will not abort the
+    whole import.
+    """
     if not rows:
         return 0, 0
     columns = _pg_columns(cur, table)
     if not columns:
         return 0, len(rows)
     conflict = CONFLICT_KEYS.get(table, ())
-    inserted = 0
     skipped = 0
+    grouped: dict[tuple[str, ...], list[tuple[Any, ...]]] = {}
+
     for raw in rows:
         row = _normalize_aliases(table, raw)
         clean = {c: _clean(row.get(c)) for c in columns if c in row}
@@ -226,33 +252,57 @@ def _upsert_rows(cur, table: str, rows: list[dict[str, Any]]) -> tuple[int, int]
         if not clean:
             skipped += 1
             continue
-        cols = list(clean.keys())
-        placeholders = ", ".join(["%s"] * len(cols))
-        values = tuple(clean[c] for c in cols)
-        sql = f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({placeholders})"
-        usable_conflict = tuple(c for c in conflict if c in cols and clean.get(c) is not None)
-        if usable_conflict:
-            update_cols = [c for c in cols if c not in usable_conflict]
-            if update_cols:
-                set_sql = ", ".join([f"{c}=EXCLUDED.{c}" for c in update_cols])
-                sql += f" ON CONFLICT ({', '.join(usable_conflict)}) DO UPDATE SET {set_sql}"
-            else:
-                sql += f" ON CONFLICT ({', '.join(usable_conflict)}) DO NOTHING"
-        else:
-            sql += " ON CONFLICT DO NOTHING"
+        cols = tuple(clean.keys())
+        grouped.setdefault(cols, []).append(tuple(clean[c] for c in cols))
+
+    imported_or_updated = 0
+    for cols, values_list in grouped.items():
+        sql = _build_upsert_sql(table, cols, conflict)
         try:
-            cur.execute("SAVEPOINT spt_import_row")
-            cur.execute(sql, values)
-            cur.execute("RELEASE SAVEPOINT spt_import_row")
-            inserted += 1
+            cur.execute("SAVEPOINT spt_import_batch")
+            cur.executemany(sql, values_list)
+            cur.execute("RELEASE SAVEPOINT spt_import_batch")
+            imported_or_updated += len(values_list)
+            continue
         except Exception:
+            # Keep the import non-destructive and tolerant of legacy dirty rows.
+            # Roll back only this batch, not previously imported tables.
             try:
-                cur.execute("ROLLBACK TO SAVEPOINT spt_import_row")
-                cur.execute("RELEASE SAVEPOINT spt_import_row")
+                cur.execute("ROLLBACK TO SAVEPOINT spt_import_batch")
+                cur.execute("RELEASE SAVEPOINT spt_import_batch")
             except Exception:
                 pass
-            skipped += 1
-    return inserted, skipped
+
+        for values in values_list:
+            try:
+                cur.execute("SAVEPOINT spt_import_row")
+                cur.execute(sql, values)
+                cur.execute("RELEASE SAVEPOINT spt_import_row")
+                imported_or_updated += 1
+            except Exception:
+                try:
+                    cur.execute("ROLLBACK TO SAVEPOINT spt_import_row")
+                    cur.execute("RELEASE SAVEPOINT spt_import_row")
+                except Exception:
+                    pass
+                skipped += 1
+    return imported_or_updated, skipped
+
+
+def _build_upsert_sql(table: str, cols: tuple[str, ...], conflict: tuple[str, ...]) -> str:
+    placeholders = ", ".join(["%s"] * len(cols))
+    sql = f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({placeholders})"
+    usable_conflict = tuple(c for c in conflict if c in cols)
+    if usable_conflict:
+        update_cols = [c for c in cols if c not in usable_conflict]
+        if update_cols:
+            set_sql = ", ".join([f"{c}=EXCLUDED.{c}" for c in update_cols])
+            sql += f" ON CONFLICT ({', '.join(usable_conflict)}) DO UPDATE SET {set_sql}"
+        else:
+            sql += f" ON CONFLICT ({', '.join(usable_conflict)}) DO NOTHING"
+    else:
+        sql += " ON CONFLICT DO NOTHING"
+    return sql
 
 
 def _json_module_rows(root: Path) -> dict[str, list[dict[str, Any]]]:
@@ -292,6 +342,41 @@ def _json_module_rows(root: Path) -> dict[str, list[dict[str, Any]]]:
                 rows = [x for x in tables.get(table, []) if isinstance(x, dict)]
         out.setdefault(table, []).extend(rows)
     return out
+
+
+def inspect_legacy_source(source_path: str | Path) -> dict[str, Any]:
+    """Preview importable legacy data without writing to Neon.
+
+    This is intentionally metadata/count oriented. For SQLite sources it uses
+    COUNT(*) only and does not load table rows. For JSON module fallback, it
+    loads only the module records that the old importer already supports.
+    """
+    root, tmp = _extract_source(source_path)
+    try:
+        db_path = _find_legacy_db(root)
+        per_table: dict[str, dict[str, int]] = {}
+        if db_path:
+            counts = _sqlite_table_counts(db_path, LEGACY_TABLES)
+            for table, count in counts.items():
+                per_table[table] = {"read": int(count), "will_write": 0, "skipped": 0}
+        else:
+            rows_by_table = _json_module_rows(root)
+            for table, rows in rows_by_table.items():
+                if rows:
+                    per_table[table] = {"read": len(rows), "will_write": 0, "skipped": 0}
+        return {
+            "ok": True,
+            "dry_run": True,
+            "source": str(source_path),
+            "sqlite_db_found": str(db_path) if db_path else "",
+            "tables": per_table,
+            "total_read": sum(x.get("read", 0) for x in per_table.values()),
+            "total_imported_or_updated": 0,
+            "total_skipped": 0,
+        }
+    finally:
+        if tmp is not None:
+            tmp.cleanup()
 
 
 def migrate_legacy_source_to_neon(source_path: str | Path) -> dict[str, Any]:
@@ -345,3 +430,30 @@ def save_uploaded_zip_and_migrate(uploaded_file) -> dict[str, Any]:
             path.unlink(missing_ok=True)
         except Exception:
             pass
+
+
+def save_uploaded_zip_and_inspect(uploaded_file) -> dict[str, Any]:
+    """Save an uploaded ZIP temporarily and inspect it without DB writes."""
+    suffix = ".zip"
+    with tempfile.NamedTemporaryFile(prefix="spt_legacy_preview_", suffix=suffix, delete=False) as f:
+        f.write(uploaded_file.getbuffer())
+        path = Path(f.name)
+    try:
+        return inspect_legacy_source(path)
+    finally:
+        try:
+            path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
+def audit_v30040_15_legacy_import_compute_fastpath() -> dict[str, Any]:
+    return {
+        "version": "V300.40",
+        "module": "15_legacy_import_to_neon",
+        "batch_upsert": True,
+        "manual_zip_preview": True,
+        "page_auto_import": False,
+        "neon_authority_unchanged": True,
+    }
+
