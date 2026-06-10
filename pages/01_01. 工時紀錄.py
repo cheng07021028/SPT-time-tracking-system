@@ -141,8 +141,15 @@ def _v103_light_table_controls(prefix: str, visible_key: str, *, has_data: bool)
     if not has_data:
         return False, False
     c1, c2, c3 = st.columns([1.15, 1.15, 2.7])
-    show_clicked = c1.button(f"顯示{prefix}", use_container_width=True, key=f"v103_show_{_v84_safe_widget_part(prefix)}")
-    hide_clicked = c2.button(f"隱藏{prefix}", use_container_width=True, key=f"v103_hide_{_v84_safe_widget_part(prefix)}")
+    # V300.44: Chinese-only prefixes all collapse to "table" in the legacy
+    # _v84_safe_widget_part() helper, so two table-control groups such as
+    # "已結束紀錄表格" and "今日明細表格" generated the same Streamlit keys
+    # (v103_show_table / v103_hide_table).  Include the persisted visible_key,
+    # which is ASCII and unique per table section, to keep keys stable and unique
+    # without changing the UI or data flow.
+    _v30044_table_control_key = f"{_v84_safe_widget_part(prefix)}_{_v84_safe_widget_part(visible_key)}"[:140]
+    show_clicked = c1.button(f"顯示{prefix}", use_container_width=True, key=f"v103_show_{_v30044_table_control_key}")
+    hide_clicked = c2.button(f"隱藏{prefix}", use_container_width=True, key=f"v103_hide_{_v30044_table_control_key}")
     if show_clicked:
         st.session_state[visible_key] = True
     if hide_clicked:
