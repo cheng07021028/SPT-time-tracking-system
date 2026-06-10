@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
@@ -46,6 +47,82 @@ MODULE_TABLE_MAP: Dict[str, Dict[str, Any]] = {
     "98_authority_diagnostic": {"name_zh": "權威檔診斷", "name_en": "Authority Diagnostic", "tables": ["spt_module_authority"], "settings_keys": ["ui"]},
     "99_speed_diagnostic": {"name_zh": "效能診斷", "name_en": "Performance", "tables": ["spt_module_authority_audit"], "settings_keys": ["ui"]},
 }
+
+
+# V300.37: lightweight process caches for module status.  12｜模組永久紀錄中心
+# is a manual health page, so short TTL caches reduce repeated Neon COUNT/schema
+# calls during Streamlit reruns without becoming an authority source.
+_V30037_STATUS_CACHE: Dict[str, Any] = {"ts": 0.0, "rows": None}
+_V30037_TABLE_COUNT_CACHE: Dict[str, Any] = {"ts": 0.0, "counts": {}}
+_V30037_STATUS_TTL_SECONDS = 15.0
+_V30037_TABLE_COUNT_TTL_SECONDS = 15.0
+
+def _v30037_cache_now() -> float:
+    try:
+        return float(time.time())
+    except Exception:
+        return 0.0
+
+def clear_module_status_cache() -> None:
+    """Clear process caches used only by module status display."""
+    try:
+        _V30037_STATUS_CACHE["ts"] = 0.0
+        _V30037_STATUS_CACHE["rows"] = None
+        _V30037_TABLE_COUNT_CACHE["ts"] = 0.0
+        _V30037_TABLE_COUNT_CACHE["counts"] = {}
+    except Exception:
+        pass
+
+def _v30037_cached_table_counts(tables: Iterable[str]) -> Dict[str, int]:
+    """Return table row counts, counting each table at most once per short TTL.
+
+    This intentionally does not cache writes or records; it only avoids repeated
+    COUNT(*) calls while the manual status page reruns.
+    """
+    normalized = []
+    for table in tables:
+        t = str(table or "").strip()
+        if t and t not in normalized:
+            normalized.append(t)
+    now = _v30037_cache_now()
+    cached_counts = _V30037_TABLE_COUNT_CACHE.get("counts")
+    if not isinstance(cached_counts, dict):
+        cached_counts = {}
+        _V30037_TABLE_COUNT_CACHE["counts"] = cached_counts
+    if now - float(_V30037_TABLE_COUNT_CACHE.get("ts") or 0.0) > _V30037_TABLE_COUNT_TTL_SECONDS:
+        cached_counts.clear()
+        _V30037_TABLE_COUNT_CACHE["ts"] = now
+    missing = [t for t in normalized if t not in cached_counts]
+    if missing:
+        if _is_pg():
+            try:
+                from services.db_service import query_one
+            except Exception:
+                query_one = None  # type: ignore[assignment]
+            for table in missing:
+                try:
+                    if query_one is None:
+                        cached_counts[table] = 0
+                    else:
+                        row = query_one(f'SELECT COUNT(*) AS c FROM "{table}"') or {}
+                        cached_counts[table] = int(row.get("c") or 0)
+                except Exception:
+                    cached_counts[table] = 0
+        elif DB_PATH.exists():
+            try:
+                with connect_db() as conn:
+                    for table in missing:
+                        try:
+                            cached_counts[table] = table_count(conn, table)
+                        except Exception:
+                            cached_counts[table] = 0
+            except Exception:
+                for table in missing:
+                    cached_counts[table] = 0
+        else:
+            for table in missing:
+                cached_counts[table] = 0
+    return {t: int(cached_counts.get(t) or 0) for t in normalized}
 
 
 def _now() -> str: return now_text()
@@ -165,7 +242,7 @@ def _table_rows(table: str) -> list[dict[str, Any]]:
     with connect_db() as conn: return read_table(conn, table)
 
 
-def export_module_records(module_code: str, username: str = "SYSTEM", write_history: bool = True) -> Dict[str, Any]:
+def export_module_records(module_code: str, username: str = "SYSTEM", write_history: bool = True, rebuild_index: bool = True) -> Dict[str, Any]:
     ensure_dirs()
     code = normalize_module_code(module_code)
     info = MODULE_TABLE_MAP.get(code) or MODULE_TABLE_MAP.get(module_code)
@@ -183,7 +260,9 @@ def export_module_records(module_code: str, username: str = "SYSTEM", write_hist
         save_json(latest_records_path(code), payload)
         if write_history: save_json(history_records_path(code), payload)
     append_audit(code, "EXPORT_RECORDS", username, {"counts": payload["counts"], "backend": payload["backend"]})
-    rebuild_global_index()
+    if rebuild_index:
+        rebuild_global_index()
+    clear_module_status_cache()
     return payload
 
 
@@ -195,54 +274,70 @@ def export_all_modules(username: str = "SYSTEM") -> Dict[str, Any]:
         code = normalize_module_code(raw_code)
         if code in seen: continue
         seen.add(code)
-        try: result[code] = export_module_records(code, username=username, write_history=True)
+        try: result[code] = export_module_records(code, username=username, write_history=True, rebuild_index=False)
         except Exception as exc: result[code] = {"ok": False, "message": str(exc)}
+    rebuild_global_index()
+    clear_module_status_cache()
     return result
 
 
-def get_module_status() -> List[Dict[str, Any]]:
+def get_module_status(force_refresh: bool = False) -> List[Dict[str, Any]]:
     ensure_dirs()
+    now = _v30037_cache_now()
+    cached_rows = _V30037_STATUS_CACHE.get("rows")
+    if (
+        not force_refresh
+        and isinstance(cached_rows, list)
+        and now - float(_V30037_STATUS_CACHE.get("ts") or 0.0) <= _V30037_STATUS_TTL_SECONDS
+    ):
+        return [dict(r) for r in cached_rows if isinstance(r, dict)]
+
+    pg_enabled = _is_pg()
     rows: List[Dict[str, Any]] = []
     seen: set[str] = set()
     authority_rows = []
-    if _is_pg():
+    if pg_enabled:
         try:
             from services.neon_authority_service import authority_status
             authority_rows = authority_status().get("rows", [])
         except Exception:
             authority_rows = []
     auth_map = {(str(r.get("module_key")), str(r.get("kind"))): r for r in authority_rows if isinstance(r, dict)}
+
+    unique_tables: list[str] = []
+    for raw_code, info in MODULE_TABLE_MAP.items():
+        code = normalize_module_code(raw_code)
+        if code in seen:
+            continue
+        seen.add(code)
+        for table in info.get("tables", []):
+            t = str(table or "").strip()
+            if t and t not in unique_tables:
+                unique_tables.append(t)
+    count_map = _v30037_cached_table_counts(unique_tables)
+
+    seen.clear()
     for raw_code, info in MODULE_TABLE_MAP.items():
         code = normalize_module_code(raw_code)
         if code in seen: continue
         seen.add(code)
-        counts = {}
-        for table in info.get("tables", []):
-            try:
-                if _is_pg():
-                    from services.db_service import query_one
-                    q = query_one(f"SELECT COUNT(*) AS c FROM {table}") or {}
-                    counts[table] = int(q.get("c") or 0)
-                elif DB_PATH.exists():
-                    with connect_db() as conn: counts[table] = table_count(conn, table)
-                else:
-                    counts[table] = 0
-            except Exception:
-                counts[table] = 0
+        counts = {str(table): int(count_map.get(str(table), 0)) for table in info.get("tables", [])}
         rec_meta = auth_map.get((code, "records"), {})
         set_meta = auth_map.get((code, "settings"), {})
         rows.append({
             "模組代碼 / Module Code": code,
             "模組 / Module": f'{info["name_zh"]} / {info["name_en"]}',
-            "紀錄檔 / Records Exists": bool(_is_pg() or latest_records_path(code).exists()),
-            "設定檔 / Settings Exists": bool(_is_pg() or latest_settings_path(code).exists()),
-            "紀錄時間 / Exported At": rec_meta.get("updated_at", "Neon live table" if _is_pg() else ""),
+            "紀錄檔 / Records Exists": bool(pg_enabled or latest_records_path(code).exists()),
+            "設定檔 / Settings Exists": bool(pg_enabled or latest_settings_path(code).exists()),
+            "紀錄時間 / Exported At": rec_meta.get("updated_at", "Neon live table" if pg_enabled else ""),
             "設定時間 / Settings At": set_meta.get("updated_at", ""),
             "資料筆數 / Counts": json.dumps(counts, ensure_ascii=False),
-            "路徑 / Path": f"neon://{','.join(info.get('tables', []))}" if _is_pg() else str(module_dir(code).relative_to(PROJECT_ROOT)),
-            "檢查說明 / Health Note": "Neon/PostgreSQL single source" if _is_pg() else "Local fallback",
-            "設定路徑 / Settings Path": f"neon://spt_module_authority/{code}/settings" if _is_pg() else str(latest_settings_path(code).relative_to(PROJECT_ROOT)),
+            "路徑 / Path": f"neon://{','.join(info.get('tables', []))}" if pg_enabled else str(module_dir(code).relative_to(PROJECT_ROOT)),
+            "檢查說明 / Health Note": "Neon/PostgreSQL single source" if pg_enabled else "Local fallback",
+            "設定路徑 / Settings Path": f"neon://spt_module_authority/{code}/settings" if pg_enabled else str(latest_settings_path(code).relative_to(PROJECT_ROOT)),
         })
+    _V30037_STATUS_CACHE["ts"] = now
+    _V30037_STATUS_CACHE["rows"] = [dict(r) for r in rows]
     return rows
 
 
@@ -259,6 +354,7 @@ def save_module_settings(module_code: str, settings: Dict[str, Any], username: s
         if write_history: save_json(history_settings_path(code), payload)
     append_audit(code, "SAVE_SETTINGS", username, {"keys": list(settings.keys())})
     rebuild_global_index()
+    clear_module_status_cache()
     return payload
 
 
@@ -294,6 +390,7 @@ def rebuild_global_index() -> Dict[str, Any]:
     else:
         save_json(GLOBAL_STATE, index)
         save_json(GLOBAL_SETTINGS, {"schema_version": "neon-v31", "updated_at": _now(), "modules": {code: str(latest_settings_path(code).relative_to(PROJECT_ROOT)) for code in MODULE_TABLE_MAP}})
+    clear_module_status_cache()
     return index
 
 

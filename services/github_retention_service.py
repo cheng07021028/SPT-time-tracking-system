@@ -18,6 +18,7 @@ import base64
 import json
 import os
 import re
+import time
 import urllib.parse
 import urllib.request
 import urllib.error
@@ -43,6 +44,22 @@ REMOTE_ALLOWED_ROOTS = [
     "data/_external_backup",
     "data/_persistent_backup",
 ]
+# V300.37: Remote metadata checks are manual, but Streamlit reruns can repeat
+# the same GitHub contents requests.  A short process cache avoids repeated API
+# calls without changing upload or cleanup behavior.
+_V30037_REMOTE_STATUS_CACHE: Dict[str, Dict[str, Any]] = {}
+_V30037_REMOTE_STATUS_TTL_SECONDS = 300.0
+
+def _v30037_remote_cache_key(path: str) -> str:
+    cfg = _repo_cfg()
+    return "|".join([cfg.get("repo", ""), cfg.get("branch", "main"), str(path or "").strip().strip("/")])
+
+def clear_github_module_audit_cache() -> None:
+    try:
+        _V30037_REMOTE_STATUS_CACHE.clear()
+    except Exception:
+        pass
+
 PROTECTED_LATEST_NAMES = {
     "spt_permanent_state.json",
     "spt_module_settings.json",
@@ -150,17 +167,29 @@ def save_cleanup_settings(cfg: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "path": str(CONFIG_PATH), "state_path": str(STATE_PATH), "settings": payload}
 
 
-def _remote_file_status(path: str) -> Dict[str, Any]:
+def _remote_file_status(path: str, *, use_cache: bool = True) -> Dict[str, Any]:
     cfg = _repo_cfg()
     token, repo, branch = cfg["token"], cfg["repo"], cfg["branch"]
     if not token:
         return {"ok": False, "exists": False, "status": 0, "message": "缺少 GITHUB_TOKEN", "path": path}
     if not repo or "/" not in repo:
         return {"ok": False, "exists": False, "status": 0, "message": "GITHUB_REPOSITORY 格式錯誤", "path": path}
+    cache_key = _v30037_remote_cache_key(path)
+    now = time.time()
+    if use_cache:
+        cached = _V30037_REMOTE_STATUS_CACHE.get(cache_key)
+        if isinstance(cached, dict) and now - float(cached.get("ts") or 0.0) <= _V30037_REMOTE_STATUS_TTL_SECONDS:
+            payload = cached.get("payload")
+            if isinstance(payload, dict):
+                return dict(payload)
     status, body = _github_api_request("GET", _contents_url(repo, path, branch), token)
     if status == 200 and isinstance(body, dict):
-        return {"ok": True, "exists": True, "status": status, "path": path, "sha": body.get("sha"), "size": body.get("size", 0), "name": body.get("name", "")}
-    return {"ok": False, "exists": False, "status": status, "message": body.get("message", "not found"), "path": path}
+        result = {"ok": True, "exists": True, "status": status, "path": path, "sha": body.get("sha"), "size": body.get("size", 0), "name": body.get("name", "")}
+    else:
+        result = {"ok": False, "exists": False, "status": status, "message": body.get("message", "not found"), "path": path}
+    if use_cache:
+        _V30037_REMOTE_STATUS_CACHE[cache_key] = {"ts": now, "payload": dict(result)}
+    return result
 
 
 def audit_module_github_links(check_remote: bool = True) -> Dict[str, Any]:
@@ -208,7 +237,7 @@ def _put_text(path_in_repo: str, text: str, message: str) -> Dict[str, Any]:
     token, repo, branch = cfg["token"], cfg["repo"], cfg["branch"]
     if not token:
         return {"ok": False, "path": path_in_repo, "message": "缺少 GITHUB_TOKEN"}
-    current = _remote_file_status(path_in_repo)
+    current = _remote_file_status(path_in_repo, use_cache=False)
     url = f"https://api.github.com/repos/{repo}/contents/{urllib.parse.quote(path_in_repo.strip('/'), safe='/')}"
     payload: Dict[str, Any] = {
         "message": message,
@@ -218,7 +247,10 @@ def _put_text(path_in_repo: str, text: str, message: str) -> Dict[str, Any]:
     if current.get("sha"):
         payload["sha"] = current["sha"]
     status, body = _github_api_request("PUT", url, token, payload)
-    return {"ok": status in (200, 201), "status": status, "path": path_in_repo, "message": body.get("message", "uploaded"), "detail": body}
+    ok = status in (200, 201)
+    if ok:
+        clear_github_module_audit_cache()
+    return {"ok": ok, "status": status, "path": path_in_repo, "message": body.get("message", "uploaded"), "detail": body}
 
 
 def upload_all_module_persistent_files_to_github() -> Dict[str, Any]:
