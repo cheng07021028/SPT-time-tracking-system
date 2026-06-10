@@ -2031,6 +2031,61 @@ def _v78_changed_rows(original_df: pd.DataFrame, edited_df: pd.DataFrame, id_col
     return pd.DataFrame(changed).reset_index(drop=True)
 
 
+def _v30025_admin_changed_columns_by_id(original_df: pd.DataFrame, edited_df: pd.DataFrame, id_col: str) -> dict[int, set[str]]:
+    """Return per-row changed internal columns for 01 admin maintenance saves.
+
+    This prevents a stale full row from overwriting another admin/operator's
+    newer fields when 20 PCs are using the system at the same time.
+    """
+    if not isinstance(original_df, pd.DataFrame) or not isinstance(edited_df, pd.DataFrame):
+        return {}
+    if not id_col or id_col not in original_df.columns or id_col not in edited_df.columns:
+        return {}
+    alias = {
+        "ID / ID": "id", "紀錄編號": "id", "ID": "id",
+        "狀態 / Status": "status",
+        "製令 / Work Order": "work_order",
+        "製令號碼 / Work Order No.": "work_order_no",
+        "P/N / Part No.": "part_no",
+        "機型 / Type": "type_name",
+        "工段名稱 / Process": "process_name", "工段 / Process": "process_name",
+        "工號 / Employee ID": "employee_id",
+        "姓名 / Name": "employee_name",
+        "開始動作 / Start Action": "start_action",
+        "開始時間戳 / Start Timestamp": "start_timestamp",
+        "結束動作 / End Action": "end_action",
+        "結束時間戳 / End Timestamp": "end_timestamp",
+        "開始日期 / Start Date": "start_date",
+        "開始時間 / Start Time": "start_time",
+        "結束日期 / End Date": "end_date",
+        "結束時間 / End Time": "end_time",
+        "工時小計 / Hours": "work_hours",
+        "工時分鐘 / Minutes": "work_minutes",
+        "備註 / Remark": "remark",
+        "組立地點 / Assembly Location": "assembly_location",
+    }
+    ignore_cols = {"刪除 / Delete", "created_at", "建立時間 / Created At", "updated_at", "更新時間 / Updated At"}
+    original_map = {}
+    for _, row in original_df.iterrows():
+        rid = _v92_to_int_id(row.get(id_col)) if "_v92_to_int_id" in globals() else None
+        if rid is not None:
+            original_map[int(rid)] = row
+    out: dict[int, set[str]] = {}
+    compare_cols = [c for c in edited_df.columns if c in original_df.columns and c not in ignore_cols]
+    for _, row in edited_df.iterrows():
+        rid = _v92_to_int_id(row.get(id_col)) if "_v92_to_int_id" in globals() else None
+        if rid is None or int(rid) not in original_map:
+            continue
+        old = original_map[int(rid)]
+        changed: set[str] = set()
+        for col in compare_cols:
+            if _v78_cell_text(row.get(col)) != _v78_cell_text(old.get(col)):
+                changed.add(alias.get(str(col), str(col)))
+        if changed:
+            out[int(rid)] = changed
+    return out
+
+
 def _v80_first_existing_col(df: pd.DataFrame, names: list[str]) -> str | None:
     if not isinstance(df, pd.DataFrame):
         return None
@@ -2484,6 +2539,10 @@ if is_admin:
                                 original_display_for_diff = display_admin.drop(columns=[delete_col], errors="ignore")
                                 save_df_all = _v80_sync_datetime_editor_columns(save_df_all, original_display_for_diff)
                                 changed_df = _v78_changed_rows(original_display_for_diff, save_df_all, _id_col)
+                                try:
+                                    changed_df.attrs["_spt_changed_columns_by_id"] = _v30025_admin_changed_columns_by_id(original_display_for_diff, save_df_all, _id_col)
+                                except Exception:
+                                    pass
                                 if changed_df.empty:
                                     st.info("沒有偵測到實際修改；未寫入 Neon，避免無效存檔造成頁面長時間運轉。")
                                 else:
@@ -2503,6 +2562,10 @@ if is_admin:
                                     original_display_for_diff = display_admin.drop(columns=[delete_col], errors="ignore")
                                     save_df_all = _v80_sync_datetime_editor_columns(save_df_all, original_display_for_diff)
                                     changed_df = _v78_changed_rows(original_display_for_diff, save_df_all, _id_col)
+                                    try:
+                                        changed_df.attrs["_spt_changed_columns_by_id"] = _v30025_admin_changed_columns_by_id(original_display_for_diff, save_df_all, _id_col)
+                                    except Exception:
+                                        pass
                                     if not changed_df.empty:
                                         save_time_records(changed_df, recalc_edited_timestamps=True)
                                     _recalc_t0 = time.perf_counter()

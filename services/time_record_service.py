@@ -154,6 +154,13 @@ def _normalize_df(df: pd.DataFrame | None) -> pd.DataFrame:
         if c not in work.columns:
             work[c] = ""
     out = work[TIME_RECORD_COLUMNS]
+    # Preserve page-side metadata such as per-row changed columns.  01 admin
+    # maintenance uses this to avoid lost-update overwrites when two PCs edit
+    # the same visible row from different sessions.
+    try:
+        out.attrs.update(getattr(work, "attrs", {}) or {})
+    except Exception:
+        pass
     # Keep track of which columns came from the editor/import source.  This is
     # important for 01/02 edit-save: missing timestamp/date/time columns must not
     # be interpreted as the user clearing those fields.
@@ -231,6 +238,35 @@ def _ensure_time_runtime_columns() -> None:
     ]
     for ddl in cols:
         _add_col("time_records", ddl)
+    # V300.25 concurrency guard for 20 PCs / 50+ operators:
+    # - same employee + same work order + same process + same date may only have
+    #   one active row.  This protects against two PCs pressing Start together.
+    # - non-unique active lookup index keeps duplicate/conflict checks fast.
+    # If old duplicate active rows already exist, the unique index creation may
+    # fail; the atomic INSERT ... WHERE NOT EXISTS in start_work still protects
+    # new writes.  Never block page startup because of legacy dirty data.
+    try:
+        execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_v30025_time_active_same_work_guard
+            ON time_records(employee_id, work_order_no, process_name, start_date)
+            WHERE (deleted_at IS NULL OR deleted_at='') AND (end_timestamp IS NULL OR end_timestamp='')
+            """,
+            (),
+        )
+    except Exception:
+        pass
+    try:
+        execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_v30025_time_active_employee_guard
+            ON time_records(employee_id, start_date, process_name, id DESC)
+            WHERE (deleted_at IS NULL OR deleted_at='') AND (end_timestamp IS NULL OR end_timestamp='')
+            """,
+            (),
+        )
+    except Exception:
+        pass
     _TIME_RUNTIME_READY = True
 
 
@@ -864,8 +900,43 @@ def start_work(employee: dict, work_order: dict, process_name: str, remark: str 
     }
     payload = _row_to_payload(row, recalc=False)
     cols = [c for c in TIME_RECORD_COLUMNS if c != "id"]
-    sql = f"INSERT INTO time_records ({', '.join(cols)}) VALUES ({', '.join(['?']*len(cols))})"
-    rid = execute(sql, tuple(payload.get(c, "") for c in cols))
+    # V300.25: make Start idempotent under concurrent PCs.  The old path did a
+    # SELECT duplicate check and then INSERT; two browsers could both pass the
+    # SELECT and create duplicate active rows.  This INSERT only succeeds if no
+    # active same-work row and no active different-process row appeared between
+    # the earlier checks and this write.
+    values_sql = ", ".join(["?"] * len(cols))
+    sql = f"""
+        INSERT INTO time_records ({', '.join(cols)})
+        SELECT {values_sql}
+        WHERE NOT EXISTS (
+            SELECT 1 FROM time_records
+            WHERE employee_id=?
+              AND (work_order=? OR work_order_no=?)
+              AND process_name=?
+              AND start_date=?
+              AND (deleted_at IS NULL OR deleted_at='')
+              AND (end_timestamp IS NULL OR end_timestamp='')
+            LIMIT 1
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM time_records
+            WHERE employee_id=?
+              AND start_date=?
+              AND process_name<>?
+              AND (deleted_at IS NULL OR deleted_at='')
+              AND (end_timestamp IS NULL OR end_timestamp='')
+            LIMIT 1
+        )
+    """
+    params = tuple(payload.get(c, "") for c in cols) + (emp_id, wo_no, wo_no, proc, today, emp_id, today, proc)
+    try:
+        rid = execute(sql, params)
+    except Exception as exc:
+        # PostgreSQL unique index violation is another safe duplicate guard.
+        raise ValueError(f"禁止重複紀錄：此人員已有同日進行中的工時紀錄，請重新整理後再操作。原始訊息：{exc}") from exc
+    if not rid:
+        raise ValueError("禁止重複紀錄：此人員已有同日進行中的相同製令/工段或不同工段紀錄，請重新整理後再操作。")
     try:
         execute(
             "INSERT INTO system_logs(log_time, user_name, action_type, target_table, target_id, message, detail, level) VALUES (?, ?, 'START_WORK', 'time_records', ?, ?, '', 'INFO')",
@@ -921,7 +992,14 @@ def finish_work(record_id: int, end_action: str = "完工", remark: str = "", fi
     except Exception:
         pass
     _cache_clear()
-    return int(sum(int(x or 0) for x in counts) or len(ids))
+    updated_count = int(sum(int(x or 0) for x in counts))
+    # V300.25: under concurrent finish clicks, PostgreSQL rowcount 0 means another
+    # PC already ended the row.  Do not report a false success count, otherwise
+    # operators think their click wrote data when it did not.  SQLite fallback keeps
+    # the old compatibility behavior for local tests where rowcount can be flaky.
+    if is_postgres_enabled():
+        return updated_count
+    return int(updated_count or len(ids))
 
 
 def delete_time_records(record_ids: Iterable[Any], reason: str = "管理員刪除工時紀錄") -> int:
@@ -1160,6 +1238,39 @@ def _sync_parallel_group_after_edit(seed_ids: list[int]) -> int:
     return int(sum(int(x or 0) for x in counts) or len(ended_ids))
 
 
+def _v30025_normalize_changed_column_map(raw: Any) -> dict[int, set[str]]:
+    out: dict[int, set[str]] = {}
+    if not isinstance(raw, dict):
+        return out
+    for key, cols in raw.items():
+        rid = _int_or_none(key)
+        if rid is None:
+            continue
+        if isinstance(cols, (set, list, tuple)):
+            out[int(rid)] = {DISPLAY_TO_INTERNAL.get(str(c), str(c)) for c in cols if _text(c)}
+    return out
+
+
+def _v30025_restrict_diff_for_editor(
+    diff: dict[str, dict[str, str]],
+    allowed_cols: set[str] | None,
+    *,
+    include_recalc_outputs: bool = False,
+) -> dict[str, dict[str, str]]:
+    if not allowed_cols:
+        return diff
+    allowed = set(allowed_cols)
+    # Timestamp/date/time are coupled; allow the normalized companion fields to
+    # be persisted when the operator edits any part of the time pair.
+    if {"start_timestamp", "start_date", "start_time"}.intersection(allowed):
+        allowed.update({"start_timestamp", "start_date", "start_time"})
+    if {"end_timestamp", "end_date", "end_time"}.intersection(allowed):
+        allowed.update({"end_timestamp", "end_date", "end_time"})
+    if include_recalc_outputs:
+        allowed.update({"raw_minutes", "work_minutes", "average_minutes", "work_hours"})
+    return {k: v for k, v in diff.items() if k in allowed}
+
+
 def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:
     _ensure_time_runtime_columns()
     work = _normalize_df(df)
@@ -1172,6 +1283,7 @@ def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) 
             ids.append(rid)
     existing_map = _load_existing_records_map(sorted(set(ids)))
     source_columns = set(work.attrs.get("_spt_source_columns", set(work.columns)))
+    changed_columns_by_id = _v30025_normalize_changed_column_map(work.attrs.get("_spt_changed_columns_by_id"))
     count = 0
     changed_or_group_seed_ids: list[int] = []
     for _, row in work.iterrows():
@@ -1182,12 +1294,13 @@ def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) 
         before = existing_map.get(int(rid)) if rid is not None else None
         # 02/01 編輯儲存要遵守重算原則：只要開始/結束日期時間被改，就在前台 Python service 重算，Neon 只做交易寫入。
         preliminary = _row_to_payload(rd, recalc=False, before=before, source_columns=source_columns)
-        diff0 = _diff_payload(before, preliminary)
+        allowed_cols = changed_columns_by_id.get(int(rid)) if rid is not None else None
+        diff0 = _v30025_restrict_diff_for_editor(_diff_payload(before, preliminary), allowed_cols)
         timing_changed = bool(_V73_TIMING_FIELDS.intersection(diff0.keys()))
         group_changed = bool(_V73_GROUP_FIELDS.intersection(diff0.keys()))
         should_recalc = bool(recalc_edited_timestamps or timing_changed)
         payload = _row_to_payload(rd, recalc=should_recalc, before=before, source_columns=source_columns)
-        diff = _diff_payload(before, payload)
+        diff = _v30025_restrict_diff_for_editor(_diff_payload(before, payload), allowed_cols, include_recalc_outputs=should_recalc)
         if before and not diff:
             continue
         kind, n = _insert_or_update_payload(payload, rid, changed_fields=diff.keys())
