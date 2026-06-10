@@ -49,7 +49,7 @@ if not st.session_state.get("_spt_v67_permission_bootstrap_ready", False):
         pass
     st.session_state["_spt_v67_permission_bootstrap_ready"] = True
 
-st.caption("V300.35 loaded｜權限管理頁：Account Editor 保留 V300.23 前端草稿合併；本版新增批次帳號儲存、匯入解析快取、權限 Excel 變更失效，降低 Neon/Streamlit 重複負擔。")
+st.caption("V300.46 loaded｜權限管理頁：修正 Paste Data 加入/直接儲存後持續運轉；貼上/匯入成功後清輸入 widget、避免 eager Neon reload、直接儲存加防重複送出。")
 
 ROLE_OPTIONS = ["admin", "manager", "leader", "operator", "viewer", "auditor"]
 ACTION_COLS = [a[0] for a in ACTIONS]
@@ -174,6 +174,86 @@ def _v30035_parse_account_paste_cached(paste_text: str, has_header: bool) -> pd.
     st.session_state["v30035_account_paste_parse_cache"] = {"sig": sig, "df": import_df.copy()}
     return import_df
 # ===== V300.35 ACCOUNT IMPORT PARSE CACHE END =====
+
+
+# ===== V300.46 ACCOUNT PASTE/IMPORT ACTION FASTPATH =====
+def _v30046_import_df_signature(df: pd.DataFrame, action: str = "") -> str:
+    """Stable signature for one pasted/imported account batch.
+
+    Used only for UI action guards and widget cleanup.  It does not replace Neon
+    transactions or authority writes.
+    """
+    try:
+        work = pd.DataFrame(df).fillna("").astype(str)
+        payload = work.to_csv(index=False).encode("utf-8", errors="ignore")
+    except Exception:
+        payload = str(df).encode("utf-8", errors="ignore")
+    return hashlib.sha1(str(action).encode("utf-8") + b"\0" + payload).hexdigest()
+
+
+def _v30046_get_editor_base_df() -> pd.DataFrame:
+    """Return current Account Editor draft without accidentally reloading Neon.
+
+    Avoid using st.session_state.get("v133_users_df", _users_for_editor()) because
+    Python evaluates the default argument eagerly, causing an unnecessary get_users()
+    even when the draft already exists.  That was one cause of Paste Data actions
+    continuing to spin after merging rows.
+    """
+    existing = st.session_state.get("v133_users_df")
+    if isinstance(existing, pd.DataFrame):
+        return existing.copy()
+    return _users_for_editor()
+
+
+def _v30046_bump_widget_nonce(kind: str) -> None:
+    key = f"v30046_{kind}_nonce"
+    try:
+        st.session_state[key] = int(st.session_state.get(key, 0) or 0) + 1
+    except Exception:
+        st.session_state[key] = 1
+    if kind == "paste":
+        st.session_state.pop("v30035_account_paste_parse_cache", None)
+    if kind == "excel":
+        st.session_state.pop("v30035_account_excel_parse_cache", None)
+
+
+def _v30046_import_action_recent(sig: str, window_seconds: float = 8.0) -> bool:
+    """Prevent accidental duplicate direct-save from double clicks/reruns."""
+    import time
+    rec = st.session_state.get("v30046_last_account_import_action")
+    if not isinstance(rec, dict) or rec.get("sig") != sig:
+        return False
+    try:
+        return (time.time() - float(rec.get("ts") or 0)) <= window_seconds
+    except Exception:
+        return False
+
+
+def _v30046_mark_import_action(sig: str, result: dict | None = None) -> None:
+    import time
+    st.session_state["v30046_last_account_import_action"] = {"sig": sig, "ts": time.time(), "result": result or {}}
+
+
+def _v30046_set_notice(level: str, message: str) -> None:
+    st.session_state["v30046_account_notice"] = {"level": str(level or "info"), "message": str(message or "")}
+
+
+def _v30046_show_notice() -> None:
+    notice = st.session_state.pop("v30046_account_notice", None)
+    if not isinstance(notice, dict) or not notice.get("message"):
+        return
+    level = str(notice.get("level") or "info").lower()
+    msg = str(notice.get("message") or "")
+    if level == "success":
+        st.success(msg)
+    elif level == "warning":
+        st.warning(msg)
+    elif level == "error":
+        st.error(msg)
+    else:
+        st.info(msg)
+# ===== V300.46 ACCOUNT PASTE/IMPORT ACTION FASTPATH END =====
+_v30046_show_notice()
 # ===== V104 PERMISSION PAGE LIGHTWEIGHT CACHE END =====
 
 
@@ -651,7 +731,8 @@ def _merge_users_editor(base_df: pd.DataFrame, new_rows: pd.DataFrame) -> pd.Dat
 
 def _save_imported_accounts(import_df: pd.DataFrame) -> dict:
     editor_rows = _account_import_to_editor_rows(import_df)
-    return save_users(_users_to_service_rows(editor_rows))
+    rows = _users_to_service_rows(editor_rows)
+    return save_users(rows)
 
 
 def _permission_summary(df: pd.DataFrame) -> pd.DataFrame:
@@ -1171,27 +1252,41 @@ if _selected_permission_section == "帳號密碼總表 / Account Password Master
             st.info("請先到『帳號清單編輯』按『啟動編輯』，再執行匯入或直接儲存。")
         st.caption("若第一列有標題，系統會依標題自動對應欄位。")
         st.code("帳號、密碼、工號、姓名、Email、角色、啟用、強制改密碼、備註", language="text")
-        uploaded = st.file_uploader("上傳帳號設定 Excel / Upload Account Excel", type=["xlsx", "xls"], key="v136_account_excel_upload")
+        excel_nonce = int(st.session_state.get("v30046_excel_nonce", 0) or 0)
+        uploaded = st.file_uploader("上傳帳號設定 Excel / Upload Account Excel", type=["xlsx", "xls"], key=f"v136_account_excel_upload_{excel_nonce}")
         excel_has_header = st.checkbox("Excel 第一列為標題列 / First row is header", value=True, key="v136_account_excel_header")
         if uploaded is not None:
             try:
                 import_df = _v30035_parse_account_excel_cached(uploaded, excel_has_header)
                 st.success(f"解析完成：{len(import_df)} 筆 / Parsed {len(import_df)} accounts")
-                st.dataframe(import_df, use_container_width=True, hide_index=True)
+                preview_df = import_df.head(300).copy()
+                st.dataframe(preview_df, use_container_width=True, hide_index=True, height=320)
+                if len(import_df) > len(preview_df):
+                    st.caption(f"僅預覽前 {len(preview_df)} 筆，實際會處理全部 {len(import_df)} 筆。")
                 e1, e2 = st.columns(2)
                 with e1:
                     if st.button("⊕ 加入帳號總表編輯 / Add to Account Editor", use_container_width=True, key="v136_excel_add_editor", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
                         new_rows = _account_import_to_editor_rows(import_df)
-                        st.session_state["v133_users_df"] = _merge_users_editor(st.session_state.get("v133_users_df", _users_for_editor()), new_rows)
-                        st.success("已加入帳號總表編輯頁，請到『帳號清單編輯』確認後儲存。")
+                        st.session_state["v133_users_df"] = _merge_users_editor(_v30046_get_editor_base_df(), new_rows)
+                        _v30046_bump_widget_nonce("excel")
+                        _v30046_set_notice("success", "已加入帳號總表編輯頁，請到『帳號清單編輯』確認後儲存。")
+                        st.rerun()
                 with e2:
                     if st.button("▣ 直接儲存 Excel 帳號 / Save Imported Accounts", type="primary", use_container_width=True, key="v136_excel_save_direct", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
-                        result = _save_imported_accounts(import_df)
-                        st.success(f"帳號已儲存：{result['saved']} 筆 / Accounts saved")
-                        if result.get("skipped"):
-                            st.warning("；".join(result["skipped"]))
+                        sig = _v30046_import_df_signature(import_df, "excel_save_direct")
+                        if _v30046_import_action_recent(sig):
+                            _v30046_set_notice("warning", "已偵測到同一批 Excel 帳號剛剛已送出，已略過重複儲存。")
+                        else:
+                            result = _save_imported_accounts(import_df)
+                            _v30046_mark_import_action(sig, result)
+                            msg = f"帳號已儲存：{result.get('saved', 0)} 筆；未異動：{result.get('skipped_unchanged', 0)} 筆 / Accounts saved"
+                            if result.get("skipped"):
+                                msg += "；" + "；".join(result["skipped"])
+                            _v30046_set_notice("success", msg)
                         _v104_cache_clear("users", "permissions")
                         st.session_state.pop("v133_users_df", None)
+                        _v30046_bump_widget_nonce("excel")
+                        st.rerun()
             except Exception as ex:
                 st.error(f"Excel 匯入失敗 / Import failed：{ex}")
 
@@ -1201,27 +1296,41 @@ if _selected_permission_section == "帳號密碼總表 / Account Password Master
             st.info("請先到『帳號清單編輯』按『啟動編輯』，再執行貼上或直接儲存。")
         st.caption("支援從 Excel 直接複製貼上，建議包含標題列。")
         st.code("帳號\t密碼\t工號\t姓名\tEmail\t角色\t啟用\t強制改密碼\t備註", language="text")
-        paste_text = st.text_area("貼上 Excel 複製資料 / Paste copied Excel data", height=220, key="v136_account_paste_text")
+        paste_nonce = int(st.session_state.get("v30046_paste_nonce", 0) or 0)
+        paste_text = st.text_area("貼上 Excel 複製資料 / Paste copied Excel data", height=220, key=f"v136_account_paste_text_{paste_nonce}")
         paste_has_header = st.checkbox("貼上資料第一列為標題列 / First row is header", value=True, key="v136_account_paste_header")
         if paste_text.strip():
             try:
                 import_df = _v30035_parse_account_paste_cached(paste_text, paste_has_header)
                 st.success(f"解析完成：{len(import_df)} 筆 / Parsed {len(import_df)} accounts")
-                st.dataframe(import_df, use_container_width=True, hide_index=True)
+                preview_df = import_df.head(300).copy()
+                st.dataframe(preview_df, use_container_width=True, hide_index=True, height=320)
+                if len(import_df) > len(preview_df):
+                    st.caption(f"僅預覽前 {len(preview_df)} 筆，實際會處理全部 {len(import_df)} 筆。")
                 p1, p2 = st.columns(2)
                 with p1:
                     if st.button("⊕ 加入帳號總表編輯 / Add to Account Editor", use_container_width=True, key="v136_paste_add_editor", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
                         new_rows = _account_import_to_editor_rows(import_df)
-                        st.session_state["v133_users_df"] = _merge_users_editor(st.session_state.get("v133_users_df", _users_for_editor()), new_rows)
-                        st.success("已加入帳號總表編輯頁，請到『帳號清單編輯』確認後儲存。")
+                        st.session_state["v133_users_df"] = _merge_users_editor(_v30046_get_editor_base_df(), new_rows)
+                        _v30046_bump_widget_nonce("paste")
+                        _v30046_set_notice("success", "已加入帳號總表編輯頁，請到『帳號清單編輯』確認後儲存。貼上輸入框已清空，避免每次 rerun 重複解析。")
+                        st.rerun()
                 with p2:
                     if st.button("▣ 直接儲存貼上帳號 / Save Pasted Accounts", type="primary", use_container_width=True, key="v136_paste_save_direct", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
-                        result = _save_imported_accounts(import_df)
-                        st.success(f"帳號已儲存：{result['saved']} 筆 / Accounts saved")
-                        if result.get("skipped"):
-                            st.warning("；".join(result["skipped"]))
+                        sig = _v30046_import_df_signature(import_df, "paste_save_direct")
+                        if _v30046_import_action_recent(sig):
+                            _v30046_set_notice("warning", "已偵測到同一批貼上帳號剛剛已送出，已略過重複儲存。")
+                        else:
+                            result = _save_imported_accounts(import_df)
+                            _v30046_mark_import_action(sig, result)
+                            msg = f"帳號已儲存：{result.get('saved', 0)} 筆；未異動：{result.get('skipped_unchanged', 0)} 筆 / Accounts saved"
+                            if result.get("skipped"):
+                                msg += "；" + "；".join(result["skipped"])
+                            _v30046_set_notice("success", msg)
                         _v104_cache_clear("users", "permissions")
                         st.session_state.pop("v133_users_df", None)
+                        _v30046_bump_widget_nonce("paste")
+                        st.rerun()
             except Exception as ex:
                 st.error(f"貼上資料解析失敗 / Paste parse failed：{ex}")
 

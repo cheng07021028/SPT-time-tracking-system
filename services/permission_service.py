@@ -329,6 +329,80 @@ def _sync_legacy_security_user(username: str, row: dict[str, Any]) -> None:
 
 
 
+def _sync_legacy_security_users_batch(rows: list[dict[str, Any]]) -> None:
+    """Batch compatibility mirror update for security_users/security_user_roles.
+
+    Paste/Excel direct-save can submit many accounts.  The old code called
+    _sync_legacy_security_user() for every changed row, which can generate 4 Neon
+    statements per account outside the main transaction.  Keep the same mirror
+    behavior, but run it in one transaction and fall back to the old per-row path
+    only when a deployment has missing/older legacy tables.
+    """
+    clean_rows = [dict(r) for r in (rows or []) if str(r.get("username") or "").strip()]
+    if not clean_rows:
+        return
+    ops: list[tuple[str, tuple[Any, ...]]] = []
+    t = now_text()
+    for row in clean_rows:
+        username = str(row.get("username") or "").strip()
+        if not username:
+            continue
+        common_update = (
+            row.get("password_hash", ""),
+            row.get("employee_id", ""),
+            row.get("display_name", username),
+            row.get("email", ""),
+            row.get("is_active", 1),
+            row.get("force_password_change", 0),
+            t,
+            username,
+        )
+        ops.append((
+            """
+            UPDATE security_users SET password_hash=?, employee_id=?, display_name=?, email=?, is_active=?,
+                force_password_change=?, updated_at=?, deleted_at='', deleted_by='', delete_reason=''
+            WHERE lower(username)=lower(?)
+            """,
+            common_update,
+        ))
+        ops.append((
+            """
+            INSERT INTO security_users(username, password_hash, employee_id, display_name, email, is_active, force_password_change, last_login_at, created_at, updated_at, deleted_at, deleted_by, delete_reason)
+            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '', ''
+            WHERE NOT EXISTS (SELECT 1 FROM security_users WHERE lower(username)=lower(?) LIMIT 1)
+            """,
+            (
+                username,
+                row.get("password_hash", ""),
+                row.get("employee_id", ""),
+                row.get("display_name", username),
+                row.get("email", ""),
+                row.get("is_active", 1),
+                row.get("force_password_change", 0),
+                row.get("last_login_at", ""),
+                row.get("created_at") or t,
+                t,
+                username,
+            ),
+        ))
+        ops.append(("DELETE FROM security_user_roles WHERE lower(username)=lower(?)", (username,)))
+        ops.append((
+            "INSERT INTO security_user_roles(username, role_code, created_at) VALUES (?, ?, ?)",
+            (username, str(row.get("role_code") or "operator"), t),
+        ))
+    if not ops:
+        return
+    try:
+        _db().execute_transaction(ops, mark_changed=True, reason="sync_legacy_security_users_batch", source_sql="SYNC_LEGACY_SECURITY_USERS_BATCH")
+    except Exception:
+        for row in clean_rows:
+            try:
+                _sync_legacy_security_user(str(row.get("username") or ""), row)
+            except Exception:
+                pass
+
+
+
 
 def _value_from_src(src: dict[str, Any], key: str, display_key: str, old: dict[str, Any], default: Any = "") -> Any:
     """Read an account field without treating an explicit blank edit as missing.
@@ -478,12 +552,9 @@ def save_users(rows: list[dict[str,Any]]) -> dict:
                 except Exception as exc:
                     skipped.append(f"{row.get('username')}: {exc}")
     # Legacy security tables are compatibility mirrors only.  Sync after authority
-    # writes succeed; failures are swallowed inside _sync_legacy_security_user.
-    for row in changed_rows:
-        try:
-            _sync_legacy_security_user(str(row.get("username") or ""), row)
-        except Exception:
-            pass
+    # writes succeed.  V300.46 batches the mirror sync so Paste/Excel direct-save
+    # does not run several extra Neon statements per account outside one transaction.
+    _sync_legacy_security_users_batch(changed_rows)
     if saved or skipped:
         _clear_cache()
         _log("SAVE_USERS", f"saved={saved}; unchanged={skipped_unchanged}; skipped={len(skipped)}")
