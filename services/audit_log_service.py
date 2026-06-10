@@ -3755,84 +3755,66 @@ clear_audit_logs_by_date_range = delete_login_logs_by_date_range
 # ================= END V95 LOGIN CLEAR PERMANENT DELETE AUDIT =================
 
 
-# ================= V300.24 11 LOGIN LOG SINGLE-READ + DEDUP FIX =================
-# 2026-06-10
-# 修正重點：
-# 1) 11｜登入紀錄查詢不可先 COUNT 再 SELECT，頁面套用查詢改用 load_login_logs_with_stats() 單次讀取。
-# 2) auth_login_logs 為 Neon/PostgreSQL 主要權威；security_login_logs 只作 legacy 相容來源。
-#    兩表同時存在時，依事件指紋去重，避免舊同步資料被顯示/統計兩次。
-# 3) where 條件改用 COALESCE(event_time, created_at) / COALESCE(login_time, created_at)，
-#    避免部分舊列只有 created_at 時讀不到。
-# 4) 清除登入紀錄時，deleted_by 使用實際 operator，不再硬寫 admin。
-# 5) table_exists 加 process cache，避免每次狀態/查詢都打 information_schema。
+# ================= V300.36 LOGIN LOG COMPUTE FASTPATH｜2026-06-10 =================
+# 目標：
+# - 11 登入紀錄查詢只跑一次 SQL，同時取得明細與統計，避免 COUNT + SELECT 重複讀。
+# - auth_login_logs / security_login_logs 合併時依事件指紋去重，保留 auth_login_logs 權威列。
+# - information_schema table_exists 加 TTL cache，避免每次 rerun / 查詢都查 schema。
+# - 清除登入紀錄時用實際 operator 寫入 deleted_by，並以 rowcount 回傳實際軟刪除筆數。
 try:
-    _v30024_prev_table_exists = _v94_table_exists  # type: ignore[name-defined]
+    import time as _v30036_time
 except Exception:  # pragma: no cover
-    _v30024_prev_table_exists = None
+    _v30036_time = None
+
+_V30036_TABLE_EXISTS_CACHE: dict[str, tuple[float, bool]] = {}
+_V30036_TABLE_EXISTS_TTL_SEC = 300.0
+
 try:
-    _v30024_prev_record_clear_event = _v95_record_login_clear_delete_event  # type: ignore[name-defined]
+    _v30036_prev_table_exists = _v94_table_exists  # type: ignore[name-defined]
 except Exception:  # pragma: no cover
-    _v30024_prev_record_clear_event = None
-
-_V30024_TABLE_EXISTS_CACHE: dict[str, tuple[float, bool]] = {}
-_V30024_TABLE_EXISTS_TTL_SECONDS = 300.0
+    _v30036_prev_table_exists = None
 
 
-def _v30024_table_exists(table: str) -> bool:
-    key = str(table or '').strip()
-    if not key:
-        return False
+def _v30036_now_monotonic() -> float:
     try:
-        import time as _time
-        now_ts = float(_time.time())
+        return float(_v30036_time.monotonic()) if _v30036_time is not None else 0.0
     except Exception:
-        now_ts = 0.0
-    cached = _V30024_TABLE_EXISTS_CACHE.get(key)
-    if cached and (not now_ts or now_ts - float(cached[0]) <= _V30024_TABLE_EXISTS_TTL_SECONDS):
-        return bool(cached[1])
-    exists = False
-    try:
-        if callable(_v30024_prev_table_exists):
-            exists = bool(_v30024_prev_table_exists(key))
-        else:
-            conn = get_connection()
-            try:
-                exists = bool(_table_exists(conn, key))
-            finally:
-                conn.close()
-    except Exception:
-        exists = False
-    _V30024_TABLE_EXISTS_CACHE[key] = (now_ts, exists)
-    return exists
+        return 0.0
 
 
-# 讓後續仍呼叫 _v94_table_exists 的函式自動取得快取版本。
 def _v94_table_exists(table: str) -> bool:  # type: ignore[override]
-    return _v30024_table_exists(table)
-
-
-def _v30024_date_boundaries(start_date=None, end_date=None) -> tuple[str | None, str | None]:
+    key = str(table or '').strip()
+    now_ts = _v30036_now_monotonic()
+    cached = _V30036_TABLE_EXISTS_CACHE.get(key)
+    if cached and now_ts and (now_ts - cached[0]) < _V30036_TABLE_EXISTS_TTL_SEC:
+        return bool(cached[1])
+    ok = False
     try:
-        return _v94_date_boundaries(start_date, end_date)  # type: ignore[name-defined]
+        if _v30036_prev_table_exists is not None:
+            ok = bool(_v30036_prev_table_exists(key))
     except Exception:
-        from datetime import datetime as _dt, timedelta as _td
-        start_txt = None
-        end_txt = None
-        if start_date:
-            start_txt = str(start_date)[:10] + ' 00:00:00'
-        if end_date:
-            try:
-                d = _dt.strptime(str(end_date)[:10], '%Y-%m-%d').date() + _td(days=1)
-                end_txt = d.strftime('%Y-%m-%d 00:00:00')
-            except Exception:
-                end_txt = str(end_date)[:10] + ' 23:59:59'
-        return start_txt, end_txt
+        ok = False
+    try:
+        _V30036_TABLE_EXISTS_CACHE[key] = (now_ts, bool(ok))
+    except Exception:
+        pass
+    return bool(ok)
 
 
-def _v30024_login_where(alias: str, time_expr: str, start_date=None, end_date=None, keyword: str = '') -> tuple[str, list]:
+def _v30036_empty_login_bundle():
+    import pandas as _pd
+    return {"logs": _pd.DataFrame(), "stats": {"records": 0, "success": 0, "failed": 0}}
+
+
+def _v30036_login_where(alias: str, time_expr: str, start_date=None, end_date=None, keyword: str = "") -> tuple[str, list]:
+    # 與 V94 相同的日期邊界，但時間欄位改用 COALESCE(time, created_at)，避免舊資料漏查。
     where = [f"({alias}.deleted_at IS NULL OR {alias}.deleted_at='')"]
     params: list = []
-    start_txt, end_txt = _v30024_date_boundaries(start_date, end_date)
+    try:
+        start_txt, end_txt = _v94_date_boundaries(start_date, end_date)  # type: ignore[name-defined]
+    except Exception:
+        start_txt = str(start_date)[:10] + " 00:00:00" if start_date else None
+        end_txt = str(end_date)[:10] + " 23:59:59" if end_date else None
     if start_txt:
         where.append(f"{time_expr} >= ?")
         params.append(start_txt)
@@ -3854,81 +3836,50 @@ def _v30024_login_where(alias: str, time_expr: str, start_date=None, end_date=No
     return " AND ".join(where), params
 
 
-def _v30024_login_event_key(row: dict[str, Any]) -> str:
-    return "|".join([
-        str(row.get('username') or '').strip().lower(),
-        str(row.get('display_name') or '').strip().lower(),
-        str(row.get('event_type') or '').strip().upper(),
-        str(row.get('result') or '').strip().upper(),
-        str(row.get('login_time') or row.get('created_at') or '').strip(),
-        str(row.get('module_code') or '').strip(),
-        str(row.get('message') or '').strip(),
-    ])
-
-
-def _v30024_dedup_login_df(df):
-    if pd is None:
-        return df
-    try:
-        if df is None or df.empty:
-            return df
-        work = df.copy()
-        # auth_login_logs 是主要權威，legacy security_login_logs 只在沒有相同事件時保留。
-        def _priority(src: Any) -> int:
-            s = str(src or '').strip().lower()
-            if s == 'auth_login_logs' or s.startswith('auth_'):
-                return 0
-            if s == 'security_login_logs':
-                return 1
-            return 2
-        if 'source' in work.columns:
-            work['_v30024_source_priority'] = work['source'].map(_priority)
-        else:
-            work['_v30024_source_priority'] = 2
-        if 'login_time' not in work.columns:
-            work['login_time'] = ''
-        work['_v30024_order'] = range(len(work))
-        work['_v30024_key'] = [
-            _v30024_login_event_key(r) for r in work.to_dict('records')
-        ]
-        work = work.sort_values(['_v30024_source_priority', '_v30024_order'], ascending=[True, True])
-        work = work.drop_duplicates(subset=['_v30024_key'], keep='first')
-        work = work.sort_values(['login_time', '_v30024_order'], ascending=[False, True], na_position='last')
-        return work.drop(columns=[c for c in ('_v30024_source_priority', '_v30024_order', '_v30024_key') if c in work.columns]).reset_index(drop=True)
-    except Exception:
-        return df
-
-
-def _v30024_stats_from_logs(logs) -> dict:
-    try:
-        if pd is not None and hasattr(logs, 'empty'):
-            total = int(len(logs))
-            if total and 'result' in logs.columns:
-                result_s = logs['result'].astype(str).str.upper()
-                success = int(result_s.isin(['OK', 'SUCCESS', '成功']).sum())
-                failed = int(result_s.isin(['FAIL', 'FAILED', 'ERROR', '失敗']).sum())
-            else:
-                success = 0
-                failed = 0
-            return {'records': total, 'success': success, 'failed': failed, 'loaded_records': total, 'single_read': True, 'deduped': True}
-        rows = logs if isinstance(logs, list) else []
-        total = len(rows)
-        success = sum(1 for r in rows if str((r or {}).get('result') or '').upper() in {'OK', 'SUCCESS', '成功'})
-        failed = sum(1 for r in rows if str((r or {}).get('result') or '').upper() in {'FAIL', 'FAILED', 'ERROR', '失敗'})
-        return {'records': total, 'success': success, 'failed': failed, 'loaded_records': total, 'single_read': True, 'deduped': True}
-    except Exception:
-        return {'records': 0, 'success': 0, 'failed': 0, 'loaded_records': 0, 'single_read': True, 'deduped': True}
-
-
-def load_login_logs(start_date=None, end_date=None, keyword: str = '', limit: int = 1000, event_types=None, results=None, include_legacy: bool = True, **kwargs):  # type: ignore[override]
+def _v30036_dedup_login_df(df):
     import pandas as _pd
+    if df is None or getattr(df, 'empty', True):
+        return _pd.DataFrame()
+    out = df.copy()
+    for c in ("username", "display_name", "event_type", "result", "login_time", "module_code", "message", "source"):
+        if c not in out.columns:
+            out[c] = ""
+    out["__source_rank"] = out["source"].astype(str).map(lambda v: 0 if v == "auth_login_logs" else 1)
+    out["__event_key"] = (
+        out["username"].astype(str).str.lower().fillna("") + "|" +
+        out["display_name"].astype(str).str.lower().fillna("") + "|" +
+        out["event_type"].astype(str).str.lower().fillna("") + "|" +
+        out["result"].astype(str).str.lower().fillna("") + "|" +
+        out["login_time"].astype(str).fillna("") + "|" +
+        out["module_code"].astype(str).str.lower().fillna("") + "|" +
+        out["message"].astype(str).str.lower().fillna("")
+    )
+    out = out.sort_values(["__source_rank", "login_time"], ascending=[True, False], na_position="last")
+    out = out.drop_duplicates("__event_key", keep="first")
+    return out.drop(columns=[c for c in ("__source_rank", "__event_key") if c in out.columns], errors="ignore").reset_index(drop=True)
+
+
+def _v30036_stats_from_df(df) -> dict:
+    if df is None or getattr(df, 'empty', True):
+        return {"records": 0, "success": 0, "failed": 0}
+    try:
+        result_col = df.get("result")
+        success = int(result_col.astype(str).str.upper().isin(["OK", "SUCCESS", "成功"]).sum()) if result_col is not None else 0
+        failed = int(result_col.astype(str).str.upper().isin(["FAIL", "FAILED", "ERROR", "失敗"]).sum()) if result_col is not None else 0
+        return {"records": int(len(df)), "success": success, "failed": failed}
+    except Exception:
+        return {"records": int(len(df)), "success": 0, "failed": 0}
+
+
+def load_login_logs_with_stats(start_date=None, end_date=None, keyword: str = "", limit: int = 1000, event_types=None, results=None, include_legacy: bool = True, **kwargs):
+    import pandas as _pd
+    lim = max(1, min(int(limit or 300), 2000))
     try:
         from services.db_service import query_df
-        lim = max(1, min(int(limit or 300), 2000))
         chunks: list[str] = []
         params: list = []
-        if _v30024_table_exists('auth_login_logs'):
-            where1, params1 = _v30024_login_where('a', "COALESCE(a.event_time, a.created_at, '')", start_date, end_date, keyword)
+        if _v94_table_exists("auth_login_logs"):
+            where1, params1 = _v30036_login_where("a", "COALESCE(a.event_time, a.created_at)", start_date, end_date, keyword)
             chunks.append(f"""
                 SELECT a.id, a.username, a.display_name, a.event_type, a.result,
                        COALESCE(a.event_time, a.created_at) AS login_time,
@@ -3940,8 +3891,8 @@ def load_login_logs(start_date=None, end_date=None, keyword: str = '', limit: in
                 WHERE {where1}
             """)
             params.extend(params1)
-        if include_legacy and _v30024_table_exists('security_login_logs'):
-            where2, params2 = _v30024_login_where('s', "COALESCE(s.login_time, s.created_at, '')", start_date, end_date, keyword)
+        if include_legacy and _v94_table_exists("security_login_logs"):
+            where2, params2 = _v30036_login_where("s", "COALESCE(s.login_time, s.created_at)", start_date, end_date, keyword)
             chunks.append(f"""
                 SELECT s.id, s.username, s.display_name, s.event_type, s.result,
                        COALESCE(s.login_time, s.created_at) AS login_time,
@@ -3954,116 +3905,106 @@ def load_login_logs(start_date=None, end_date=None, keyword: str = '', limit: in
             """)
             params.extend(params2)
         if not chunks:
-            return _pd.DataFrame()
-        # limit 放大一點再去重，避免前幾筆都是 auth/security 重複列時，去重後筆數不足。
-        sql_limit = min(max(lim * 2, lim), 4000) if include_legacy else lim
-        sql = " SELECT * FROM (" + " UNION ALL ".join(chunks) + ") q ORDER BY login_time DESC NULLS LAST, id DESC LIMIT ?"
-        params.append(sql_limit)
+            return _v30036_empty_login_bundle()
+        sql = """
+        WITH raw_login AS (
+        """ + " UNION ALL ".join(chunks) + """
+        ), ranked_login AS (
+            SELECT raw_login.*,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY lower(COALESCE(username,'')), lower(COALESCE(display_name,'')),
+                                    lower(COALESCE(event_type,'')), lower(COALESCE(result,'')),
+                                    COALESCE(login_time,''), lower(COALESCE(module_code,'')), lower(COALESCE(message,''))
+                       ORDER BY CASE WHEN source='auth_login_logs' THEN 0 ELSE 1 END, id DESC
+                   ) AS __rn
+            FROM raw_login
+        ), final_login AS (
+            SELECT * FROM ranked_login WHERE __rn=1
+        )
+        SELECT *,
+               COUNT(*) OVER() AS __total_records,
+               SUM(CASE WHEN upper(COALESCE(result,'')) IN ('OK','SUCCESS','成功') THEN 1 ELSE 0 END) OVER() AS __total_success,
+               SUM(CASE WHEN upper(COALESCE(result,'')) IN ('FAIL','FAILED','ERROR','失敗') THEN 1 ELSE 0 END) OVER() AS __total_failed
+        FROM final_login
+        """
+        if event_types:
+            placeholders = ",".join(["?"] * len(event_types))
+            sql += f" WHERE event_type IN ({placeholders})"
+            params.extend(list(event_types))
+        if results:
+            connector = " AND " if event_types else " WHERE "
+            placeholders = ",".join(["?"] * len(results))
+            sql += f"{connector} result IN ({placeholders})"
+            params.extend(list(results))
+        sql += " ORDER BY CASE WHEN login_time IS NULL OR login_time='' THEN 1 ELSE 0 END, login_time DESC, id DESC LIMIT ?"
+        params.append(lim)
         df = query_df(sql, tuple(params))
         if df is None or df.empty:
-            return _pd.DataFrame()
-        if event_types and 'event_type' in df.columns:
-            ev_set = {str(x).strip().upper() for x in event_types if str(x).strip()}
-            df = df[df['event_type'].astype(str).str.upper().isin(ev_set)]
-        if results and 'result' in df.columns:
-            res_set = {str(x).strip().upper() for x in results if str(x).strip()}
-            df = df[df['result'].astype(str).str.upper().isin(res_set)]
-        df = _v30024_dedup_login_df(df)
-        return df.head(lim).reset_index(drop=True)
+            return _v30036_empty_login_bundle()
+        total_records = int(df.get("__total_records", _pd.Series([len(df)])).iloc[0] or 0) if "__total_records" in df.columns else int(len(df))
+        total_success = int(df.get("__total_success", _pd.Series([0])).iloc[0] or 0) if "__total_success" in df.columns else 0
+        total_failed = int(df.get("__total_failed", _pd.Series([0])).iloc[0] or 0) if "__total_failed" in df.columns else 0
+        logs = df.drop(columns=[c for c in ("__rn", "__total_records", "__total_success", "__total_failed") if c in df.columns], errors="ignore").reset_index(drop=True)
+        return {"logs": logs, "stats": {"records": total_records, "success": total_success, "failed": total_failed}}
     except Exception:
+        # Fallback：保留舊行為但做 Python 去重，避免查詢頁整個失效。
+        try:
+            prev = _v30036_prev_load_login_logs(start_date=start_date, end_date=end_date, keyword=keyword, limit=lim, event_types=event_types, results=results, include_legacy=include_legacy, **kwargs)  # type: ignore[name-defined]
+            if prev is None:
+                prev = _pd.DataFrame()
+            logs = _v30036_dedup_login_df(prev)
+            return {"logs": logs, "stats": _v30036_stats_from_df(logs)}
+        except Exception:
+            return _v30036_empty_login_bundle()
+
+try:
+    _v30036_prev_load_login_logs = load_login_logs  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30036_prev_load_login_logs = None
+
+
+def load_login_logs(start_date=None, end_date=None, keyword: str = "", limit: int = 1000, event_types=None, results=None, include_legacy: bool = True, **kwargs):  # type: ignore[override]
+    bundle = load_login_logs_with_stats(start_date=start_date, end_date=end_date, keyword=keyword, limit=limit, event_types=event_types, results=results, include_legacy=include_legacy, **kwargs)
+    logs = bundle.get("logs") if isinstance(bundle, dict) else None
+    if logs is None:
+        import pandas as _pd
         return _pd.DataFrame()
+    return logs
 
 
-def load_login_logs_with_stats(start_date=None, end_date=None, keyword: str = '', limit: int = 1000, event_types=None, results=None, include_legacy: bool = True, **kwargs) -> dict:
-    logs = load_login_logs(start_date=start_date, end_date=end_date, keyword=keyword, limit=limit, event_types=event_types, results=results, include_legacy=include_legacy, **kwargs)
-    return {'logs': logs, 'stats': _v30024_stats_from_logs(logs), 'single_read': True, 'deduped': True}
+def get_login_log_stats(start_date=None, end_date=None, keyword: str = "") -> dict:  # type: ignore[override]
+    # 用 limit=1 取得 window stats，仍是單次查詢，不會再 COUNT + SELECT。
+    bundle = load_login_logs_with_stats(start_date=start_date, end_date=end_date, keyword=keyword, limit=1, include_legacy=True)
+    return dict(bundle.get("stats") or {"records": 0, "success": 0, "failed": 0}) if isinstance(bundle, dict) else {"records": 0, "success": 0, "failed": 0}
 
 
-def _v30024_exact_count_login_logs(start_date=None, end_date=None, keyword: str = '', include_legacy: bool = True) -> dict:
-    """Exact count for callers that explicitly ask get_login_log_stats(); page 11 search avoids this extra read."""
-    try:
-        from services.db_service import query_one
-        chunks: list[str] = []
-        params: list = []
-        if _v30024_table_exists('auth_login_logs'):
-            where1, params1 = _v30024_login_where('a', "COALESCE(a.event_time, a.created_at, '')", start_date, end_date, keyword)
-            chunks.append(f"""
-                SELECT lower(COALESCE(a.username,'')) AS username_key,
-                       COALESCE(a.display_name,'') AS display_name_key,
-                       upper(COALESCE(a.event_type,'')) AS event_type,
-                       upper(COALESCE(a.result,'')) AS result,
-                       COALESCE(a.event_time, a.created_at, '') AS login_time,
-                       COALESCE(a.module_code,'') AS module_code,
-                       COALESCE(a.message,'') AS message
-                FROM auth_login_logs a
-                WHERE {where1}
-            """)
-            params.extend(params1)
-        if include_legacy and _v30024_table_exists('security_login_logs'):
-            where2, params2 = _v30024_login_where('s', "COALESCE(s.login_time, s.created_at, '')", start_date, end_date, keyword)
-            chunks.append(f"""
-                SELECT lower(COALESCE(s.username,'')) AS username_key,
-                       COALESCE(s.display_name,'') AS display_name_key,
-                       upper(COALESCE(s.event_type,'')) AS event_type,
-                       upper(COALESCE(s.result,'')) AS result,
-                       COALESCE(s.login_time, s.created_at, '') AS login_time,
-                       COALESCE(s.module_code,'') AS module_code,
-                       COALESCE(s.message,'') AS message
-                FROM security_login_logs s
-                WHERE {where2}
-            """)
-            params.extend(params2)
-        if not chunks:
-            return {'records': 0, 'success': 0, 'failed': 0, 'deduped': True}
-        sql = """
-        SELECT COUNT(*) AS records,
-               SUM(CASE WHEN result IN ('OK','SUCCESS','成功') THEN 1 ELSE 0 END) AS success,
-               SUM(CASE WHEN result IN ('FAIL','FAILED','ERROR','失敗') THEN 1 ELSE 0 END) AS failed
-        FROM (
-        """ + " UNION ".join(chunks) + "\n        ) q"
-        row = query_one(sql, tuple(params)) or {}
-        return {'records': int(row.get('records') or 0), 'success': int(row.get('success') or 0), 'failed': int(row.get('failed') or 0), 'deduped': True}
-    except Exception:
-        return _v30024_stats_from_logs(load_login_logs(start_date=start_date, end_date=end_date, keyword=keyword, limit=100000, include_legacy=include_legacy))
-
-
-def get_login_log_stats(start_date=None, end_date=None, keyword: str = '') -> dict:  # type: ignore[override]
-    # 無篩選狀態仍維持快速估算；有明確查詢條件時用單一 UNION 去重 COUNT。
-    if not start_date and not end_date and not keyword:
-        status = get_audit_permanent_status()
-        return {'records': int(status.get('count') or 0), 'success': 0, 'failed': 0, 'estimated': bool(status.get('estimated')), 'deduped': True}
-    return _v30024_exact_count_login_logs(start_date=start_date, end_date=end_date, keyword=keyword, include_legacy=True)
-
-
-def delete_login_logs_by_date_range(start_date: str, end_date: str, operator: str = '', **kwargs: Any) -> int:  # type: ignore[override]
+def delete_login_logs_by_date_range(start_date: str, end_date: str, operator: str = "", **kwargs: Any) -> int:  # type: ignore[override]
+    actor = _v95_current_operator(operator) if "_v95_current_operator" in globals() else str(operator or "admin")
+    now = _v31_now() if "_v31_now" in globals() else _now()
     deleted = 0
-    err = ''
-    actor = _v95_current_operator(operator) if '_v95_current_operator' in globals() else (str(operator or 'admin'))
+    err = ""
     try:
         from services.db_service import execute
-        start_txt, end_txt = _v30024_date_boundaries(start_date, end_date)
-        if not start_txt or not end_txt:
-            return 0
-        now = _v31_now() if '_v31_now' in globals() else _v30042_login_now() if '_v30042_login_now' in globals() else _now()
-        if _v30024_table_exists('auth_login_logs'):
+        start_txt, end_txt = _v94_date_boundaries(start_date, end_date)  # type: ignore[name-defined]
+        if _v94_table_exists("auth_login_logs"):
             deleted += int(execute(
                 """
                 UPDATE auth_login_logs
                 SET deleted_at=?, deleted_by=?, delete_reason='clear_login_logs'
-                WHERE COALESCE(event_time, created_at, '') >= ?
-                  AND COALESCE(event_time, created_at, '') < ?
-                  AND COALESCE(deleted_at,'')=''
+                WHERE COALESCE(deleted_at,'')=''
+                  AND COALESCE(event_time, created_at) >= ?
+                  AND COALESCE(event_time, created_at) < ?
                 """,
                 (now, actor, start_txt, end_txt),
             ) or 0)
-        if _v30024_table_exists('security_login_logs'):
+        if _v94_table_exists("security_login_logs"):
             deleted += int(execute(
                 """
                 UPDATE security_login_logs
                 SET deleted_at=?, deleted_by=?, delete_reason='clear_login_logs'
-                WHERE COALESCE(login_time, created_at, '') >= ?
-                  AND COALESCE(login_time, created_at, '') < ?
-                  AND COALESCE(deleted_at,'')=''
+                WHERE COALESCE(deleted_at,'')=''
+                  AND COALESCE(login_time, created_at) >= ?
+                  AND COALESCE(login_time, created_at) < ?
                 """,
                 (now, actor, start_txt, end_txt),
             ) or 0)
@@ -4073,20 +4014,25 @@ def delete_login_logs_by_date_range(start_date: str, end_date: str, operator: st
         raise
     finally:
         try:
-            if callable(_v30024_prev_record_clear_event):
-                _v30024_prev_record_clear_event(start_date, end_date, int(deleted or 0), operator=actor, result='ERROR' if err else 'OK', error=err)
+            if "_v95_record_login_clear_delete_event" in globals():
+                _v95_record_login_clear_delete_event(start_date, end_date, int(deleted or 0), operator=actor, result="ERROR" if err else "OK", error=err)
         except Exception:
             pass
 
-
-# Pin aliases to the V300.24 implementations.
 clear_login_logs_by_date_range = delete_login_logs_by_date_range
 clear_login_logs_by_date = delete_login_logs_by_date_range
 clear_login_logs = delete_login_logs_by_date_range
 delete_audit_logs_by_date_range = delete_login_logs_by_date_range
 clear_audit_logs_by_date_range = delete_login_logs_by_date_range
-get_login_logs = load_login_logs
-query_login_logs = load_login_logs
-load_audit_logs = load_login_logs
-login_log_stats = get_login_log_stats
-# ================= END V300.24 11 LOGIN LOG SINGLE-READ + DEDUP FIX =================
+
+
+def audit_v30036_login_logs_compute_fastpath() -> dict[str, Any]:
+    return {
+        "version": "V300.36_LOGIN_LOGS_COMPUTE_FASTPATH",
+        "single_query_logs_with_stats": True,
+        "dedup_auth_and_legacy": True,
+        "table_exists_ttl_seconds": _V30036_TABLE_EXISTS_TTL_SEC,
+        "delete_uses_operator_rowcount": True,
+        "table_exists_cache_items": len(_V30036_TABLE_EXISTS_CACHE),
+    }
+# ================= END V300.36 LOGIN LOG COMPUTE FASTPATH =================

@@ -176,6 +176,30 @@ _default_login_filters = {
     "limit": 300,
 }
 _applied_login_filters = st.session_state.get("v39_login_log_filters_applied", _default_login_filters.copy())
+
+# V300.36：登入紀錄查詢結果與 CSV 匯出快取。
+# 原則：只有按「套用查詢 / 恢復預設 / 刪除」才清除；一般 rerun 不重查 Neon、不重建 CSV bytes。
+def _v30036_clear_login_query_cache() -> None:
+    for _k in (
+        "_spt_v67_login_logs_cached",
+        "_spt_v67_login_logs_signature",
+        "_spt_v67_login_logs_csv_signature",
+        "_spt_v67_login_logs_csv_bytes",
+    ):
+        st.session_state.pop(_k, None)
+    st.session_state["_spt_v67_login_logs_loaded"] = False
+
+def _v30036_csv_bytes_cached(show_df: pd.DataFrame, signature: tuple) -> bytes:
+    sig = (signature, tuple(show_df.columns), int(len(show_df)))
+    if st.session_state.get("_spt_v67_login_logs_csv_signature") == sig:
+        cached = st.session_state.get("_spt_v67_login_logs_csv_bytes")
+        if isinstance(cached, (bytes, bytearray)):
+            return bytes(cached)
+    data = show_df.to_csv(index=False).encode("utf-8-sig")
+    st.session_state["_spt_v67_login_logs_csv_signature"] = sig
+    st.session_state["_spt_v67_login_logs_csv_bytes"] = data
+    return data
+
 with st.form("v39_login_log_search_form", clear_on_submit=False):
     fc1, fc2, fc3, fc4 = st.columns([1, 1, 2, 1])
     with fc1:
@@ -193,9 +217,7 @@ with st.form("v39_login_log_search_form", clear_on_submit=False):
         reset_query = st.form_submit_button("↺ 恢復預設 / Reset", use_container_width=True)
 if reset_query:
     st.session_state["v39_login_log_filters_applied"] = _default_login_filters.copy()
-    st.session_state.pop("_spt_v67_login_logs_cached", None)
-    st.session_state.pop("_spt_v67_login_logs_signature", None)
-    st.session_state["_spt_v67_login_logs_loaded"] = False
+    _v30036_clear_login_query_cache()
     st.rerun()
 if apply_query:
     st.session_state["v39_login_log_filters_applied"] = {
@@ -204,6 +226,7 @@ if apply_query:
         "keyword": pending_keyword,
         "limit": int(pending_limit),
     }
+    _v30036_clear_login_query_cache()
     st.session_state["_spt_v67_login_logs_force_query"] = True
     st.rerun()
 _applied_login_filters = st.session_state.get("v39_login_log_filters_applied", _default_login_filters.copy())
@@ -216,16 +239,18 @@ _login_query_signature = (str(start), str(end), keyword, int(limit))
 _login_force = bool(st.session_state.pop("_spt_v67_login_logs_force_query", False))
 _login_loaded = bool(st.session_state.get("_spt_v67_login_logs_loaded", False))
 if _login_force or (_login_loaded and st.session_state.get("_spt_v67_login_logs_signature") != _login_query_signature):
-    # V300.24：查詢只打一次登入紀錄讀取路徑。
-    # 舊版同一次 Apply Search 會先 get_login_log_stats() 做 COUNT，再 load_login_logs() 做 SELECT；
-    # auth_login_logs + security_login_logs 都啟用時等於重複讀取兩套表，資料量大時容易造成頁面長時間運轉。
-    bundle = load_login_logs_with_stats(start_date=str(start), end_date=str(end), keyword=keyword, limit=limit, include_legacy=True)
-    stats = dict(bundle.get("stats") or {})
-    logs = bundle.get("logs", pd.DataFrame())
+    # V300.36：一次 SQL 讀取明細 + 統計，避免同一查詢先 COUNT 再 SELECT。
+    bundle = load_login_logs_with_stats(
+        start_date=str(start),
+        end_date=str(end),
+        keyword=keyword,
+        limit=limit,
+        include_legacy=True,
+    )
+    stats = bundle.get("stats", {"records": 0, "success": 0, "failed": 0}) if isinstance(bundle, dict) else {"records": 0, "success": 0, "failed": 0}
+    logs = bundle.get("logs", pd.DataFrame()) if isinstance(bundle, dict) else pd.DataFrame()
     if isinstance(logs, list):
         logs = pd.DataFrame(logs)
-    elif not isinstance(logs, pd.DataFrame):
-        logs = pd.DataFrame()
     st.session_state["_spt_v67_login_logs_cached"] = {"stats": stats, "logs": logs}
     st.session_state["_spt_v67_login_logs_signature"] = _login_query_signature
     st.session_state["_spt_v67_login_logs_loaded"] = True
@@ -279,7 +304,7 @@ else:
     st.dataframe(show, use_container_width=True, hide_index=True, height=420)
     st.download_button(
         "⬇️ 匯出登入紀錄 CSV / Export CSV",
-        data=show.to_csv(index=False).encode("utf-8-sig"),
+        data=_v30036_csv_bytes_cached(show, _login_query_signature),
         file_name=f"login_logs_{start}_{end}.csv",
         mime="text/csv",
         use_container_width=True,
@@ -307,12 +332,12 @@ if st.button("⊖ 確認清除日期區間內登入紀錄 / Delete Logs in Date 
     else:
         _login_clear_operator = str(st.session_state.get("auth_username") or st.session_state.get("username") or "admin")
         count = delete_login_logs_by_date_range(str(start), str(end), operator=_login_clear_operator)
-        st.session_state.pop("_spt_v67_login_logs_cached", None)
-        st.session_state.pop("_spt_v67_login_logs_signature", None)
-        st.session_state["_spt_v67_login_logs_loaded"] = False
-        status_after = get_audit_permanent_status()
-        st.success(f"已清除 {count} 筆登入紀錄，權威檔目前 {status_after.get('count', 0)} 筆 / Deleted {count} logs; authority now has {status_after.get('count', 0)} rows")
-        st.caption(f"權威資料已更新：{status_after.get('path', '-')}｜DeleteState：{status_after.get('delete_state_path', '-')}｜本次刪除稽核已寫入 system_logs / operation_logs。")
+        _v30036_clear_login_query_cache()
+        for _k in ("v94_login_status_cached", "v94_login_status_loaded_at"):
+            st.session_state.pop(_k, None)
+        st.session_state["v34_login_status_loaded"] = False
+        st.success(f"已清除 {count} 筆登入紀錄 / Deleted {count} login logs")
+        st.caption("權威資料已更新：Neon/PostgreSQL deleted_at 軟刪除；本次刪除稽核已寫入 system_logs / operation_logs。需要最新總筆數時，請按上方『載入登入紀錄狀態與在線人員』手動讀取。")
         st.session_state["v11_reset_confirm_delete_login_logs"] = True
         st.rerun()
 
