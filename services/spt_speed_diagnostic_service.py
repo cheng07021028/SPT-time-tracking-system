@@ -159,3 +159,31 @@ def write_report(last_hours: float | None = 24) -> Path:
     summary = build_summary(last_hours=last_hours)
     path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
+
+def build_and_write_summary(last_hours: float | None = 24, limit: int = 5000, top_n: int = 50) -> tuple[dict[str, Any], Path]:
+    """Build the 99-page summary and write the JSON report with one event read.
+
+    V300.42 avoids the old page flow that called build_summary() and write_report(),
+    causing performance_events.jsonl to be read twice for the same refresh.
+    """
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    path = REPORT_DIR / "spt_v257_speed_summary.json"
+    if not callable(read_events) or not callable(summarize_events):
+        summary = {"error": "performance_profiler_service unavailable"}
+    else:
+        events = read_events(limit=limit, last_hours=last_hours)  # type: ignore[misc]
+        summary = summarize_events(events, top_n=top_n)  # type: ignore[misc]
+    try:
+        path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+    return summary, path
+
+
+def audit_v30042_99_speed_diagnostic_fastpath() -> dict[str, Any]:
+    return {
+        "version": "V300.42",
+        "single_read_summary_writer": True,
+        "report_dir": str(REPORT_DIR),
+    }
+

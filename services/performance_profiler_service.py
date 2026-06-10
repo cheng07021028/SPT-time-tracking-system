@@ -256,10 +256,74 @@ def mark_installed(key: str) -> bool:
         return True
 
 
+
+
+# ================= V300.42 PERFORMANCE DIAGNOSTIC FASTPATH =================
+# 99. 效能診斷只需要最近 N 筆事件。避免為了頁面診斷把整個 JSONL 檔案讀進記憶體。
+# 注意：這只影響診斷頁讀取方式，不影響正式 profiler 寫入事件。
+_V30042_TAIL_BYTES = int(float(os.environ.get("SPT_PERF_READ_TAIL_BYTES", str(2 * 1024 * 1024)) or (2 * 1024 * 1024)))
+
+
+def _v30042_tail_lines(path: Path, *, max_lines: int, max_bytes: int | None = None) -> list[str]:
+    """Return recent lines from a JSONL file without reading the whole file.
+
+    performance_events.jsonl may grow until rotation.  The old implementation used
+    read_text().splitlines(), which allocates the whole file on every 99-page refresh.
+    For summaries we only need the most recent records, so reading the tail is enough.
+    """
+    try:
+        if not path.exists() or max_lines <= 0:
+            return []
+        size = int(path.stat().st_size or 0)
+        if size <= 0:
+            return []
+        window = int(max_bytes if max_bytes is not None else _V30042_TAIL_BYTES)
+        window = max(64 * 1024, window)
+        start = max(0, size - window)
+        with path.open("rb") as fh:
+            fh.seek(start)
+            data = fh.read()
+        text = data.decode("utf-8", errors="ignore")
+        lines = text.splitlines()
+        if start > 0 and lines:
+            # 第一行可能從檔案中間截斷，丟棄避免 JSON parse 噪音。
+            lines = lines[1:]
+        return lines[-max_lines:]
+    except Exception:
+        return []
+
+
+def v30042_event_file_info() -> dict[str, Any]:
+    """Lightweight metadata for the raw JSONL file used by page 99."""
+    try:
+        if not EVENT_PATH.exists():
+            return {"exists": False, "path": str(EVENT_PATH), "size_bytes": 0, "mtime": 0.0}
+        stat = EVENT_PATH.stat()
+        return {
+            "exists": True,
+            "path": str(EVENT_PATH),
+            "size_bytes": int(stat.st_size or 0),
+            "mtime": float(stat.st_mtime or 0.0),
+        }
+    except Exception as exc:
+        return {"exists": False, "path": str(EVENT_PATH), "error": _safe_text(exc, 300)}
+
+
+def audit_v30042_99_performance_diagnostic_fastpath() -> dict[str, Any]:
+    return {
+        "version": "V300.42",
+        "read_events_tail_reader": True,
+        "tail_bytes": _V30042_TAIL_BYTES,
+        "event_path": str(EVENT_PATH),
+    }
+# ================= END V300.42 PERFORMANCE DIAGNOSTIC FASTPATH =================
+
+
 def read_events(limit: int = 1000, last_hours: float | None = None) -> list[dict[str, Any]]:
-    files = []
-    if EVENT_PATH.with_suffix(".jsonl.1").exists():
-        files.append(EVENT_PATH.with_suffix(".jsonl.1"))
+    files: list[Path] = []
+    rotated = EVENT_PATH.with_suffix(".jsonl.1")
+    if rotated.exists():
+        files.append(rotated)
     if EVENT_PATH.exists():
         files.append(EVENT_PATH)
     events: list[dict[str, Any]] = []
@@ -267,12 +331,11 @@ def read_events(limit: int = 1000, last_hours: float | None = None) -> list[dict
     if last_hours is not None:
         cutoff = time.time() - float(last_hours) * 3600.0
     try:
+        max_lines = max(int(limit) * 2, 2000)
+        # 只讀每個 JSONL 檔案尾端，避免 99 頁每次重新整理都整檔 read_text。
         for path in files:
-            try:
-                lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
-            except Exception:
-                continue
-            for line in lines[-max(limit * 2, 2000):]:
+            lines = _v30042_tail_lines(path, max_lines=max_lines)
+            for line in lines:
                 try:
                     ev = json.loads(line)
                 except Exception:

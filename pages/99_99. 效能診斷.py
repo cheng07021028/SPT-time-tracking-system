@@ -9,8 +9,8 @@ import streamlit as st
 
 from services.theme_service import apply_theme, render_header
 from services.security_service import require_login, get_current_user
-from services.spt_speed_diagnostic_service import build_summary, write_report
-from services.performance_profiler_service import read_events
+from services.spt_speed_diagnostic_service import build_summary, write_report, build_and_write_summary
+from services.performance_profiler_service import read_events, v30042_event_file_info
 
 
 
@@ -79,10 +79,13 @@ if refresh_report:
     st.session_state["v39_perf_filters_applied"] = {"hours": int(pending_hours), "limit": int(pending_limit)}
     hours = int(pending_hours)
     limit = int(pending_limit)
-    summary = build_summary(last_hours=float(hours), limit=int(limit))
-    report_path = write_report(last_hours=float(hours))
+    # V300.42：一次讀取 performance_events 後同時產生畫面 summary 與 JSON 報告，避免重複讀大型 JSONL。
+    summary, report_path_obj = build_and_write_summary(last_hours=float(hours), limit=int(limit), top_n=50)
+    report_path = str(report_path_obj)
     st.session_state["v59_perf_summary"] = summary
-    st.session_state["v59_perf_report_path"] = str(report_path)
+    st.session_state["v59_perf_report_path"] = report_path
+    st.session_state.pop("v30042_perf_summary_download", None)
+    st.session_state.pop("v30042_raw_events_download", None)
 else:
     summary = st.session_state.get("v59_perf_summary", {"event_count": 0, "slow_count": 0, "error_count": 0, "by_name": [], "by_category": [], "hot_tables_or_modules": [], "top_events": []})
     report_path = st.session_state.get("v59_perf_report_path", "尚未重新整理")
@@ -158,27 +161,61 @@ try:
 except Exception as exc:
     st.warning(f"V32 架構/效能快測暫時無法執行：{exc}")
 
-json_text = json.dumps(summary, ensure_ascii=False, indent=2)
-st.download_button(
-    "下載 V258 測速報告 JSON",
-    data=json_text.encode("utf-8"),
-    file_name="SPT_V258_speed_report.json",
-    mime="application/json",
-    use_container_width=True,
-)
+st.divider()
+st.subheader("V300.42 下載檔案準備 / Download preparation")
+st.caption("下載資料改為手動準備，避免 99 頁每次 rerun 都重新 json.dumps 或 read_bytes 讀大型 JSONL。")
+
+_summary_sig = json.dumps({
+    "event_count": summary.get("event_count", 0),
+    "slow_count": summary.get("slow_count", 0),
+    "error_count": summary.get("error_count", 0),
+    "report_path": str(report_path),
+}, ensure_ascii=False, sort_keys=True)
+_summary_download = st.session_state.get("v30042_perf_summary_download")
+if not isinstance(_summary_download, dict) or _summary_download.get("sig") != _summary_sig:
+    _summary_download = None
+if st.button("準備測速報告 JSON 下載", use_container_width=True):
+    st.session_state["v30042_perf_summary_download"] = {
+        "sig": _summary_sig,
+        "data": json.dumps(summary, ensure_ascii=False, indent=2).encode("utf-8"),
+    }
+_summary_download = st.session_state.get("v30042_perf_summary_download")
+if isinstance(_summary_download, dict) and _summary_download.get("data"):
+    st.download_button(
+        "下載 V258 測速報告 JSON",
+        data=_summary_download.get("data"),
+        file_name="SPT_V258_speed_report.json",
+        mime="application/json",
+        use_container_width=True,
+    )
 
 try:
-    event_path = Path("data/performance/performance_events.jsonl")
-    if event_path.exists():
+    _event_info = v30042_event_file_info()
+except Exception:
+    _event_info = {"exists": False}
+if _event_info.get("exists"):
+    st.caption(f"原始事件檔大小：約 {int(_event_info.get('size_bytes') or 0):,} bytes。需要下載時才讀取檔案內容。")
+    _raw_sig = f"{_event_info.get('size_bytes')}:{_event_info.get('mtime')}"
+    _raw_download = st.session_state.get("v30042_raw_events_download")
+    if not isinstance(_raw_download, dict) or _raw_download.get("sig") != _raw_sig:
+        _raw_download = None
+    if st.button("準備原始測速事件 JSONL 下載", use_container_width=True):
+        try:
+            event_path = Path(_event_info.get("path") or "data/performance/performance_events.jsonl")
+            st.session_state["v30042_raw_events_download"] = {"sig": _raw_sig, "data": event_path.read_bytes()}
+        except Exception as exc:
+            st.warning(f"原始測速事件檔暫時無法讀取：{exc}")
+    _raw_download = st.session_state.get("v30042_raw_events_download")
+    if isinstance(_raw_download, dict) and _raw_download.get("data"):
         st.download_button(
             "下載原始測速事件 JSONL",
-            data=event_path.read_bytes(),
+            data=_raw_download.get("data"),
             file_name="SPT_V258_performance_events.jsonl",
             mime="application/jsonl",
             use_container_width=True,
         )
-except Exception:
-    pass
+else:
+    st.caption("目前沒有原始測速事件檔。")
 
 try:
     _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
