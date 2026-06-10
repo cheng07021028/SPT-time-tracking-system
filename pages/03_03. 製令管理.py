@@ -389,6 +389,36 @@ def _excel_bytes(sheets: dict[str, pd.DataFrame]) -> bytes:
     return bio.getvalue()
 
 
+def _v30028_work_order_template_bytes() -> bytes:
+    """Cache the static 03 import template in session to avoid rebuilding Excel bytes on every rerun."""
+    key = "v30028_work_order_template_bytes"
+    if key not in st.session_state:
+        tpl = pd.DataFrame(columns=["製令", "P/N", "機型", "組立地點", "客戶", "備註", "啟用"])
+        st.session_state[key] = _excel_bytes({"template": tpl})
+    return st.session_state[key]
+
+
+def _v30028_sheet_setting_cache_key(sheet_name: str) -> str:
+    return f"v30028_work_order_sheet_setting::{str(sheet_name)}"
+
+
+def _v30028_get_sheet_setting(sheet_name: str) -> dict:
+    """Read OneDrive mapping settings once per session until the user saves/clears them."""
+    key = _v30028_sheet_setting_cache_key(sheet_name)
+    if key not in st.session_state:
+        cfg = get_sheet_setting(sheet_name)
+        st.session_state[key] = cfg if isinstance(cfg, dict) else {"header_row": 1, "mapping": {}, "delete_missing": False}
+    return dict(st.session_state.get(key) or {})
+
+
+def _v30028_set_sheet_setting_cache(sheet_name: str, cfg: dict | None) -> None:
+    key = _v30028_sheet_setting_cache_key(sheet_name)
+    if cfg is None:
+        st.session_state.pop(key, None)
+    else:
+        st.session_state[key] = dict(cfg)
+
+
 def _make_unique_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Normalize Excel column names to unique strings for Streamlit and mapping."""
     if df is None:
@@ -703,8 +733,7 @@ with tab1:
     if "v68_work_order_export_bytes" in st.session_state:
         dl1.download_button("下載目前製令清單 / Download Work Orders", data=st.session_state["v68_work_order_export_bytes"], file_name="SPT_製令清單.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="v68_download_work_order_export")
         dl1.caption(f"已準備 {st.session_state.get('v68_work_order_export_rows', 0)} 筆。")
-    tpl = pd.DataFrame(columns=["製令", "P/N", "機型", "組立地點", "客戶", "備註", "啟用"])
-    dl2.download_button("⟰ 下載製令匯入範本 / Download Template", data=_excel_bytes({"template": tpl}), file_name="SPT_製令匯入範本.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+    dl2.download_button("⟰ 下載製令匯入範本 / Download Template", data=_v30028_work_order_template_bytes(), file_name="SPT_製令匯入範本.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
     st.info("V68：唯讀模式改用輕量表格顯示；按『啟動編輯』後才載入可編輯 data_editor，避免每次選擇都重繪大型編輯器。")
     if work_order_edit_enabled:
@@ -831,7 +860,7 @@ with tab4:
     if sheets:
         sheet = st.selectbox("選擇活頁 / Select Sheet", list(sheets.keys()), key="wo_onedrive_sheet_select_v243")
         raw_src = sheets[sheet]
-        saved_cfg = get_sheet_setting(sheet)
+        saved_cfg = _v30028_get_sheet_setting(sheet)
         saved_mapping = saved_cfg.get("mapping", {}) if isinstance(saved_cfg.get("mapping"), dict) else {}
         guess_row = _guess_header_row(raw_src)
         try:
@@ -958,9 +987,11 @@ with tab4:
         sc1, sc2 = st.columns(2)
         if sc1.button("▣ 永久記錄目前欄位對應 / Save Mapping Only", use_container_width=True, key=f"wo_save_mapping_only_v246_{sheet}"):
             save_sheet_setting(sheet, int(header_row), mapping, bool(do_delete), import_mode=import_mode, row_key_col=row_key_col)
+            _v30028_set_sheet_setting_cache(sheet, {"header_row": int(header_row), "mapping": mapping, "delete_missing": bool(do_delete), "import_mode": import_mode, "row_key_col": row_key_col})
             st.success("已永久記錄目前 OneDrive 製令欄位對應設定與匯入模式。下次進入此活頁會自動帶入。")
         if sc2.button("◌ 清除本頁欄位對應設定 / Clear Mapping", use_container_width=True, key=f"wo_clear_mapping_v246_{sheet}"):
             clear_work_order_sync_settings()
+            _v30028_set_sheet_setting_cache(sheet, None)
             st.warning("已清除 OneDrive 製令欄位對應永久設定；重新讀取後會回到自動判斷。")
             rerun()
 
@@ -976,6 +1007,7 @@ with tab4:
                 st.error("來源資料沒有可寫入的製令。請確認標題列號與製令欄位對應。")
             else:
                 save_sheet_setting(sheet, int(header_row), mapping, bool(do_delete), import_mode=import_mode, row_key_col=row_key_col)
+                _v30028_set_sheet_setting_cache(sheet, {"header_row": int(header_row), "mapping": mapping, "delete_missing": bool(do_delete), "import_mode": import_mode, "row_key_col": row_key_col})
                 planned_count = len(add_df) + len(upd_df) + (len(del_df) if do_delete else 0)
                 if planned_count <= 0:
                     msg = "製令同步完成：沒有需要新增、更新或刪除的製令。欄位對應已永久記錄。"

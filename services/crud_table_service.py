@@ -223,55 +223,111 @@ def _save_log(action_type: str, table: str, msg: str) -> None:
 
 
 def save_work_orders(df: pd.DataFrame) -> dict[str, Any]:
+    """Persist 03 work orders through the Neon/PostgreSQL authority table.
+
+    V300.28: keep the public behavior of the old row-by-row save, but remove
+    the expensive hot path that did one SELECT plus one write per row.  Large
+    paste/Excel/OneDrive imports now read existing keys once, then write all
+    changes in one transaction.  This reduces Neon compute and connection churn
+    without changing UI behavior, soft-delete rules, or reboot durability.
+    """
     _ensure_runtime_columns()
     work = _normalize(df, WORK_ORDER_COLS, WO_DISPLAY_TO_INTERNAL)
     now = now_text()
     result = {"inserted": 0, "updated": 0, "deleted": 0, "skipped": 0}
+
+    try:
+        existing_df = query_df("SELECT id, work_order FROM work_orders", ())
+    except Exception:
+        existing_df = pd.DataFrame()
+    if not isinstance(existing_df, pd.DataFrame):
+        existing_df = pd.DataFrame()
+
+    existing_by_wo: dict[str, int] = {}
+    existing_by_id: set[int] = set()
+    if not existing_df.empty:
+        for _, old in existing_df.iterrows():
+            old_id = _int_or_none(old.get("id"))
+            old_wo = _text(old.get("work_order"))
+            if old_id is not None:
+                existing_by_id.add(old_id)
+            if old_wo and old_id is not None and old_wo not in existing_by_wo:
+                existing_by_wo[old_wo] = old_id
+
+    operations: list[tuple[str, Iterable[Any]]] = []
     for _, row in work.iterrows():
         wo = _text(row.get("work_order"))
         if not wo:
             result["skipped"] += 1
             continue
         rid = _int_or_none(row.get("id"))
+
         if _bool(row.get("_delete")):
             if rid:
-                result["deleted"] += execute("UPDATE work_orders SET deleted_at=?, deleted_by='admin', delete_reason='03 製令管理刪除', updated_at=? WHERE id=? AND (deleted_at IS NULL OR deleted_at='')", (now, now, rid))
+                operations.append((
+                    "UPDATE work_orders SET deleted_at=?, deleted_by='admin', delete_reason='03 製令管理刪除', updated_at=? WHERE id=? AND (deleted_at IS NULL OR deleted_at='')",
+                    (now, now, rid),
+                ))
+                if rid in existing_by_id:
+                    result["deleted"] += 1
             else:
-                result["deleted"] += execute("UPDATE work_orders SET deleted_at=?, deleted_by='admin', delete_reason='03 製令管理刪除', updated_at=? WHERE work_order=? AND (deleted_at IS NULL OR deleted_at='')", (now, now, wo))
+                operations.append((
+                    "UPDATE work_orders SET deleted_at=?, deleted_by='admin', delete_reason='03 製令管理刪除', updated_at=? WHERE work_order=? AND (deleted_at IS NULL OR deleted_at='')",
+                    (now, now, wo),
+                ))
+                if wo in existing_by_wo:
+                    result["deleted"] += 1
             continue
-        payload = (
-            wo, wo, _text(row.get("part_no")), _text(row.get("type_name")), _text(row.get("assembly_location")), _text(row.get("customer")), _text(row.get("note")),
-            1 if _bool(row.get("is_active"), True) else 0, now,
-        )
+
+        part_no = _text(row.get("part_no"))
+        type_name = _text(row.get("type_name"))
+        assembly_location = _text(row.get("assembly_location"))
+        customer = _text(row.get("customer"))
+        note = _text(row.get("note"))
+        active_val = 1 if _bool(row.get("is_active"), True) else 0
+
         if rid:
-            execute(
+            operations.append((
                 """
                 UPDATE work_orders SET work_order=?, work_order_no=?, part_no=?, type_name=?, assembly_location=?, customer=?, note=?, is_active=?, active=?, updated_at=?, deleted_at='', deleted_by='', delete_reason=''
                 WHERE id=?
                 """,
-                payload + (payload[7], rid,),
-            )
+                (wo, wo, part_no, type_name, assembly_location, customer, note, active_val, active_val, now, rid),
+            ))
             result["updated"] += 1
+            existing_by_wo[wo] = rid
+            existing_by_id.add(rid)
             continue
-        existing = query_one("SELECT id FROM work_orders WHERE work_order=? LIMIT 1", (wo,))
-        if existing:
-            execute(
-            """
-            UPDATE work_orders SET work_order_no=?, part_no=?, type_name=?, assembly_location=?, customer=?, note=?, is_active=?, active=?, updated_at=?, deleted_at='', deleted_by='', delete_reason=''
-            WHERE work_order=?
-            """,
-            (wo, payload[2], payload[3], payload[4], payload[5], payload[6], payload[7], payload[7], now, wo),
-        )
+
+        if wo in existing_by_wo:
+            operations.append((
+                """
+                UPDATE work_orders SET work_order_no=?, part_no=?, type_name=?, assembly_location=?, customer=?, note=?, is_active=?, active=?, updated_at=?, deleted_at='', deleted_by='', delete_reason=''
+                WHERE work_order=?
+                """,
+                (wo, part_no, type_name, assembly_location, customer, note, active_val, active_val, now, wo),
+            ))
             result["updated"] += 1
         else:
-            execute(
+            operations.append((
                 """
                 INSERT INTO work_orders(work_order, work_order_no, part_no, type_name, assembly_location, customer, note, is_active, active, created_at, updated_at, deleted_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
                 """,
-                (wo, wo, payload[2], payload[3], payload[4], payload[5], payload[6], payload[7], payload[7], now, now),
-            )
+                (wo, wo, part_no, type_name, assembly_location, customer, note, active_val, active_val, now, now),
+            ))
             result["inserted"] += 1
+            # Preserve old row-order semantics for duplicated work_order values in
+            # the same import: first row inserts, later rows update that key.
+            existing_by_wo[wo] = -1
+
+    if operations:
+        execute_transaction(
+            operations,
+            mark_changed=True,
+            reason="03 製令管理批次儲存",
+            source_sql="SAVE_WORK_ORDERS_BATCH",
+        )
     _save_log("SAVE_WORK_ORDERS", "work_orders", f"製令儲存 inserted={result['inserted']} updated={result['updated']} deleted={result['deleted']}")
     clear_query_cache()
     clear_master_data_cache()
