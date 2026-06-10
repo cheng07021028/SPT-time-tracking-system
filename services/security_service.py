@@ -66,10 +66,31 @@ MODULES = [
     {"module_code": "11_login_logs", "module_no": "11", "module_name": "登入紀錄", "module_name_en": "Login Logs"},
     {"module_code": "12_module_persistence", "module_no": "12", "module_name": "模組永久紀錄中心", "module_name_en": "Module Permanent Records"},
     {"module_code": "13_system_settings", "module_no": "13", "module_name": "系統設定", "module_name_en": "System Settings"},
+    {"module_code": "14_data_health", "module_no": "14", "module_name": "資料健康檢查中心", "module_name_en": "Data Health"},
+    {"module_code": "15_legacy_migration", "module_no": "15", "module_name": "舊資料匯入到Neon", "module_name_en": "Legacy Migration"},
+    {"module_code": "98_authority_diagnostic", "module_no": "98", "module_name": "權威檔診斷", "module_name_en": "Authority Diagnostic"},
+    {"module_code": "99_speed_diagnostic", "module_no": "99", "module_name": "效能診斷", "module_name_en": "Performance Diagnostic"},
 ]
 
 MODULE_CODE_TO_NO = {m["module_code"]: m["module_no"] for m in MODULES}
 MODULE_NO_TO_CODE = {m["module_no"]: m["module_code"] for m in MODULES}
+
+
+def _v30043_core_module_count() -> int:
+    """Return the public login KPI count for core business modules.
+
+    Core modules are numbered 01-15. Diagnostic/maintenance pages such as
+    98 and 99 are intentionally not counted as CORE MODULES, but they remain
+    registered in MODULES for permission and admin-cache compatibility.
+    """
+    try:
+        return len([
+            m for m in MODULES
+            if str(m.get("module_no", "")).isdigit()
+            and 1 <= int(str(m.get("module_no"))) <= 15
+        ])
+    except Exception:
+        return 15
 
 ROLES = [
     ("admin", "系統管理員", "System Admin"),
@@ -1372,7 +1393,7 @@ html body div[data-testid="stForm"] label * {
           以權限控管、即時工時、歷史追溯與永久備份為核心，打造製造現場可稽核、可分析、可持續升級的智慧工時管理平台。
         </div>
         <div class="spt-login-metrics">
-          <div class="spt-login-metric"><b>13</b><span>CORE MODULES</span></div>
+          <div class="spt-login-metric"><b>{core_module_count}</b><span>CORE MODULES</span></div>
           <div class="spt-login-metric"><b>24H</b><span>TIME TRACE</span></div>
           <div class="spt-login-metric"><b>∞</b><span>PERSISTENCE</span></div>
         </div>
@@ -1380,7 +1401,7 @@ html body div[data-testid="stForm"] label * {
       <div class="spt-form-card">
         <div class="spt-form-title">⛨ 安全登入</div>
         <div class="spt-form-caption">請輸入個人帳號密碼。系統將依帳號權限載入可操作模組。</div>
-""".replace("{logo_html}", logo_html),
+""".replace("{logo_html}", logo_html).replace("{core_module_count}", str(_v30043_core_module_count())),
         unsafe_allow_html=True,
     )
     with st.form("login_form", clear_on_submit=False):
