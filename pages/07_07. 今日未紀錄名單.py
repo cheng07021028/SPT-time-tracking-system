@@ -87,6 +87,14 @@ MISSING_TODAY_DF_KEY = "v69_07_missing_today_df"
 MISSING_TODAY_LOADED_KEY = "v69_07_missing_today_loaded"
 MISSING_TODAY_TS_KEY = "v69_07_missing_today_ts"
 
+# V300.32：07 省 Neon Compute 快速路徑。
+# - 每日出勤紀錄改優先以「單日 payload」讀寫，避免每次儲存整份歷史 JSON。
+# - 所選日期未紀錄名單加入短 TTL session cache，避免同一份出勤表在 rerun 時重複查 time_records。
+V30032_DAILY_KIND_PREFIX = "records_by_date"
+V30032_SELECTED_MISSING_CACHE_KEY = "v30032_07_selected_missing_cache"
+V30032_SELECTED_MISSING_TTL_SECONDS = 15
+V30032_DAILY_EXCEL_SIG_KEY = "v30032_daily_attendance_excel_sig"
+
 DAILY_COLS = [
     "record_id",
     "attendance_date",
@@ -183,6 +191,32 @@ def _safe_text(v: Any) -> str:
     except Exception:
         pass
     return str(v).strip()
+
+
+def _v30032_df_signature(df: pd.DataFrame) -> str:
+    """Build a small stable signature for cache invalidation without touching Neon."""
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return "empty"
+    try:
+        work = df.fillna("").astype(str)
+        # hash_pandas_object is fast for the small daily attendance / missing tables.
+        h = pd.util.hash_pandas_object(work, index=True).sum()
+        return f"{len(work)}:{len(work.columns)}:{int(h)}"
+    except Exception:
+        return f"{len(df)}:{list(df.columns)}"
+
+
+def _v30032_clear_daily_output_cache() -> None:
+    for key in (
+        V30032_SELECTED_MISSING_CACHE_KEY,
+        "v69_daily_attendance_excel_bytes",
+        "v69_daily_attendance_excel_date",
+        V30032_DAILY_EXCEL_SIG_KEY,
+    ):
+        try:
+            st.session_state.pop(key, None)
+        except Exception:
+            pass
 
 
 def _date_to_text(v: Any) -> str:
@@ -295,6 +329,58 @@ def _load_all_daily_attendance_rows() -> list[dict[str, Any]]:
     return _normalise_daily_rows(_extract_daily_rows(_read_daily_payload()))
 
 
+def _v30032_daily_kind_for_date(target_date: str) -> str:
+    return f"{V30032_DAILY_KIND_PREFIX}:{_date_to_text(target_date)}"
+
+
+def _v30032_load_daily_rows_for_date_from_neon(target_date: str) -> list[dict[str, Any]] | None:
+    """Load only one attendance date from Neon when the V300.32 per-date payload exists.
+
+    Returns None when the per-date payload has never been created, so callers can fall back
+    to the legacy all-records payload without losing old data.
+    """
+    try:
+        from services.neon_authority_service import is_neon_enabled, load_payload
+        if not is_neon_enabled():
+            return None
+        payload = load_payload(DAILY_MODULE_KEY, _v30032_daily_kind_for_date(target_date), None)
+        if payload is None:
+            return None
+        return _normalise_daily_rows(_extract_daily_rows(payload))
+    except Exception:
+        return None
+
+
+def _v30032_save_daily_rows_for_date_to_neon(target_date: str, rows: list[dict[str, Any]], *, reason: str) -> bool:
+    """Save only one attendance date to Neon.
+
+    This avoids rewriting the legacy all-date JSON payload and prevents one admin saving
+    today's attendance from overwriting another admin's edits on a different date.
+    """
+    clean = [r for r in _normalise_daily_rows(rows) if _date_to_text(r.get("attendance_date")) == _date_to_text(target_date)]
+    payload = {
+        "authority_schema": "SPT-07-DailyAttendance-V30032-per-date",
+        "module_key": DAILY_MODULE_KEY,
+        "kind": _v30032_daily_kind_for_date(target_date),
+        "attendance_date": _date_to_text(target_date),
+        "updated_at": _now_text(),
+        "updated_by": _current_user_name(),
+        "reason": reason,
+        "tables": {"daily_attendance": clean},
+        "table_counts": {"daily_attendance": len(clean)},
+        "records": clean,
+    }
+    try:
+        from services.neon_authority_service import is_neon_enabled, save_payload, append_audit
+        if not is_neon_enabled():
+            return False
+        save_payload(DAILY_MODULE_KEY, _v30032_daily_kind_for_date(target_date), payload, user=_current_user_name())
+        append_audit(DAILY_MODULE_KEY, "SAVE_DAILY_ATTENDANCE_DATE", _current_user_name(), "OK", reason, {"attendance_date": target_date, "count": len(clean)})
+        return True
+    except Exception:
+        return False
+
+
 def _save_all_daily_attendance_rows(rows: list[dict[str, Any]], *, reason: str = "save_daily_attendance") -> None:
     clean = _normalise_daily_rows(rows)
     payload = {
@@ -396,8 +482,11 @@ def _default_daily_rows_from_employee_master(target_date: str, employee_df: pd.D
 
 
 def _load_daily_rows_for_date(target_date: str, employee_df: pd.DataFrame) -> pd.DataFrame:
-    all_rows = _load_all_daily_attendance_rows()
-    rows = [r for r in all_rows if _date_to_text(r.get("attendance_date")) == target_date]
+    # V300.32：正式 Neon 先讀單日 payload；舊資料尚未轉成單日 payload 時才回退讀 legacy 全量 payload。
+    rows = _v30032_load_daily_rows_for_date_from_neon(target_date)
+    if rows is None:
+        all_rows = _load_all_daily_attendance_rows()
+        rows = [r for r in all_rows if _date_to_text(r.get("attendance_date")) == target_date]
     if not rows:
         rows = _default_daily_rows_from_employee_master(target_date, employee_df)
     return pd.DataFrame(_normalise_daily_rows(rows), columns=DAILY_COLS)
@@ -442,8 +531,6 @@ def _from_daily_editor_df(df: pd.DataFrame, target_date: str) -> pd.DataFrame:
 
 def _save_daily_editor_df(editor_df: pd.DataFrame, target_date: str) -> dict[str, Any]:
     incoming = _from_daily_editor_df(editor_df, target_date)
-    all_existing = _load_all_daily_attendance_rows()
-    keep_other_dates = [r for r in all_existing if _date_to_text(r.get("attendance_date")) != target_date]
 
     now = _now_text()
     saved_rows: list[dict[str, Any]] = []
@@ -472,12 +559,24 @@ def _save_daily_editor_df(editor_df: pd.DataFrame, target_date: str) -> dict[str
     for rec in saved_rows:
         k = _safe_text(rec.get("employee_id")) or _safe_text(rec.get("record_id")) or uuid.uuid4().hex
         dedup[k] = rec
-    final_rows = keep_other_dates + list(dedup.values())
-    _save_all_daily_attendance_rows(final_rows, reason="v234_save_daily_attendance")
-    _append_daily_event("SAVE_DAILY_ATTENDANCE", list(dedup.values()), target_date=target_date, note=f"deleted={len(deleted_rows)}")
+
+    final_today_rows = list(dedup.values())
+    # V300.32：Neon 正式環境只寫所選日期 payload，避免整份每日出勤歷史被重寫。
+    saved_to_neon_date = _v30032_save_daily_rows_for_date_to_neon(
+        target_date,
+        final_today_rows,
+        reason="v30032_save_daily_attendance_date",
+    )
+    if not saved_to_neon_date:
+        # 本機 / 無 Neon fallback 保持舊行為，確保 local JSON 測試仍能保存其他日期。
+        all_existing = _load_all_daily_attendance_rows()
+        keep_other_dates = [r for r in all_existing if _date_to_text(r.get("attendance_date")) != target_date]
+        _save_all_daily_attendance_rows(keep_other_dates + final_today_rows, reason="v30032_save_daily_attendance_local_fallback")
+
+    _append_daily_event("SAVE_DAILY_ATTENDANCE", final_today_rows, target_date=target_date, note=f"deleted={len(deleted_rows)}")
     if deleted_rows:
         _append_daily_event("DELETE_DAILY_ATTENDANCE", deleted_rows, target_date=target_date, note="deleted rows from 07 daily attendance editor")
-    return {"saved": len(dedup), "deleted": len(deleted_rows), "total": len(final_rows)}
+    return {"saved": len(final_today_rows), "deleted": len(deleted_rows), "total": len(final_today_rows), "rows": final_today_rows}
 
 
 def _build_missing_from_daily_attendance(att_df: pd.DataFrame, target_date: str) -> pd.DataFrame:
@@ -523,6 +622,20 @@ def _build_missing_from_daily_attendance(att_df: pd.DataFrame, target_date: str)
     out["last_start_time"] = out["last_start_time"].fillna("").astype(str)
     out = out[out["today_record_count"] == 0].copy()
     return out[["employee_id", "employee_name", "department", "title", "attendance_status", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]].sort_values("employee_id")
+
+
+def _v30032_build_missing_from_daily_attendance_cached(att_df: pd.DataFrame, target_date: str) -> pd.DataFrame:
+    sig = f"{_date_to_text(target_date)}:{_v30032_df_signature(att_df)}"
+    now_ts = datetime.now().timestamp()
+    cache = st.session_state.get(V30032_SELECTED_MISSING_CACHE_KEY, {})
+    if isinstance(cache, dict) and cache.get("sig") == sig:
+        age = now_ts - float(cache.get("ts", 0) or 0)
+        cached_df = cache.get("df")
+        if age <= V30032_SELECTED_MISSING_TTL_SECONDS and isinstance(cached_df, pd.DataFrame):
+            return cached_df.copy()
+    out = _build_missing_from_daily_attendance(att_df, target_date)
+    st.session_state[V30032_SELECTED_MISSING_CACHE_KEY] = {"sig": sig, "ts": now_ts, "df": out.copy()}
+    return out
 
 
 def _attendance_summary(att_df: pd.DataFrame) -> pd.DataFrame:
@@ -831,6 +944,7 @@ current_employee_df = _current_internal_df() if STATE_KEY in st.session_state el
 # V69: do not load the independent daily attendance authority automatically on every page open/date change.
 # It may read Neon/module payloads; load only after explicit user action, then keep it in session.
 if st.session_state.get(DAILY_LAST_DATE_KEY) != selected_date:
+    _v30032_clear_daily_output_cache()
     st.session_state[DAILY_LOADED_KEY] = False
     st.session_state[DAILY_STATE_KEY] = pd.DataFrame(columns=DAILY_COLS)
     st.session_state[DAILY_LAST_DATE_KEY] = selected_date
@@ -844,11 +958,13 @@ if msg:
 
 btn1, btn2, btn3, btn4 = st.columns(4)
 if btn1.button("⟳ 載入/重新載入出勤紀錄 / Load / Reload", use_container_width=True, key="v234_daily_reload"):
+    _v30032_clear_daily_output_cache()
     st.session_state[DAILY_STATE_KEY] = _load_daily_rows_for_date(selected_date, current_employee_df)
     st.session_state[DAILY_LOADED_KEY] = True
     st.session_state[DAILY_REV_KEY] = int(st.session_state.get(DAILY_REV_KEY, 0)) + 1
     rerun()
 if btn2.button("＋ 依人員名單補齊 / Fill From Employees", use_container_width=True, key="v234_daily_fill_from_employees"):
+    _v30032_clear_daily_output_cache()
     base = st.session_state.get(DAILY_STATE_KEY, pd.DataFrame()).copy()
     defaults = pd.DataFrame(_default_daily_rows_from_employee_master(selected_date, current_employee_df), columns=DAILY_COLS)
     if base is None or base.empty:
@@ -862,6 +978,7 @@ if btn2.button("＋ 依人員名單補齊 / Fill From Employees", use_container_
     st.session_state[DAILY_REV_KEY] = int(st.session_state.get(DAILY_REV_KEY, 0)) + 1
     rerun()
 if btn3.button("☑ 全部出勤 / All Attendance", use_container_width=True, key="v234_daily_all_attendance"):
+    _v30032_clear_daily_output_cache()
     df0 = pd.DataFrame(st.session_state.get(DAILY_STATE_KEY, pd.DataFrame())).copy()
     if not df0.empty:
         df0["is_today_attendance"] = True
@@ -871,6 +988,7 @@ if btn3.button("☑ 全部出勤 / All Attendance", use_container_width=True, ke
         st.session_state[DAILY_REV_KEY] = int(st.session_state.get(DAILY_REV_KEY, 0)) + 1
         rerun()
 if btn4.button("☐ 全部未出勤 / Clear Attendance", use_container_width=True, key="v234_daily_clear_attendance"):
+    _v30032_clear_daily_output_cache()
     df0 = pd.DataFrame(st.session_state.get(DAILY_STATE_KEY, pd.DataFrame())).copy()
     if not df0.empty:
         df0["is_today_attendance"] = False
@@ -933,14 +1051,16 @@ else:
         # 在 submit 之前也保留目前畫面草稿，切換下載或其他操作時不會丟失。
         st.session_state[DAILY_STATE_KEY] = _from_daily_editor_df(daily_edited, selected_date).drop(columns=["_delete"], errors="ignore")
     if daily_submit:
+        _v30032_clear_daily_output_cache()
         result = _save_daily_editor_df(daily_edited, selected_date)
-        st.session_state[DAILY_STATE_KEY] = _load_daily_rows_for_date(selected_date, current_employee_df)
-        st.session_state[DAILY_MESSAGE_KEY] = f"每日出勤紀錄已儲存：保存 {result.get('saved', 0)} 筆，刪除 {result.get('deleted', 0)} 筆，永久紀錄總筆數 {result.get('total', 0)} 筆。"
+        st.session_state[DAILY_STATE_KEY] = pd.DataFrame(result.get("rows", []), columns=DAILY_COLS)
+        st.session_state[DAILY_LOADED_KEY] = True
+        st.session_state[DAILY_MESSAGE_KEY] = f"每日出勤紀錄已儲存：保存 {result.get('saved', 0)} 筆，刪除 {result.get('deleted', 0)} 筆，所選日期永久紀錄 {result.get('total', 0)} 筆。"
         st.session_state[DAILY_REV_KEY] = int(st.session_state.get(DAILY_REV_KEY, 0)) + 1
         rerun()
 
 current_daily_df = pd.DataFrame(st.session_state.get(DAILY_STATE_KEY, pd.DataFrame()), columns=DAILY_COLS)
-selected_missing_df = _build_missing_from_daily_attendance(current_daily_df, selected_date) if st.session_state.get(DAILY_LOADED_KEY, False) else pd.DataFrame()
+selected_missing_df = _v30032_build_missing_from_daily_attendance_cached(current_daily_df, selected_date) if st.session_state.get(DAILY_LOADED_KEY, False) else pd.DataFrame()
 if not st.session_state.get(DAILY_LOADED_KEY, False):
     st.info("V69：每日出勤紀錄不再於開頁自動載入；請按『載入/重新載入出勤紀錄』。")
 summary_df = _attendance_summary(current_daily_df)
@@ -951,10 +1071,12 @@ met3.metric("在廠 / In Factory", f"{int(current_daily_df.get('is_in_factory', 
 met4.metric("該日未紀錄 / Missing", f"{len(selected_missing_df):,}")
 
 ex1, ex2 = st.columns([1, 3])
+_daily_excel_sig = f"{selected_date}:{_v30032_df_signature(current_daily_df)}:{_v30032_df_signature(selected_missing_df)}"
 if ex1.button("準備每日出勤 Excel / Prepare Excel", use_container_width=True, key="v69_prepare_daily_attendance_excel"):
     st.session_state["v69_daily_attendance_excel_bytes"] = _make_daily_attendance_excel(current_daily_df, selected_missing_df, selected_date)
     st.session_state["v69_daily_attendance_excel_date"] = selected_date
-if "v69_daily_attendance_excel_bytes" in st.session_state:
+    st.session_state[V30032_DAILY_EXCEL_SIG_KEY] = _daily_excel_sig
+if "v69_daily_attendance_excel_bytes" in st.session_state and st.session_state.get(V30032_DAILY_EXCEL_SIG_KEY) == _daily_excel_sig:
     st.download_button(
         "⬇ 下載每日出勤紀錄 Excel / Download Daily Attendance Excel",
         data=st.session_state["v69_daily_attendance_excel_bytes"],
