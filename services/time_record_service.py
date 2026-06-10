@@ -863,16 +863,41 @@ def start_work(employee: dict, work_order: dict, process_name: str, remark: str 
     proc = _text(process_name)
     if not emp_id or not wo_no or not proc:
         raise ValueError("工號、製令、工段名稱不可空白。")
-    duplicate = get_active_same_work(emp_id, wo_no, proc, today, emp_name)
-    if not duplicate.empty:
+
+    # V300.26 Neon Free compute guard:
+    # The previous Start path queried active same-work and conflicting active work
+    # separately.  For 20 PCs / 50+ operators this doubles SELECT traffic on the
+    # hottest button.  Read this employee's active rows for today once, then split
+    # duplicate/conflict checks in Python.  The atomic INSERT ... WHERE NOT EXISTS
+    # below remains the final authority, so read/write correctness is unchanged.
+    active_today = get_active_records(employee_id=emp_id, start_date=today)
+    duplicate = pd.DataFrame()
+    conflicts = pd.DataFrame()
+    if isinstance(active_today, pd.DataFrame) and not active_today.empty:
+        try:
+            proc_mask = active_today.get("process_name", pd.Series([], dtype=str)).fillna("").astype(str).str.strip() == proc
+            wo_values = active_today.get("work_order", pd.Series([], dtype=str)).fillna("").astype(str).str.strip()
+            wo_no_values = active_today.get("work_order_no", pd.Series([], dtype=str)).fillna("").astype(str).str.strip()
+            wo_mask = (wo_values == wo_no) | (wo_no_values == wo_no)
+            duplicate = active_today.loc[proc_mask & wo_mask].copy()
+            conflicts = active_today.loc[~proc_mask].copy()
+        except Exception:
+            duplicate = get_active_same_work(emp_id, wo_no, proc, today, None)
+            conflicts = get_conflicting_active_records(emp_id, proc, today, None)
+    if isinstance(duplicate, pd.DataFrame) and not duplicate.empty:
         raise ValueError(f"禁止重複紀錄：此人員已有相同製令與工段正在計時：{wo_no} / {proc}")
-    conflicts = get_conflicting_active_records(emp_id, proc, today, emp_name)
     conflict_ids = _ids_from_df(conflicts)
     if conflict_ids and not auto_pause_old:
         raise ValueError("此人員已有不同作業正在計時，請先暫停、完工或下班前一筆作業。")
     if conflict_ids and auto_pause_old:
         _soft_pause_conflicts(conflict_ids, now)
-    wo_info = {**_lookup_work_order(wo_no), **(work_order or {})}
+
+    wo_info = dict(work_order or {})
+    # Avoid a second work_orders lookup when the 01 page already supplied the
+    # selected master row.  If metadata is incomplete, keep the old lookup path so
+    # display/history fields remain complete.
+    if not all(_text(wo_info.get(k)) for k in ("part_no", "type_name", "assembly_location")):
+        wo_info = {**_lookup_work_order(wo_no), **wo_info}
     opid = uuid.uuid4().hex
     record_key = f"{emp_id}|{wo_no}|{proc}|{opid}"
     row = {

@@ -403,6 +403,7 @@ from services.time_record_service import (
     finish_work,
     get_active_group,
     get_active_record,
+    get_active_records,
     get_conflicting_active_records,
     load_records,
     get_active_same_work,
@@ -1073,9 +1074,21 @@ def _v72_load_active_df(employee_id: str, employee_name: str = "", *, force: boo
     if (not force) and isinstance(cached, pd.DataFrame) and loaded_perf and (now_perf - loaded_perf) < V72_ACTIVE_TTL_SECONDS:
         return cached.copy()
     try:
-        df = refresh_active_records_for_employee(employee_id, employee_name=employee_name)
-    except TypeError:
-        df = refresh_active_records_for_employee(employee_id)
+        # V300.26 Neon Free compute guard:
+        # Normal active-work refreshes must not evict db_service SELECT caches.
+        # The old path called refresh_active_records_for_employee(), which clears
+        # backend query caches before every active check when the 45-second
+        # foreground TTL expires.  That makes unrelated employee/work-order/today
+        # reads miss cache and wakes Neon more often.  Use a normal bounded SELECT
+        # for automatic checks; keep the explicit refresh button as the only path
+        # that clears backend caches.  Button writes still clear caches immediately.
+        if force:
+            try:
+                df = refresh_active_records_for_employee(employee_id, employee_name=employee_name)
+            except TypeError:
+                df = refresh_active_records_for_employee(employee_id)
+        else:
+            df = get_active_records(employee_id=employee_id, employee_name=employee_name)
     except Exception:
         df = pd.DataFrame()
     if not isinstance(df, pd.DataFrame):
