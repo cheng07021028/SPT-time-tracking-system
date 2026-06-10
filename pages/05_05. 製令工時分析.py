@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 from io import BytesIO
+import hashlib
 
 import pandas as pd
 import plotly.express as px
@@ -33,6 +34,8 @@ FILTER_KEY = "_spt_05_analysis_filters"
 V69_QUERY_KEY = "_spt_v69_05_query_applied"
 V69_DF_KEY = "_spt_v69_05_base_df"
 V69_FILTER_SIG_KEY = "_spt_v69_05_filter_signature"
+V30030_SUMMARY_CACHE_KEY = "_spt_v30030_05_summary_bundle"
+V30030_EXCEL_CACHE_PREFIX = "_spt_v30030_05_excel_"
 if FILTER_KEY not in st.session_state:
     st.session_state[FILTER_KEY] = load_analysis_filters()
 filters = dict(st.session_state[FILTER_KEY])
@@ -51,6 +54,37 @@ def _excel_bytes(sheets: dict[str, pd.DataFrame]) -> bytes:
         for name, data in sheets.items():
             (data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)).to_excel(writer, index=False, sheet_name=str(name)[:31] or "Sheet1")
     return bio.getvalue()
+
+
+def _v30030_clear_analysis_output_cache() -> None:
+    """Clear derived 05 outputs without touching Neon authority data.
+
+    05 can render several heavy groupby/pivot tables and Excel files after one
+    query.  These are derived UI artifacts, so they should be reused while the
+    filter signature is unchanged and cleared after a new query or save.
+    """
+    try:
+        for key in list(st.session_state.keys()):
+            if str(key).startswith(V30030_EXCEL_CACHE_PREFIX) or key == V30030_SUMMARY_CACHE_KEY:
+                st.session_state.pop(key, None)
+    except Exception:
+        pass
+
+
+def _v30030_cache_token(*parts: object) -> str:
+    raw = "|".join(str(p) for p in parts)
+    return hashlib.sha1(raw.encode("utf-8", errors="ignore")).hexdigest()[:16]
+
+
+def _v30030_excel_bytes_cached(name: str, signature: str, sheets: dict[str, pd.DataFrame]) -> bytes:
+    """Cache Excel bytes per applied filter to avoid rebuilding workbooks on every rerun."""
+    key = f"{V30030_EXCEL_CACHE_PREFIX}{name}_{_v30030_cache_token(signature)}"
+    cached = st.session_state.get(key)
+    if isinstance(cached, (bytes, bytearray)):
+        return bytes(cached)
+    data = _excel_bytes(sheets)
+    st.session_state[key] = data
+    return data
 
 def _parse_date(value, fallback: date) -> date:
     try:
@@ -369,6 +403,108 @@ def _localize_work_order_process_table(df: pd.DataFrame) -> pd.DataFrame:
     return df.rename(columns={k: v for k, v in cols.items() if k in df.columns})
 
 
+def _v30030_build_analysis_bundle(source_df: pd.DataFrame, filters: dict) -> dict:
+    """Build heavy derived analysis outputs once per applied filter signature.
+
+    This keeps the read/write model unchanged: Neon is still queried only when
+    the user applies filters.  It only prevents Streamlit reruns from rebuilding
+    the same groupby, pivot and metric data over and over.
+    """
+    work_df = _apply_filters(source_df, filters)
+    if work_df is None or work_df.empty:
+        return {
+            "df": pd.DataFrame() if work_df is None else work_df,
+            "avg_hours": 0.0,
+            "unfinished_count": 0,
+            "abnormal_count": 0,
+            "max_wo": "-",
+            "by_wo": pd.DataFrame(),
+            "by_proc": pd.DataFrame(),
+            "wo_process": pd.DataFrame(),
+            "wo_process_display": pd.DataFrame(),
+            "wo_process_pivot_hours": pd.DataFrame(),
+            "wo_process_pivot_text": pd.DataFrame(),
+            "by_emp": pd.DataFrame(),
+            "trend": pd.DataFrame(),
+        }
+
+    work_df = work_df.copy()
+    if "work_hours" not in work_df.columns:
+        work_df["work_hours"] = 0.0
+    work_df["work_hours"] = _coerce_work_hours(work_df["work_hours"])
+    work_df["work_time_text"] = work_df["work_hours"].map(hours_to_hms)
+
+    for col in ["work_order", "process_name", "employee_id", "employee_name", "department", "start_date", "id"]:
+        if col not in work_df.columns:
+            work_df[col] = "" if col != "id" else range(1, len(work_df) + 1)
+
+    end_ts = work_df.get("end_timestamp", pd.Series([""] * len(work_df))).fillna("").astype(str).str.strip()
+    status_series = work_df.get("status", pd.Series([""] * len(work_df))).fillna("").astype(str)
+    unfinished_mask = (status_series == "作業中") & (end_ts.isin(["", "None", "none", "nan"]))
+    abnormal_mask = (work_df["work_hours"] == 0) | (work_df["work_hours"] > 12) | unfinished_mask
+    avg_hours = work_df["work_hours"].mean() if len(work_df) else 0
+
+    max_wo = "-"
+    if "work_order" in work_df.columns and not work_df.empty:
+        tmp = work_df.groupby("work_order", dropna=False)["work_hours"].sum().sort_values(ascending=False)
+        max_wo = str(tmp.index[0]) if len(tmp) else "-"
+
+    sort_by = filters.get("sort_by", "累積工時由大到小")
+    by_wo = (
+        work_df.groupby("work_order", dropna=False)
+        .agg(total_hours=("work_hours", "sum"), count=("id", "count"), avg_hours=("work_hours", "mean"), employee_count=("employee_id", "nunique"), process_count=("process_name", "nunique"))
+        .reset_index()
+    )
+    by_wo = _sort_summary(by_wo, sort_by, "work_order")
+    by_wo["工時 / Time"] = by_wo["total_hours"].map(hours_to_hms)
+    by_wo["平均 / Avg"] = by_wo["avg_hours"].map(hours_to_hms)
+
+    by_proc = (
+        work_df.groupby("process_name", dropna=False)
+        .agg(total_hours=("work_hours", "sum"), count=("id", "count"), avg_hours=("work_hours", "mean"), employee_count=("employee_id", "nunique"), work_order_count=("work_order", "nunique"))
+        .reset_index()
+    )
+    by_proc = _sort_summary(by_proc, sort_by, "process_name")
+    by_proc["工時 / Time"] = by_proc["total_hours"].map(hours_to_hms)
+    by_proc["平均 / Avg"] = by_proc["avg_hours"].map(hours_to_hms)
+
+    wo_process, wo_process_pivot_hours, wo_process_pivot_text = _build_work_order_process_summary(work_df)
+    wo_process_display = _localize_work_order_process_table(wo_process)
+
+    by_emp = (
+        work_df.groupby(["employee_id", "employee_name", "department"], dropna=False)
+        .agg(total_hours=("work_hours", "sum"), count=("id", "count"), avg_hours=("work_hours", "mean"), work_order_count=("work_order", "nunique"), process_count=("process_name", "nunique"))
+        .reset_index()
+    )
+    by_emp = _sort_summary(by_emp, sort_by, "employee_name")
+    by_emp["工時 / Time"] = by_emp["total_hours"].map(hours_to_hms)
+    by_emp["平均 / Avg"] = by_emp["avg_hours"].map(hours_to_hms)
+
+    trend = (
+        work_df.groupby("start_date", dropna=False)
+        .agg(total_hours=("work_hours", "sum"), count=("id", "count"), work_order_count=("work_order", "nunique"), employee_count=("employee_id", "nunique"))
+        .reset_index()
+        .sort_values("start_date")
+    )
+    trend["工時 / Time"] = trend["total_hours"].map(hours_to_hms)
+
+    return {
+        "df": work_df,
+        "avg_hours": avg_hours,
+        "unfinished_count": int(unfinished_mask.sum()),
+        "abnormal_count": int(abnormal_mask.sum()),
+        "max_wo": max_wo,
+        "by_wo": by_wo,
+        "by_proc": by_proc,
+        "wo_process": wo_process,
+        "wo_process_display": wo_process_display,
+        "wo_process_pivot_hours": wo_process_pivot_hours,
+        "wo_process_pivot_text": wo_process_pivot_text,
+        "by_emp": by_emp,
+        "trend": trend,
+    }
+
+
 start_saved = _parse_date(filters.get("start_date"), today_date() - timedelta(days=30))
 end_saved = _parse_date(filters.get("end_date"), today_date())
 # V69: do not query time_records just to open the analysis page or render filter widgets.
@@ -449,6 +585,7 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
         st.session_state[V69_QUERY_KEY] = True
         st.session_state.pop(V69_DF_KEY, None)
         st.session_state.pop(V69_FILTER_SIG_KEY, None)
+        _v30030_clear_analysis_output_cache()
         st.success("已套用並永久記錄 05 分析篩選條件，正在查詢分析資料。")
         st.rerun()
 
@@ -476,21 +613,29 @@ if df.empty:
     st.info("查無工時資料 / No records")
     st.stop()
 
-df = _apply_filters(df, filters)
+_summary_sig = f"{_filter_signature}|rows={len(df)}|v30030"
+_cached_summary = st.session_state.get(V30030_SUMMARY_CACHE_KEY)
+if isinstance(_cached_summary, dict) and _cached_summary.get("sig") == _summary_sig and isinstance(_cached_summary.get("bundle"), dict):
+    _bundle = _cached_summary["bundle"]
+else:
+    _bundle = _v30030_build_analysis_bundle(df, filters)
+    st.session_state[V30030_SUMMARY_CACHE_KEY] = {"sig": _summary_sig, "bundle": _bundle}
+
+df = _bundle.get("df", pd.DataFrame())
 if df.empty:
     st.warning("目前篩選條件下查無資料，請調整篩選條件後再套用。")
     st.stop()
 
-if "work_hours" not in df.columns:
-    df["work_hours"] = 0.0
-df["work_hours"] = _coerce_work_hours(df["work_hours"])
-df["work_time_text"] = df["work_hours"].map(hours_to_hms)
-
-end_ts = df.get("end_timestamp", pd.Series([""] * len(df))).fillna("").astype(str).str.strip()
-status_series = df.get("status", pd.Series([""] * len(df))).fillna("").astype(str)
-unfinished_mask = (status_series == "作業中") & (end_ts.isin(["", "None", "none", "nan"]))
-abnormal_mask = (df["work_hours"] == 0) | (df["work_hours"] > 12) | unfinished_mask
-avg_hours = df["work_hours"].mean() if len(df) else 0
+avg_hours = float(_bundle.get("avg_hours") or 0)
+max_wo = str(_bundle.get("max_wo") or "-")
+by_wo = _bundle.get("by_wo", pd.DataFrame())
+by_proc = _bundle.get("by_proc", pd.DataFrame())
+wo_process = _bundle.get("wo_process", pd.DataFrame())
+wo_process_display = _bundle.get("wo_process_display", pd.DataFrame())
+wo_process_pivot_hours = _bundle.get("wo_process_pivot_hours", pd.DataFrame())
+wo_process_pivot_text = _bundle.get("wo_process_pivot_text", pd.DataFrame())
+by_emp = _bundle.get("by_emp", pd.DataFrame())
+trend = _bundle.get("trend", pd.DataFrame())
 
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("累積工時 / Total Time", hours_to_hms(df["work_hours"].sum()))
@@ -500,55 +645,12 @@ m4.metric("工段數 / Processes", f"{df['process_name'].nunique():,}" if "proce
 
 k1, k2, k3, k4 = st.columns(4)
 k1.metric("平均每筆工時 / Avg", hours_to_hms(avg_hours))
-k2.metric("未結束筆數 / Unfinished", f"{int(unfinished_mask.sum()):,}")
-k3.metric("異常筆數 / Exceptions", f"{int(abnormal_mask.sum()):,}")
-max_wo = "-"
-if "work_order" in df.columns and not df.empty:
-    tmp = df.groupby("work_order", dropna=False)["work_hours"].sum().sort_values(ascending=False)
-    max_wo = str(tmp.index[0]) if len(tmp) else "-"
+k2.metric("未結束筆數 / Unfinished", f"{int(_bundle.get('unfinished_count') or 0):,}")
+k3.metric("異常筆數 / Exceptions", f"{int(_bundle.get('abnormal_count') or 0):,}")
 k4.metric("最大工時製令 / Top WO", max_wo)
 
 sort_by = filters.get("sort_by", "累積工時由大到小")
 top_n = filters.get("top_n", "Top 20")
-
-by_wo = (
-    df.groupby("work_order", dropna=False)
-    .agg(total_hours=("work_hours", "sum"), count=("id", "count"), avg_hours=("work_hours", "mean"), employee_count=("employee_id", "nunique"), process_count=("process_name", "nunique"))
-    .reset_index()
-)
-by_wo = _sort_summary(by_wo, sort_by, "work_order")
-by_wo["工時 / Time"] = by_wo["total_hours"].map(hours_to_hms)
-by_wo["平均 / Avg"] = by_wo["avg_hours"].map(hours_to_hms)
-
-by_proc = (
-    df.groupby("process_name", dropna=False)
-    .agg(total_hours=("work_hours", "sum"), count=("id", "count"), avg_hours=("work_hours", "mean"), employee_count=("employee_id", "nunique"), work_order_count=("work_order", "nunique"))
-    .reset_index()
-)
-by_proc = _sort_summary(by_proc, sort_by, "process_name")
-by_proc["工時 / Time"] = by_proc["total_hours"].map(hours_to_hms)
-by_proc["平均 / Avg"] = by_proc["avg_hours"].map(hours_to_hms)
-
-# V233：每個製令總工時 + 各工段名稱 / Process 的工時拆解。
-wo_process, wo_process_pivot_hours, wo_process_pivot_text = _build_work_order_process_summary(df)
-wo_process_display = _localize_work_order_process_table(wo_process)
-
-by_emp = (
-    df.groupby(["employee_id", "employee_name", "department"], dropna=False)
-    .agg(total_hours=("work_hours", "sum"), count=("id", "count"), avg_hours=("work_hours", "mean"), work_order_count=("work_order", "nunique"), process_count=("process_name", "nunique"))
-    .reset_index()
-)
-by_emp = _sort_summary(by_emp, sort_by, "employee_name")
-by_emp["工時 / Time"] = by_emp["total_hours"].map(hours_to_hms)
-by_emp["平均 / Avg"] = by_emp["avg_hours"].map(hours_to_hms)
-
-trend = (
-    df.groupby("start_date", dropna=False)
-    .agg(total_hours=("work_hours", "sum"), count=("id", "count"), work_order_count=("work_order", "nunique"), employee_count=("employee_id", "nunique"))
-    .reset_index()
-    .sort_values("start_date")
-)
-trend["工時 / Time"] = trend["total_hours"].map(hours_to_hms)
 
 plotly_template = "plotly_dark"
 
@@ -573,7 +675,7 @@ def style_fig(fig, height: int = 430):
 st.markdown("### ⟰ Excel 下載 / Excel Export")
 st.download_button(
     "⟰ 下載目前分析結果 Excel / Export Current Analysis",
-    data=_excel_bytes({
+    data=_v30030_excel_bytes_cached("current_analysis", _summary_sig, {
         "summary_work_order": by_wo,
         "work_order_process": wo_process_display,
         "wo_process_pivot_hours": wo_process_pivot_hours,
@@ -659,7 +761,7 @@ with tab2:
 
     st.download_button(
         "⟰ 下載製令 x 工段分析 Excel / Export Work Order Process Analysis",
-        data=_excel_bytes({
+        data=_v30030_excel_bytes_cached("wo_process", _summary_sig, {
             "work_order_process": wo_process_display,
             "pivot_hours": wo_process_pivot_hours,
             "pivot_time": wo_process_pivot_text,
@@ -753,6 +855,9 @@ with tab6:
             clear_editor_draft("analysis_detail_records")
         except Exception:
             pass
+        st.session_state.pop(V69_DF_KEY, None)
+        st.session_state.pop(V69_FILTER_SIG_KEY, None)
+        _v30030_clear_analysis_output_cache()
         st.success(f"已儲存 {count} 筆明細。")
         st.rerun()
 
