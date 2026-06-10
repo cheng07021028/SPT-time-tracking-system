@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from datetime import timedelta
+import hashlib
+import time
 
 import pandas as pd
 import streamlit as st
@@ -142,6 +144,52 @@ except Exception:
     _SPT_V40_PAGE_TOKEN = None
 
 
+# V300.39: lightweight page-level cache for expensive reports / Excel bytes.
+# Scope: 14. data health page only.  It does not change Neon authority writes.
+def _v30039_obj_sig(obj) -> str:
+    try:
+        raw = repr(obj).encode("utf-8", "ignore")
+    except Exception:
+        raw = str(type(obj)).encode("utf-8", "ignore")
+    return hashlib.md5(raw).hexdigest()
+
+def _v30039_cache_get(key: str, sig: str = "", ttl_seconds: float | None = None):
+    box = st.session_state.get(key)
+    if not isinstance(box, dict):
+        return None
+    if str(box.get("sig", "")) != str(sig or ""):
+        return None
+    if ttl_seconds is not None:
+        ts = float(box.get("ts", 0) or 0)
+        if time.time() - ts > float(ttl_seconds):
+            return None
+    return box.get("value")
+
+def _v30039_cache_set(key: str, sig: str, value):
+    st.session_state[key] = {"sig": str(sig or ""), "ts": time.time(), "value": value}
+    return value
+
+def _v30039_cached_value(key: str, sig: str, factory, ttl_seconds: float | None = None):
+    cached = _v30039_cache_get(key, sig, ttl_seconds=ttl_seconds)
+    if cached is not None:
+        return cached
+    return _v30039_cache_set(key, sig, factory())
+
+def _v30039_clear_prefix(prefix: str) -> None:
+    for k in list(st.session_state.keys()):
+        if str(k).startswith(prefix):
+            st.session_state.pop(k, None)
+
+def _v30039_report_loaded(report, work_date=None) -> bool:
+    if not isinstance(report, dict) or not report:
+        return False
+    if report.get("manual_load_required"):
+        return False
+    if work_date is not None and str(report.get("work_date", "")) and str(report.get("work_date")) != str(work_date):
+        return False
+    return True
+
+
 st.warning(
     "本頁只用於資料健康檢查與非破壞式修復。檢查不寫入；修復只合併缺漏資料到 01/02 權威檔，"
     "不刪除、不重新編號、不用畫面局部資料覆蓋完整歷史。"
@@ -257,7 +305,11 @@ with st.expander("V166 監控詳細資料 / Monitoring Details", expanded=False)
 if CAN_EXPORT:
     st.download_button(
         "⬇️ 下載 V166 系統監控 Excel",
-        data=export_monitoring_excel_bytes(v166_snapshot),
+        data=_v30039_cached_value(
+            "v30039_v166_monitoring_excel",
+            _v30039_obj_sig({"snapshot": v166_snapshot, "kind": "monitoring_excel"}),
+            lambda: export_monitoring_excel_bytes(v166_snapshot),
+        ),
         file_name=f"SPT_V166_系統監控_{v166_snapshot.get('work_date', '')}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
@@ -293,6 +345,7 @@ v163_b1, v163_b2, v163_b3, v163_b4 = st.columns([1, 1, 1, 1])
 if v163_b1.button("🔍 檢查結帳狀態", use_container_width=True, key="v163_check_daily_close"):
     with st.spinner("正在檢查當日工時、未結束作業與資料健康摘要..."):
         st.session_state["v163_daily_close_report"] = daily_close_report(str(v163_work_date))
+        _v30039_clear_prefix("v30039_v163_")
     st.rerun()
 
 v163_confirm_close = v163_b2.checkbox("確認結帳", value=False, disabled=not CAN_REPAIR, key="v163_confirm_close")
@@ -311,6 +364,7 @@ if v163_b3.button(
             block_on_critical_health=bool(v163_block_critical),
         )
         st.session_state["v163_daily_close_report"] = daily_close_report(str(v163_work_date))
+        _v30039_clear_prefix("v30039_v163_")
     st.rerun()
 
 v163_confirm_reopen = v163_b4.checkbox("確認重新開啟", value=False, disabled=not CAN_REPAIR, key="v163_confirm_reopen")
@@ -323,6 +377,7 @@ if st.button(
     with st.spinner("正在重新開啟已結帳日期；此動作只解除鎖定，不修改工時資料..."):
         st.session_state["v163_daily_close_action"] = reopen_work_date(str(v163_work_date), reason=v163_note or "管理員重新開啟日期更正")
         st.session_state["v163_daily_close_report"] = daily_close_report(str(v163_work_date))
+        _v30039_clear_prefix("v30039_v163_")
     st.rerun()
 
 v163_action = st.session_state.get("v163_daily_close_action")
@@ -341,11 +396,18 @@ if isinstance(v163_action, dict) and v163_action:
         st.json(v163_action)
 
 v163_report = st.session_state.get("v163_daily_close_report")
-if not isinstance(v163_report, dict) or not v163_report:
-    try:
-        v163_report = daily_close_report(str(v163_work_date))
-    except Exception as exc:
-        v163_report = {"ok": False, "error": str(exc), "work_date": str(v163_work_date)}
+if not _v30039_report_loaded(v163_report, work_date=str(v163_work_date)):
+    # V300.39: do not run daily_close_report automatically on every rerun.
+    # Press 「檢查結帳狀態」 or close/reopen actions to load the report.
+    v163_report = {
+        "ok": True,
+        "manual_load_required": True,
+        "work_date": str(v163_work_date),
+        "closed": False,
+        "record_count": "未載入",
+        "active_count": "未載入",
+        "health_summary": {"critical_count": "未載入"},
+    }
 
 if isinstance(v163_report, dict):
     dc1, dc2, dc3, dc4, dc5 = st.columns(5)
@@ -360,10 +422,17 @@ if isinstance(v163_report, dict):
         close_info = v163_report.get("close_info") if isinstance(v163_report.get("close_info"), dict) else {}
         st.success(f"{v163_report.get('work_date')} 已結帳鎖定。結帳人：{close_info.get('closed_by','')}；時間：{close_info.get('closed_at','')}。")
     else:
-        if int(v163_report.get("active_count") or 0) > 0:
-            st.warning("此日期仍有未結束作業，建議先處理完再結帳。")
+        if v163_report.get("manual_load_required"):
+            st.info("尚未載入每日結帳狀態；請按『檢查結帳狀態』後再確認是否可結帳。")
         else:
-            st.info("此日期尚未結帳；若確認資料正確，可執行每日結帳並鎖定。")
+            try:
+                _v163_active_count = int(v163_report.get("active_count") or 0)
+            except Exception:
+                _v163_active_count = 0
+            if _v163_active_count > 0:
+                st.warning("此日期仍有未結束作業，建議先處理完再結帳。")
+            else:
+                st.info("此日期尚未結帳；若確認資料正確，可執行每日結帳並鎖定。")
 
     if v163_report.get("active_records"):
         with st.expander("V163 未結束作業明細 / Active Records Blocking Close", expanded=True):
@@ -380,7 +449,11 @@ if isinstance(v163_report, dict):
         try:
             st.download_button(
                 "⬇️ 下載 V163 每日結帳報告 Excel",
-                data=export_daily_close_excel_bytes(str(v163_work_date)),
+                data=_v30039_cached_value(
+                    "v30039_v163_daily_close_excel",
+                    _v30039_obj_sig({"date": str(v163_work_date), "report": v163_report}),
+                    lambda: export_daily_close_excel_bytes(str(v163_work_date)),
+                ),
                 file_name=f"SPT_V163_每日結帳報告_{v163_work_date}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
@@ -486,7 +559,7 @@ if v158_c1.button("📦 建立完整備份 ZIP", use_container_width=True, disab
     st.rerun()
 
 if v158_c2.button("🔄 重新讀取最近備份", use_container_width=True, key="v158_refresh_backup_list"):
-    st.session_state.pop("v158_backup_list", None)
+    st.session_state["v158_backup_list"] = list_backup_snapshots(limit=10)
     st.rerun()
 
 if create_backup_disabled:
@@ -514,14 +587,14 @@ if isinstance(v158_backup_result, dict) and v158_backup_result.get("ok"):
     )
 
 with st.expander("最近本機備份 / Recent Local Backups", expanded=False):
-    try:
-        backup_list = list_backup_snapshots(limit=10)
+    backup_list = st.session_state.get("v158_backup_list")
+    if isinstance(backup_list, list):
         if backup_list:
             st.dataframe(pd.DataFrame(backup_list), use_container_width=True, hide_index=True, height=260)
         else:
             st.info("尚未建立 V158 本機備份。")
-    except Exception as exc:
-        st.error(f"讀取最近備份失敗：{exc}")
+    else:
+        st.caption("V300.39：本機備份清單不再於每次 rerun 自動掃描；請按『重新讀取最近備份』載入。")
 
 st.markdown("#### 檢查備份 ZIP / Inspect Backup ZIP")
 backup_file = st.file_uploader(
@@ -696,7 +769,11 @@ if v157_result:
     v157_rows = compact_result_rows(v157_result)
     if v157_rows:
         st.dataframe(pd.DataFrame(v157_rows), use_container_width=True, hide_index=True, height=360)
-    v157_excel = export_v157_regression_excel_bytes(v157_result)
+    v157_excel = _v30039_cached_value(
+        "v30039_v157_regression_excel",
+        _v30039_obj_sig(v157_result),
+        lambda: export_v157_regression_excel_bytes(v157_result),
+    )
     st.download_button(
         "⬇️ 下載 V157 測試報告 Excel",
         data=v157_excel,
@@ -766,7 +843,11 @@ if result:
         else:
             st.info("沒有可預覽的合併資料。")
 
-    excel_bytes = export_audit_excel_bytes(result)
+    excel_bytes = _v30039_cached_value(
+        "v30039_v153_audit_excel",
+        _v30039_obj_sig(result),
+        lambda: export_audit_excel_bytes(result),
+    )
     st.download_button(
         "⬇️ 下載資料健康檢查 Excel",
         data=excel_bytes,
@@ -1008,7 +1089,11 @@ else:
     if CAN_EXPORT:
         v166b_export_col.download_button(
             "⬇️ 下載待補結算清單 Excel",
-            data=export_pending_close_excel_bytes(v166b_snapshot),
+            data=_v30039_cached_value(
+                "v30039_v166b_pending_close_excel",
+                _v30039_obj_sig({"snapshot": v166b_snapshot, "start": str(start_date), "end": str(end_date)}),
+                lambda: export_pending_close_excel_bytes(v166b_snapshot),
+            ),
             file_name=f"SPT_V166B_LOG_only_待補結算_{start_date}_{end_date}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
@@ -1158,7 +1243,11 @@ else:
     if CAN_EXPORT:
         v166c_b2.download_button(
             "⬇️ 下載 V166C LOG 快照候選 Excel",
-            data=export_log_snapshot_candidates_excel_bytes(v166c_snapshot),
+            data=_v30039_cached_value(
+                "v30039_v166c_snapshot_candidates_excel",
+                _v30039_obj_sig({"snapshot": v166c_snapshot, "start": str(start_date), "end": str(end_date)}),
+                lambda: export_log_snapshot_candidates_excel_bytes(v166c_snapshot),
+            ),
             file_name=f"SPT_V166C_LOG完整快照候選_{start_date}_{end_date}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
@@ -1259,7 +1348,11 @@ if v166d_b2.button("🧩 補強舊 LOG 快照", use_container_width=True, disabl
 if CAN_EXPORT and v166d_cov.get("ok", True):
     v166d_b3.download_button(
         "⬇️ 下載 V166D 覆蓋率報告",
-        data=export_log_snapshot_coverage_excel_bytes(v166d_cov),
+        data=_v30039_cached_value(
+            "v30039_v166d_snapshot_coverage_excel",
+            _v30039_obj_sig({"coverage": v166d_cov, "start": str(start_date), "end": str(end_date)}),
+            lambda: export_log_snapshot_coverage_excel_bytes(v166d_cov),
+        ),
         file_name=f"SPT_V166D_LOG快照覆蓋率_{start_date}_{end_date}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
@@ -1358,7 +1451,11 @@ else:
         if CAN_EXPORT and export_v182_audit_excel_bytes is not None:
             st.download_button(
                 "⬇️ 下載 V182-V188 一次彙整檢查 Excel",
-                data=export_v182_audit_excel_bytes(v182_report),
+                data=_v30039_cached_value(
+                    "v30039_v182_audit_excel",
+                    _v30039_obj_sig(v182_report),
+                    lambda: export_v182_audit_excel_bytes(v182_report),
+                ),
                 file_name=f"SPT_V182_一次彙整檢查_{v182_report.get('generated_at','').replace(':','').replace(' ','_')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
@@ -1437,7 +1534,11 @@ if v189_report:
     if CAN_EXPORT and callable(export_v189_report_excel_bytes):
         st.download_button(
             "⬇️ 下載 V189 大表後端分頁檢查 Excel",
-            data=export_v189_report_excel_bytes(v189_report),
+            data=_v30039_cached_value(
+                "v30039_v189_report_excel",
+                _v30039_obj_sig(v189_report),
+                lambda: export_v189_report_excel_bytes(v189_report),
+            ),
             file_name=f"SPT_V189_大表後端分頁檢查_{str(v189_report.get('generated_at','')).replace(':','').replace(' ','_')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
@@ -1471,7 +1572,11 @@ if v190_report:
     if CAN_EXPORT and callable(export_v190_assessment_excel_bytes):
         st.download_button(
             "⬇️ 下載 V190 資料庫轉換評估 Excel",
-            data=export_v190_assessment_excel_bytes(v190_report),
+            data=_v30039_cached_value(
+                "v30039_v190_assessment_excel",
+                _v30039_obj_sig(v190_report),
+                lambda: export_v190_assessment_excel_bytes(v190_report),
+            ),
             file_name=f"SPT_V190_DB轉換評估_{str(v190_report.get('generated_at','')).replace(':','').replace(' ','_')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
