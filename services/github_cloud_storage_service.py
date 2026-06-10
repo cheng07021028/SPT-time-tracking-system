@@ -414,8 +414,17 @@ def restore_from_github_if_database_empty(force: bool = False) -> Dict[str, Any]
         return {"ok": False, "message": f"GitHub 自動還原失敗：{exc}"}
 
 
-def github_cloud_file_status() -> Dict[str, Any]:
+def github_cloud_file_status(metadata_only: bool = False, include_summary: bool = True) -> Dict[str, Any]:
+    """Return GitHub backup file status.
+
+    V300.34:
+    - Backward compatible by default: old callers still receive summaries for
+      permanent-state JSON files.
+    - Page 09 can pass metadata_only=True to avoid downloading large JSON
+      contents when the operator only needs file existence/size/sha status.
+    """
     cfg = github_config()
+    token, repo, branch = cfg.get("token", ""), cfg.get("repo", ""), cfg.get("branch", "main") or "main"
     rows: List[Dict[str, Any]] = []
     for path in [
         f"{REMOTE_STATE_ROOT}/spt_permanent_state.json",
@@ -424,9 +433,31 @@ def github_cloud_file_status() -> Dict[str, Any]:
         *[f"{root}/spt_permanent_state.json" for root in LEGACY_REMOTE_ROOTS],
         *[f"{root}/spt_module_settings.json" for root in LEGACY_REMOTE_ROOTS],
     ]:
+        if metadata_only:
+            if not token:
+                rows.append({"path": path, "exists": False, "status": 0, "message": "缺少 GITHUB_TOKEN"})
+                continue
+            if not repo or "/" not in repo:
+                rows.append({"path": path, "exists": False, "status": 0, "message": "GITHUB_REPOSITORY 格式錯誤"})
+                continue
+            res = _get_remote_file(repo, branch, token, path)
+            body = res.get("body", {}) if isinstance(res.get("body"), dict) else {}
+            item = {
+                "path": path,
+                "exists": bool(res.get("ok")),
+                "status": res.get("status"),
+                "message": body.get("message", "OK" if res.get("ok") else "not found"),
+                "sha": body.get("sha", ""),
+                "size": body.get("size", 0),
+                "download_url": bool(body.get("download_url")),
+                "summary_skipped": True,
+            }
+            rows.append(item)
+            continue
+
         res = download_text_from_github(path)
         item = {"path": path, "exists": bool(res.get("ok")), "message": res.get("message", "OK" if res.get("ok") else "")}
-        if res.get("ok") and "spt_permanent_state" in path:
+        if include_summary and res.get("ok") and "spt_permanent_state" in path:
             try:
                 payload = json.loads(str(res.get("text", "{}")))
                 item["business_row_count"] = payload.get("business_row_count") or sum(len(payload.get("tables", {}).get(t, [])) for t in BUSINESS_TABLES)
@@ -434,7 +465,7 @@ def github_cloud_file_status() -> Dict[str, Any]:
             except Exception:
                 pass
         rows.append(item)
-    return {"repo": cfg.get("repo"), "branch": cfg.get("branch"), "token_set": bool(cfg.get("token")), "files": rows}
+    return {"repo": cfg.get("repo"), "branch": cfg.get("branch"), "token_set": bool(cfg.get("token")), "metadata_only": bool(metadata_only), "files": rows}
 
 
 def migrate_legacy_date_path_to_data_path() -> Dict[str, Any]:

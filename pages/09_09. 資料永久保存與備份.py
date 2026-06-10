@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -49,6 +50,117 @@ except Exception:
     _SPT_V40_PAGE_TOKEN = None
 
 
+# V300.34: Keep page 09 light on Streamlit reruns.
+# - Backup/restore actions remain explicit buttons.
+# - Local/GitHub status reads are cached or manually triggered.
+# - Neon/PostgreSQL authority is not changed by this page optimization.
+V30034_GITHUB_CFG_CACHE_KEY = "v30034_09_github_cfg_cache"
+V30034_CLEANUP_CFG_CACHE_KEY = "v30034_09_cleanup_cfg_cache"
+V30034_PENDING_CACHE_KEY = "v30034_09_pending_status_cache"
+V30034_LATEST_PREVIEW_KEY = "v30034_09_latest_state_preview"
+V30034_PENDING_TTL_SECONDS = 8.0
+V30034_SETTINGS_TTL_SECONDS = 300.0
+
+
+def _v30034_now_ts() -> float:
+    try:
+        return float(time.time())
+    except Exception:
+        return 0.0
+
+
+def _v30034_file_signature(path: Path) -> tuple[bool, int, int]:
+    try:
+        if not path.exists():
+            return (False, 0, 0)
+        stat = path.stat()
+        return (True, int(stat.st_size), int(stat.st_mtime))
+    except Exception:
+        return (False, 0, 0)
+
+
+def _v30034_get_cached_payload(key: str, ttl: float) -> dict | None:
+    payload = st.session_state.get(key)
+    if not isinstance(payload, dict):
+        return None
+    if ttl > 0 and (_v30034_now_ts() - float(payload.get("cached_at", 0.0) or 0.0)) > ttl:
+        return None
+    data = payload.get("data")
+    return data if isinstance(data, dict) else None
+
+
+def _v30034_set_cached_payload(key: str, data: dict) -> dict:
+    st.session_state[key] = {"cached_at": _v30034_now_ts(), "data": data}
+    return data
+
+
+def _v30034_github_config_cached(force: bool = False) -> dict:
+    if not force:
+        cached = _v30034_get_cached_payload(V30034_GITHUB_CFG_CACHE_KEY, V30034_SETTINGS_TTL_SECONDS)
+        if cached is not None:
+            return cached
+    return _v30034_set_cached_payload(V30034_GITHUB_CFG_CACHE_KEY, github_config())
+
+
+def _v30034_load_cleanup_settings_cached(force: bool = False) -> dict:
+    if not force:
+        cached = _v30034_get_cached_payload(V30034_CLEANUP_CFG_CACHE_KEY, V30034_SETTINGS_TTL_SECONDS)
+        if cached is not None:
+            return cached
+    return _v30034_set_cached_payload(V30034_CLEANUP_CFG_CACHE_KEY, load_cleanup_settings())
+
+
+def _v30034_save_cleanup_settings_cached(cfg: dict) -> dict:
+    saved = save_cleanup_settings(cfg)
+    settings = saved.get("settings") if isinstance(saved, dict) else None
+    if isinstance(settings, dict):
+        _v30034_set_cached_payload(V30034_CLEANUP_CFG_CACHE_KEY, settings)
+    else:
+        st.session_state.pop(V30034_CLEANUP_CFG_CACHE_KEY, None)
+    return saved
+
+
+def _v30034_pending_backup_status_cached(force: bool = False) -> dict:
+    if not force:
+        cached = _v30034_get_cached_payload(V30034_PENDING_CACHE_KEY, V30034_PENDING_TTL_SECONDS)
+        if cached is not None:
+            return cached
+    return _v30034_set_cached_payload(V30034_PENDING_CACHE_KEY, pending_backup_status())
+
+
+def _v30034_clear_pending_status_cache() -> None:
+    st.session_state.pop(V30034_PENDING_CACHE_KEY, None)
+
+
+def _v30034_latest_state_preview(force: bool = False) -> dict | None:
+    sig = _v30034_file_signature(LATEST_STATE)
+    cached = st.session_state.get(V30034_LATEST_PREVIEW_KEY)
+    if not force and isinstance(cached, dict) and cached.get("signature") == sig:
+        preview = cached.get("preview")
+        return preview if isinstance(preview, dict) else None
+    if not sig[0]:
+        st.session_state.pop(V30034_LATEST_PREVIEW_KEY, None)
+        return None
+    try:
+        data = json.loads(LATEST_STATE.read_text(encoding="utf-8"))
+        preview = {
+            "export_time": data.get("export_time") or data.get("exported_at"),
+            "version": data.get("version") or data.get("schema_version"),
+            "business_row_count": data.get("business_row_count"),
+            "table_counts": data.get("table_counts", {}),
+            "skipped": data.get("skipped"),
+            "warning": data.get("warning"),
+            "file_size": sig[1],
+            "file_mtime": sig[2],
+        }
+        st.session_state[V30034_LATEST_PREVIEW_KEY] = {"signature": sig, "preview": preview}
+        return preview
+    except Exception as exc:
+        preview = {"error": str(exc), "file_size": sig[1], "file_mtime": sig[2]}
+        st.session_state[V30034_LATEST_PREVIEW_KEY] = {"signature": sig, "preview": preview}
+        return preview
+
+
 st.subheader("資料防消失中心 / Data Guard Center")
 st.caption("V3.06：本頁只做備份紀錄、GitHub 備份狀態、手動雲端備份/還原查詢；每日自動備份排程統一在 13｜系統設定。")
 st.info(
@@ -56,7 +168,7 @@ st.info(
     "系統會先從 GitHub 的 data/permanent_store/persistent_state/spt_permanent_state.json 下載並還原。"
 )
 
-cfg = github_config()
+cfg = _v30034_github_config_cached()
 with st.expander("GitHub 雲端設定檢查 / Cloud Settings", expanded=True):
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Repository", cfg.get("repo") or "未設定")
@@ -104,7 +216,7 @@ with st.expander("GitHub 模組備份連結檢查 / Module Backup Link Audit", e
 
 with st.expander("GitHub 備份檔清理 / GitHub Backup Cleanup", expanded=False):
     st.caption("安全規則：預設只清理有時間戳的 history/backup 檔，不刪 latest 主檔，避免影響目前系統顯示與功能。")
-    cleanup_cfg = load_cleanup_settings()
+    cleanup_cfg = _v30034_load_cleanup_settings_cached()
     roots_default = cleanup_cfg.get("roots", ["data/permanent_store/persistent_state/history", "data/permanent_store/persistent_state/audit_history", "data/permanent_store/persistent_modules"])
     selected_roots = st.multiselect(
         "清理範圍 / Cleanup Roots",
@@ -140,7 +252,7 @@ with st.expander("GitHub 備份檔清理 / GitHub Backup Cleanup", expanded=Fals
     keep_days = sc3.number_input("保留天數", min_value=7, max_value=3650, value=int(cleanup_cfg.get("keep_days", 90)), step=1, key="v326_cleanup_keep_days")
     sc4.metric("上次清理", cleanup_cfg.get("last_run_at") or "尚未執行")
     if st.button("儲存 GitHub 定期清理設定 / Save Cleanup Schedule", use_container_width=True, key="v326_save_cleanup_schedule"):
-        saved = save_cleanup_settings({
+        saved = _v30034_save_cleanup_settings_cached({
             **cleanup_cfg,
             "enabled": bool(sched_enabled),
             "frequency": frequency,
@@ -154,7 +266,7 @@ with st.expander("GitHub 備份檔清理 / GitHub Backup Cleanup", expanded=Fals
 st.divider()
 
 st.subheader("待備份狀態 / Pending Backup Status")
-pending = pending_backup_status()
+pending = _v30034_pending_backup_status_cached()
 if pending.get("pending"):
     st.warning(
         f"資料已有變更尚未備份：{pending.get('reason', '')}\n\n"
@@ -172,6 +284,7 @@ with c1:
         res = create_permanent_files()
         if res.get("ok"):
             clear_pending_backup_marker()
+            _v30034_clear_pending_status_cache()
             st.success("永久檔案已建立，待備份標記已清除。")
         else:
             st.warning(res.get("message", "建立失敗或被安全機制阻擋。"))
@@ -181,6 +294,7 @@ with c2:
         res = upload_existing_permanent_files(archive=True)
         if res.get("ok"):
             clear_pending_backup_marker()
+            _v30034_clear_pending_status_cache()
             st.success("已上傳既有永久檔到 GitHub，待備份標記已清除。")
         else:
             st.error(res.get("message", "上傳失敗"))
@@ -190,6 +304,7 @@ with c3:
         res = create_and_upload_permanent_files()
         if res.get("ok"):
             clear_pending_backup_marker()
+            _v30034_clear_pending_status_cache()
             st.success("永久備份完成，已存到 GitHub，待備份標記已清除。")
         else:
             st.error(res.get("message", "永久備份未完成；請看 JSON。"))
@@ -208,7 +323,7 @@ st.subheader("雲端檢查與修正 / Cloud Check & Fix")
 c5, c6, c7 = st.columns(3)
 with c5:
     if st.button("檢查 GitHub 雲端檔案", use_container_width=True):
-        st.json(github_cloud_file_status())
+        st.json(github_cloud_file_status(metadata_only=True, include_summary=False))
 with c6:
     if st.button("修正舊路徑 date → data", use_container_width=True):
         res = migrate_legacy_date_path_to_data_path()
@@ -246,19 +361,18 @@ else:
     st.info("V69：永久檔狀態不再於開頁自動查詢資料庫，請按上方按鈕。")
 
 if LATEST_STATE.exists():
-    with st.expander("預覽永久資料 latest / Preview Permanent State", expanded=True):
-        try:
-            data = json.loads(LATEST_STATE.read_text(encoding="utf-8"))
-            st.json({
-                "export_time": data.get("export_time") or data.get("exported_at"),
-                "version": data.get("version") or data.get("schema_version"),
-                "business_row_count": data.get("business_row_count"),
-                "table_counts": data.get("table_counts", {}),
-                "skipped": data.get("skipped"),
-                "warning": data.get("warning"),
-            })
-        except Exception as exc:
-            st.error(str(exc))
+    lp1, lp2 = st.columns([1, 3])
+    if lp1.button("載入 latest 預覽", use_container_width=True, key="v30034_load_latest_preview"):
+        _v30034_latest_state_preview(force=True)
+    preview_payload = _v30034_latest_state_preview(force=False) if isinstance(st.session_state.get(V30034_LATEST_PREVIEW_KEY), dict) else None
+    if preview_payload:
+        with st.expander("預覽永久資料 latest / Preview Permanent State", expanded=False):
+            if preview_payload.get("error"):
+                st.error(preview_payload.get("error"))
+            else:
+                st.json(preview_payload)
+    else:
+        lp2.info("V300.34：latest JSON 可能很大，頁面不再自動讀取；需要時請按左側按鈕載入預覽。")
 
 st.caption("GitHub 正確保存路徑：data/permanent_store/persistent_state/ 與 data/permanent_store/persistent_state/history/。history 檔案使用時間戳，不會覆蓋舊檔。")
 
