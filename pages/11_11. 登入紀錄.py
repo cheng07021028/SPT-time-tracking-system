@@ -11,6 +11,7 @@ from services.audit_log_service import (
     bootstrap_audit_log_service,
     migrate_security_login_logs_to_login_logs,
     load_login_logs,
+    load_login_logs_with_stats,
     get_login_log_stats,
     delete_login_logs_by_date_range,
     export_audit_logs_to_permanent_file,
@@ -215,10 +216,16 @@ _login_query_signature = (str(start), str(end), keyword, int(limit))
 _login_force = bool(st.session_state.pop("_spt_v67_login_logs_force_query", False))
 _login_loaded = bool(st.session_state.get("_spt_v67_login_logs_loaded", False))
 if _login_force or (_login_loaded and st.session_state.get("_spt_v67_login_logs_signature") != _login_query_signature):
-    stats = get_login_log_stats(str(start), str(end), keyword)  # SQL COUNT only after Apply.
-    logs = load_login_logs(start_date=str(start), end_date=str(end), keyword=keyword, limit=limit, include_legacy=True)
+    # V300.24：查詢只打一次登入紀錄讀取路徑。
+    # 舊版同一次 Apply Search 會先 get_login_log_stats() 做 COUNT，再 load_login_logs() 做 SELECT；
+    # auth_login_logs + security_login_logs 都啟用時等於重複讀取兩套表，資料量大時容易造成頁面長時間運轉。
+    bundle = load_login_logs_with_stats(start_date=str(start), end_date=str(end), keyword=keyword, limit=limit, include_legacy=True)
+    stats = dict(bundle.get("stats") or {})
+    logs = bundle.get("logs", pd.DataFrame())
     if isinstance(logs, list):
         logs = pd.DataFrame(logs)
+    elif not isinstance(logs, pd.DataFrame):
+        logs = pd.DataFrame()
     st.session_state["_spt_v67_login_logs_cached"] = {"stats": stats, "logs": logs}
     st.session_state["_spt_v67_login_logs_signature"] = _login_query_signature
     st.session_state["_spt_v67_login_logs_loaded"] = True
