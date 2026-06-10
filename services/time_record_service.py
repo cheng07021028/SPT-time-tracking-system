@@ -1399,14 +1399,57 @@ def recalculate_time_records(record_ids: Iterable[Any]) -> int:
 
 
 def load_daily_record_summary_sql(work_date: str):
-    df = load_records(str(work_date), str(work_date))
-    if df.empty:
-        return pd.DataFrame()
-    if "work_minutes" not in df.columns:
-        df["work_minutes"] = 0.0
-    out = df.groupby(["employee_id", "employee_name"], dropna=False)["work_minutes"].sum().reset_index()
-    out["work_hours"] = out["work_minutes"].astype(float) / 60.0
-    return out
+    """Return only the columns needed by 08 daily employee-hours.
+
+    V300.33: this used to call ``load_records(date, date)``, which loads the
+    full 01/02 record column set and then lets 08 group it in pandas.  For the
+    Neon Free plan, 08 should not spend compute or bandwidth on unused columns.
+    The function now uses an indexed start_date query first and falls back to a
+    bounded timestamp range only for legacy rows whose start_date is blank.
+    """
+    _ensure_time_runtime_columns()
+    d = _text(work_date)[:10]
+    cols = ["employee_id", "employee_name", "work_hours", "end_timestamp", "status"]
+    if not d:
+        return pd.DataFrame(columns=cols)
+
+    def _minimal_query(sql: str, params: tuple[Any, ...]) -> pd.DataFrame:
+        try:
+            df = query_df(sql, params)
+            if isinstance(df, pd.DataFrame):
+                work = df.where(pd.notna(df), "").reset_index(drop=True)
+                for c in cols:
+                    if c not in work.columns:
+                        work[c] = ""
+                return work[cols]
+        except Exception:
+            pass
+        return pd.DataFrame(columns=cols)
+
+    sql = f"""
+        SELECT employee_id, employee_name, work_hours, end_timestamp, status
+        FROM time_records
+        WHERE {_not_deleted_predicate()}
+          AND start_date = ?
+        ORDER BY employee_id, id
+    """
+    df = _minimal_query(sql, (d,))
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        return df
+
+    # Legacy fallback: bounded timestamp-only rows.  Do not use substr()/OR in
+    # the primary path because it can bypass indexes on larger Neon tables.
+    next_day = _today_end_text(d)
+    fallback_sql = f"""
+        SELECT employee_id, employee_name, work_hours, end_timestamp, status
+        FROM time_records
+        WHERE {_not_deleted_predicate()}
+          AND COALESCE(start_date,'')=''
+          AND start_timestamp >= ?
+          AND start_timestamp < ?
+        ORDER BY employee_id, id
+    """
+    return _minimal_query(fallback_sql, (f"{d} 00:00:00", f"{next_day} 00:00:00"))
 
 
 def audit_v63_time_record_runtime_consolidated() -> dict[str, Any]:

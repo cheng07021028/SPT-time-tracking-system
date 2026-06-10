@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 from datetime import date
+import time
 import streamlit as st
 import plotly.express as px
 
@@ -30,6 +31,35 @@ except Exception:
 
 
 STATUS_OPTIONS = ["作業中", "未紀錄", "偏低", "正常", "超時"]
+
+V30033_DAILY_BUNDLE_CACHE_KEY = "_v30033_daily_hours_bundle_cache"
+V30033_DAILY_BUNDLE_TTL_SECONDS = 15.0
+
+
+def _v30033_clear_daily_hours_cache() -> None:
+    """Clear 08 derived-data cache after Apply/Reset so manual refresh always reads fresh Neon data."""
+    try:
+        st.session_state.pop(V30033_DAILY_BUNDLE_CACHE_KEY, None)
+    except Exception:
+        pass
+
+
+def _v30033_df_signature(df: pd.DataFrame | None, columns: list[str] | None = None) -> str:
+    """Small stable signature for employee master data used by the 08 daily-hours cache."""
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return "empty"
+    cols = [c for c in (columns or list(df.columns)) if c in df.columns]
+    if not cols:
+        return f"rows:{len(df)}"
+    try:
+        sample = df[cols].copy().fillna("").astype(str)
+        h = pd.util.hash_pandas_object(sample, index=False).sum()
+        return f"rows:{len(sample)}:hash:{int(h)}"
+    except Exception:
+        try:
+            return f"rows:{len(df)}:cols:{','.join(cols)}"
+        except Exception:
+            return "fallback"
 
 
 def _status(total_hours, record_count, active_count) -> str:
@@ -85,6 +115,7 @@ with fc_b:
             "daily_hours_no_record_only", "_spt_v67_daily_hours_query_applied",
         ]:
             st.session_state.pop(k, None)
+        _v30033_clear_daily_hours_cache()
         st.rerun()
 
 with st.expander("🔎 篩選條件 / Filters", expanded=True):
@@ -121,6 +152,9 @@ with st.expander("🔎 篩選條件 / Filters", expanded=True):
             st.session_state["daily_hours_status"] = selected_status
             st.session_state["daily_hours_no_record_only"] = show_only_no_record
             st.session_state["_spt_v67_daily_hours_query_applied"] = True
+            # V300.33：按「套用篩選」視為手動刷新，必須讀最新 Neon 權威資料；
+            # 後續同條件 rerun 才使用短 TTL session cache，避免重複查詢與重複 groupby。
+            _v30033_clear_daily_hours_cache()
 
 # V67：首次進入 08 頁只顯示篩選表單，不立即查每日工時。
 # 避免切頁或重新整理時自動掃描 Neon；按「套用篩選」後才載入資料。
@@ -175,49 +209,88 @@ def _v174_work_hours_to_float(value) -> float:
     return 0.0
 
 # V29: 使用權威檔人員與工時資料即時計算，避免 SQLite 快取延遲造成資料錯誤。
-emp = _employees_authority_df.copy()
-for _c in ["is_active", "is_in_factory", "is_today_attendance"]:
-    if _c not in emp.columns:
-        emp[_c] = False
-    emp[_c] = emp[_c].astype(str).str.lower().str.strip().isin(["1", "true", "yes", "y", "是", "啟用", "在廠", "出勤"]) | (emp[_c] == 1) | (emp[_c] == True)
-emp = emp[(emp["is_active"]) & (emp["is_in_factory"]) & (emp["is_today_attendance"])]
-# V174：08 每日工時只查必要欄位 employee_id/work_hours/end_timestamp/status，
-# 不再為一天彙總載入 time_records 全欄位。畫面與篩選功能保持不變。
-if callable(load_daily_record_summary_sql):
-    try:
-        records = load_daily_record_summary_sql(d)
-    except Exception:
-        records = load_records(start_date=d, end_date=d)
-else:
-    records = load_records(start_date=d, end_date=d)
-if records is None:
-    records = pd.DataFrame()
-if not records.empty:
-    rec = records.copy()
-    if "start_date" in rec.columns:
-        rec = rec[rec["start_date"].astype(str) == d]
-    elif "work_date" in rec.columns:
-        rec = rec[rec["work_date"].astype(str) == d]
-    if "work_hours" not in rec.columns:
-        rec["work_hours"] = 0
-    rec["work_hours"] = rec["work_hours"].map(_v174_work_hours_to_float).fillna(0)
-    rec["is_active_record"] = rec.get("end_timestamp", pd.Series([""] * len(rec))).fillna("").astype(str).str.strip().eq("") if "end_timestamp" in rec.columns else False
-    grp = rec.groupby("employee_id", dropna=False).agg(
-        total_hours=("work_hours", "sum"),
-        record_count=("employee_id", "size"),
-        active_count=("is_active_record", "sum"),
-    ).reset_index()
-    base_df = emp.merge(grp, on="employee_id", how="left")
-else:
-    base_df = emp.copy()
-    base_df["total_hours"] = 0
-    base_df["record_count"] = 0
-    base_df["active_count"] = 0
-for _c in ["total_hours", "record_count", "active_count"]:
-    if _c not in base_df.columns:
-        base_df[_c] = 0
-    base_df[_c] = pd.to_numeric(base_df[_c], errors="coerce").fillna(0)
-base_df = base_df.sort_values(["total_hours", "employee_id"], kind="stable").reset_index(drop=True)
+# V300.33：每日工時是查詢/分析頁，按「套用篩選」才讀取最新 Neon；
+# 同一日期、同一份人員主檔在短 TTL 內重用彙總結果，避免 Streamlit rerun
+# 重複查 time_records、重複 groupby、重複重畫圖。寫入仍由 01/02 即時寫 Neon。
+def _v30033_build_daily_base_df(work_date: str, employees_df: pd.DataFrame) -> pd.DataFrame:
+    emp = employees_df.copy() if isinstance(employees_df, pd.DataFrame) else pd.DataFrame()
+    for _c in ["is_active", "is_in_factory", "is_today_attendance"]:
+        if _c not in emp.columns:
+            emp[_c] = False
+        emp[_c] = emp[_c].astype(str).str.lower().str.strip().isin(["1", "true", "yes", "y", "是", "啟用", "在廠", "出勤"]) | (emp[_c] == 1) | (emp[_c] == True)
+    if not emp.empty:
+        emp = emp[(emp["is_active"]) & (emp["is_in_factory"]) & (emp["is_today_attendance"])]
+
+    sig_cols = [
+        "employee_id", "employee_name", "department", "title",
+        "is_active", "is_in_factory", "is_today_attendance", "updated_at",
+    ]
+    signature = (str(work_date), _v30033_df_signature(emp, sig_cols))
+    now_mono = time.monotonic()
+    cached = st.session_state.get(V30033_DAILY_BUNDLE_CACHE_KEY)
+    if isinstance(cached, dict) and cached.get("signature") == signature:
+        try:
+            if now_mono - float(cached.get("created_at", 0.0)) <= V30033_DAILY_BUNDLE_TTL_SECONDS:
+                cached_df = cached.get("base_df")
+                if isinstance(cached_df, pd.DataFrame):
+                    return cached_df.copy()
+        except Exception:
+            pass
+
+    # V174/V300.33：08 每日工時只查必要欄位 employee_id/work_hours/end_timestamp/status，
+    # 不再為一天彙總載入 time_records 全欄位。畫面與篩選功能保持不變。
+    if callable(load_daily_record_summary_sql):
+        try:
+            records = load_daily_record_summary_sql(work_date)
+        except Exception:
+            records = load_records(start_date=work_date, end_date=work_date)
+    else:
+        records = load_records(start_date=work_date, end_date=work_date)
+    if records is None:
+        records = pd.DataFrame()
+
+    if not records.empty:
+        rec = records.copy()
+        if "start_date" in rec.columns:
+            rec = rec[rec["start_date"].astype(str) == work_date]
+        elif "work_date" in rec.columns:
+            rec = rec[rec["work_date"].astype(str) == work_date]
+
+        if {"total_hours", "record_count", "active_count"}.issubset(set(rec.columns)):
+            grp = rec[["employee_id", "total_hours", "record_count", "active_count"]].copy()
+        else:
+            if "work_hours" not in rec.columns:
+                rec["work_hours"] = 0
+            rec["work_hours"] = rec["work_hours"].map(_v174_work_hours_to_float).fillna(0)
+            rec["is_active_record"] = rec.get("end_timestamp", pd.Series([""] * len(rec))).fillna("").astype(str).str.strip().eq("") if "end_timestamp" in rec.columns else False
+            grp = rec.groupby("employee_id", dropna=False).agg(
+                total_hours=("work_hours", "sum"),
+                record_count=("employee_id", "size"),
+                active_count=("is_active_record", "sum"),
+            ).reset_index()
+        base_df = emp.merge(grp, on="employee_id", how="left")
+    else:
+        base_df = emp.copy()
+        base_df["total_hours"] = 0
+        base_df["record_count"] = 0
+        base_df["active_count"] = 0
+
+    for _c in ["total_hours", "record_count", "active_count"]:
+        if _c not in base_df.columns:
+            base_df[_c] = 0
+        base_df[_c] = pd.to_numeric(base_df[_c], errors="coerce").fillna(0)
+    if "employee_id" not in base_df.columns:
+        base_df["employee_id"] = ""
+    base_df = base_df.sort_values(["total_hours", "employee_id"], kind="stable").reset_index(drop=True)
+
+    st.session_state[V30033_DAILY_BUNDLE_CACHE_KEY] = {
+        "signature": signature,
+        "created_at": now_mono,
+        "base_df": base_df.copy(),
+    }
+    return base_df
+
+base_df = _v30033_build_daily_base_df(d, _employees_authority_df)
 
 if not base_df.empty:
     base_df["status"] = base_df.apply(
