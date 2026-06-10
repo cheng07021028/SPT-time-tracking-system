@@ -973,6 +973,60 @@ def start_work(employee: dict, work_order: dict, process_name: str, remark: str 
     return int(rid or 0)
 
 
+def _v30045_parallel_average_from_records(
+    records: dict[int, dict[str, Any]],
+    ids: list[int],
+    *,
+    group_end_ts: Any | None = None,
+) -> dict[str, Any]:
+    """Calculate synchronized-work average from earliest start to one group end.
+
+    Site rule V300.45:
+    If multiple synchronous work records are ended/recalculated together, the
+    subtotal written back to every row must be:
+
+        (group end time - earliest start time, minus rest periods) / row count
+
+    It must NOT be the average of each row's own individual duration, otherwise
+    records started later incorrectly receive the same longer subtotal.
+    """
+    clean_ids: list[int] = []
+    starts: list[datetime] = []
+    ends: list[datetime] = []
+    for x in ids or []:
+        rid = _int_or_none(x)
+        if rid is None or rid in clean_ids:
+            continue
+        rec = records.get(int(rid), {})
+        st = _parse_dt(rec.get("start_timestamp"))
+        if st is None:
+            continue
+        clean_ids.append(int(rid))
+        starts.append(st)
+        explicit_end = _parse_dt(group_end_ts) if group_end_ts is not None else None
+        if explicit_end is not None:
+            ends.append(explicit_end)
+        else:
+            et = _parse_dt(rec.get("end_timestamp"))
+            if et is not None:
+                ends.append(et)
+    if not clean_ids or not starts or not ends:
+        return {"ids": clean_ids, "raw_total": 0.0, "net_total": 0.0, "raw_each": 0.0, "net_each": 0.0, "start_ts": "", "end_ts": ""}
+    start_dt = min(starts)
+    end_dt = max(ends)
+    raw_total, net_total = calculate_work_minutes(_fmt_dt(start_dt), _fmt_dt(end_dt))
+    n = max(len(clean_ids), 1)
+    return {
+        "ids": clean_ids,
+        "raw_total": round(raw_total, 2),
+        "net_total": round(net_total, 2),
+        "raw_each": round(raw_total / n, 2),
+        "net_each": round(net_total / n, 2),
+        "start_ts": _fmt_dt(start_dt),
+        "end_ts": _fmt_dt(end_dt),
+    }
+
+
 def finish_work(record_id: int, end_action: str = "完工", remark: str = "", finish_parallel_group: bool = True) -> int:
     _ensure_time_runtime_columns()
     rid = int(record_id)
@@ -983,19 +1037,15 @@ def finish_work(record_id: int, end_action: str = "完工", remark: str = "", fi
     status = END_ACTION_STATUS.get(action, action)
     # Fetch all active records in one lightweight read; all duration/rest/average calculations stay in Python.
     records = _records_by_ids(ids)
-    raw_net: dict[int, tuple[float, float]] = {}
-    for i in ids:
-        rec = records.get(int(i), {})
-        raw_net[i] = calculate_work_minutes(rec.get("start_timestamp"), now)
-    if len(ids) > 1:
-        total_net = sum(v[1] for v in raw_net.values())
-        avg_net = round(total_net / max(len(ids), 1), 2)
-    else:
-        avg_net = None
+    parallel_average = _v30045_parallel_average_from_records(records, ids, group_end_ts=now) if len(ids) > 1 else {}
     ops: list[tuple[str, tuple[Any, ...]]] = []
     for i in ids:
-        raw, net = raw_net.get(i, (0.0, 0.0))
-        final_net = avg_net if avg_net is not None else net
+        if len(ids) > 1:
+            raw = float(parallel_average.get("raw_each") or 0.0)
+            final_net = float(parallel_average.get("net_each") or 0.0)
+        else:
+            rec = records.get(int(i), {})
+            raw, final_net = calculate_work_minutes(rec.get("start_timestamp"), now)
         msg = _text(remark)
         ops.append((
             """
@@ -1010,9 +1060,12 @@ def finish_work(record_id: int, end_action: str = "完工", remark: str = "", fi
         ))
     counts = execute_transaction(ops, mark_changed=True, reason="finish_work", source_sql="finish_work")
     try:
+        detail = f"ids={ids}"
+        if len(ids) > 1:
+            detail += f"; group_start={parallel_average.get('start_ts')}; group_end={parallel_average.get('end_ts')}; group_net={parallel_average.get('net_total')}; average_minutes={parallel_average.get('net_each')}"
         execute(
             "INSERT INTO system_logs(log_time, user_name, action_type, target_table, target_id, message, detail, level) VALUES (?, ?, 'FINISH_WORK', 'time_records', ?, ?, ?, 'INFO')",
-            (now, "SYSTEM", str(rid), f"{action} 工時紀錄", f"ids={ids}"),
+            (now, "SYSTEM", str(rid), f"{action} 工時紀錄", detail),
         )
     except Exception:
         pass
@@ -1233,16 +1286,12 @@ def _sync_parallel_group_after_edit(seed_ids: list[int]) -> int:
     ended_ids = [i for i, rec in records.items() if _text(rec.get("start_timestamp")) and _text(rec.get("end_timestamp"))]
     if len(ended_ids) <= 1:
         return 0
-    nets: dict[int, tuple[float, float]] = {}
-    for i in ended_ids:
-        rec = records.get(i, {})
-        nets[i] = calculate_work_minutes(rec.get("start_timestamp"), rec.get("end_timestamp"))
-    total_net = sum(v[1] for v in nets.values())
-    avg_net = round(total_net / max(len(ended_ids), 1), 2)
+    parallel_average = _v30045_parallel_average_from_records(records, ended_ids)
+    avg_raw = float(parallel_average.get("raw_each") or 0.0)
+    avg_net = float(parallel_average.get("net_each") or 0.0)
     now = now_text()
     ops: list[tuple[str, tuple[Any, ...]]] = []
     for i in ended_ids:
-        raw, _net = nets.get(i, (0.0, 0.0))
         ops.append((
             """
             UPDATE time_records
@@ -1250,13 +1299,18 @@ def _sync_parallel_group_after_edit(seed_ids: list[int]) -> int:
                 updated_at=?, updated_by='system', version=COALESCE(version,1)+1
             WHERE id=? AND (deleted_at IS NULL OR deleted_at='')
             """,
-            (round(raw, 2), avg_net, avg_net, round(avg_net / 60.0, 4), now, i),
+            (round(avg_raw, 2), round(avg_net, 2), round(avg_net, 2), round(avg_net / 60.0, 4), now, i),
         ))
     counts = execute_transaction(ops, mark_changed=True, reason="sync_parallel_group_after_edit", source_sql="sync_parallel_group_after_edit")
     try:
+        detail = (
+            f"ids={ended_ids}; group_start={parallel_average.get('start_ts')}; "
+            f"group_end={parallel_average.get('end_ts')}; group_net={parallel_average.get('net_total')}; "
+            f"average_minutes={avg_net}"
+        )
         execute(
             "INSERT INTO system_logs(log_time, user_name, action_type, target_table, target_id, message, detail, level) VALUES (?, ?, 'SYNC_PARALLEL_GROUP', 'time_records', ?, ?, ?, 'INFO')",
-            (now, "SYSTEM", ",".join(map(str, ended_ids[:50])), f"同步作業平均重算 {len(ended_ids)} 筆", f"ids={ended_ids}; average_minutes={avg_net}"),
+            (now, "SYSTEM", ",".join(map(str, ended_ids[:50])), f"同步作業平均重算 {len(ended_ids)} 筆", detail),
         )
     except Exception:
         pass
@@ -1374,15 +1428,37 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
 
 def recalculate_time_records(record_ids: Iterable[Any]) -> int:
     _ensure_time_runtime_columns()
-    ids = []
+    ids: list[int] = []
     for x in record_ids or []:
         i = _int_or_none(x)
         if i is not None and i > 0 and i not in ids:
-            ids.append(i)
+            ids.append(int(i))
+    if not ids:
+        return 0
+
+    # V300.45: 02 history/admin recalc must use the same synchronized-work rule
+    # as Finish Work.  If any selected row belongs to a parallel group, recalc the
+    # whole ended group as: earliest start -> group end, divided by group count.
+    selected = _load_existing_records_map(ids)
+    grouped_ids: set[int] = set()
+    for rec in selected.values():
+        related = _related_group_ids_from_record(rec)
+        if len(related) <= 1:
+            continue
+        related_records = _load_existing_records_map(related)
+        ended = [i for i, r in related_records.items() if _text(r.get("start_timestamp")) and _text(r.get("end_timestamp"))]
+        if len(ended) > 1:
+            grouped_ids.update(int(i) for i in ended)
+
     count = 0
+    if grouped_ids:
+        count += _sync_parallel_group_after_edit(sorted(grouped_ids))
+
     now = now_text()
     for rid in ids:
-        rec = _safe_one(f"SELECT {_base_cols()} FROM time_records WHERE id=? AND (deleted_at IS NULL OR deleted_at='') LIMIT 1", (rid,))
+        if rid in grouped_ids:
+            continue
+        rec = selected.get(int(rid)) or _safe_one(f"SELECT {_base_cols()} FROM time_records WHERE id=? AND (deleted_at IS NULL OR deleted_at='') LIMIT 1", (rid,))
         if not rec:
             continue
         raw, net = calculate_work_minutes(rec.get("start_timestamp"), rec.get("end_timestamp"))
