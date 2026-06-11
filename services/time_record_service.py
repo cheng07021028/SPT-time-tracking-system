@@ -1528,6 +1528,74 @@ def load_daily_record_summary_sql(work_date: str):
     return _minimal_query(fallback_sql, (f"{d} 00:00:00", f"{next_day} 00:00:00"))
 
 
+def load_daily_record_employee_index_sql(work_date: str):
+    """Return one row per employee who has any 01/02 time record on a date.
+
+    V300.62: 07 missing-list comparison should not load the full 02 history data.
+    This helper performs a single indexed, date-bounded authority-table read and
+    returns only employee_id/count/last time.  The actual missing-list comparison
+    is performed by 07 in pandas/session state.
+    """
+    _ensure_time_runtime_columns()
+    d = _text(work_date)[:10]
+    cols = ["employee_id", "employee_name", "today_record_count", "last_start_time"]
+    if not d:
+        return pd.DataFrame(columns=cols)
+
+    def _employee_index_query(sql: str, params: tuple[Any, ...]) -> pd.DataFrame:
+        try:
+            df = query_df(sql, params)
+            if isinstance(df, pd.DataFrame):
+                work = df.where(pd.notna(df), "").reset_index(drop=True)
+                for c in cols:
+                    if c not in work.columns:
+                        work[c] = 0 if c == "today_record_count" else ""
+                work["employee_id"] = work["employee_id"].fillna("").astype(str).str.strip()
+                work = work[work["employee_id"] != ""].copy()
+                work["today_record_count"] = pd.to_numeric(work["today_record_count"], errors="coerce").fillna(0).astype(int)
+                return work[cols]
+        except Exception:
+            pass
+        return pd.DataFrame(columns=cols)
+
+    sql = f"""
+        SELECT
+            employee_id,
+            MAX(employee_name) AS employee_name,
+            COUNT(*) AS today_record_count,
+            MAX(COALESCE(NULLIF(start_timestamp,''), NULLIF(end_timestamp,''), NULLIF(start_date || ' ' || start_time, ' '), start_date)) AS last_start_time
+        FROM time_records
+        WHERE {_not_deleted_predicate()}
+          AND employee_id IS NOT NULL
+          AND employee_id <> ''
+          AND start_date = ?
+        GROUP BY employee_id
+        ORDER BY employee_id
+    """
+    df = _employee_index_query(sql, (d,))
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        return df
+
+    next_day = _today_end_text(d)
+    fallback_sql = f"""
+        SELECT
+            employee_id,
+            MAX(employee_name) AS employee_name,
+            COUNT(*) AS today_record_count,
+            MAX(COALESCE(NULLIF(start_timestamp,''), NULLIF(end_timestamp,''))) AS last_start_time
+        FROM time_records
+        WHERE {_not_deleted_predicate()}
+          AND employee_id IS NOT NULL
+          AND employee_id <> ''
+          AND COALESCE(start_date,'')=''
+          AND start_timestamp >= ?
+          AND start_timestamp < ?
+        GROUP BY employee_id
+        ORDER BY employee_id
+    """
+    return _employee_index_query(fallback_sql, (f"{d} 00:00:00", f"{next_day} 00:00:00"))
+
+
 def audit_v63_time_record_runtime_consolidated() -> dict[str, Any]:
     return {
         "version": "V63_TIME_RECORD_RUNTIME_CONSOLIDATED",

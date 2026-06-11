@@ -22,6 +22,10 @@ from services.theme_service import apply_theme, render_header
 from services.security_service import require_module_access, check_permission
 from services.crud_table_service import load_employees, save_employees
 from services.time_record_service import load_records, load_daily_record_summary_sql
+try:
+    from services.time_record_service import load_daily_record_employee_index_sql
+except Exception:  # pragma: no cover
+    load_daily_record_employee_index_sql = None
 from services.table_ui_service import render_table
 try:
     from services.table_ui_service import render_width_settings, apply_column_order, load_widths
@@ -111,6 +115,12 @@ V30032_DAILY_EXCEL_SIG_KEY = "v30032_daily_attendance_excel_sig"
 # - 舊版全量 records payload 優先用 SQL jsonb 只取指定日期，避免整包 JSON 下載/解析。
 # - 未紀錄名單改用 08 共用的輕量每日工時 SQL，不再呼叫 load_records() 讀完整欄位。
 V30055_DAILY_LOAD_MESSAGE_KEY = "v30055_07_daily_load_message"
+
+# V300.62：07 未紀錄比對只從 01/02 time_records 權威表取「單日員工索引」。
+# Neon 僅做一個小型 indexed read；員工出勤名單與工時索引的 merge/count 在前台 session 內完成，
+# 避免讀取 02 歷史紀錄整表，也不影響 01 工時紀錄熱路徑。
+V30062_TIME_INDEX_CACHE_KEY = "v30062_07_time_record_employee_index_cache"
+V30062_TIME_INDEX_TTL_SECONDS = 120
 
 DAILY_COLS = [
     "record_id",
@@ -794,7 +804,7 @@ def _save_daily_editor_df(editor_df: pd.DataFrame, target_date: str) -> dict[str
     return {"saved": len(final_today_rows), "deleted": len(deleted_rows), "total": len(final_today_rows), "rows": final_today_rows}
 
 
-def _build_missing_from_daily_attendance(att_df: pd.DataFrame, target_date: str) -> pd.DataFrame:
+def _build_missing_from_daily_attendance(att_df: pd.DataFrame, target_date: str, *, force_refresh: bool = False) -> pd.DataFrame:
     if att_df is None or att_df.empty:
         return pd.DataFrame(columns=[
             "employee_id", "employee_name", "department", "title", "attendance_status",
@@ -811,21 +821,12 @@ def _build_missing_from_daily_attendance(att_df: pd.DataFrame, target_date: str)
         att["last_start_time"] = ""
         att["today_record_count"] = 0
         return att[["employee_id", "employee_name", "department", "title", "attendance_status", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]]
-    rec = _v30055_load_time_records_summary_for_date(target_date)
-    if rec is None or not isinstance(rec, pd.DataFrame) or rec.empty or "employee_id" not in rec.columns:
+    time_idx = _v30062_load_time_record_employee_index_for_missing(target_date, force_refresh=force_refresh)
+    if time_idx is None or not isinstance(time_idx, pd.DataFrame) or time_idx.empty or "employee_id" not in time_idx.columns:
         att["last_start_time"] = ""
         att["today_record_count"] = 0
         return att[["employee_id", "employee_name", "department", "title", "attendance_status", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]].sort_values("employee_id")
-    rec = _v30060_prepare_time_record_summary_for_missing(rec, target_date)
-    if rec.empty:
-        att["last_start_time"] = ""
-        att["today_record_count"] = 0
-        return att[["employee_id", "employee_name", "department", "title", "attendance_status", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]].sort_values("employee_id")
-    grp = rec.groupby("employee_id", dropna=False).agg(
-        last_start_time=("start_timestamp", "max"),
-        today_record_count=("employee_id", "size"),
-    ).reset_index()
-    out = att.merge(grp, on="employee_id", how="left")
+    out = att.merge(time_idx[["employee_id", "last_start_time", "today_record_count"]], on="employee_id", how="left")
     out["today_record_count"] = pd.to_numeric(out["today_record_count"], errors="coerce").fillna(0).astype(int)
     out["last_start_time"] = out["last_start_time"].fillna("").astype(str)
     out = out[out["today_record_count"] == 0].copy()
@@ -1042,7 +1043,80 @@ def _v30060_prepare_time_record_summary_for_missing(rec: pd.DataFrame, target_da
     return out
 
 
-def _build_missing_today_df(employee_df: pd.DataFrame, target_date: str) -> pd.DataFrame:
+def _v30062_normalize_time_record_employee_index(raw: pd.DataFrame, target_date: str) -> pd.DataFrame:
+    """Return one row per employee who has a 01/02 time record on target_date."""
+    cols = ["employee_id", "employee_name", "today_record_count", "last_start_time"]
+    if raw is None or not isinstance(raw, pd.DataFrame) or raw.empty:
+        return pd.DataFrame(columns=cols)
+    work = raw.copy()
+    if "employee_id" not in work.columns:
+        return pd.DataFrame(columns=cols)
+    work["employee_id"] = work["employee_id"].fillna("").astype(str).str.strip()
+    work = work[work["employee_id"] != ""].copy()
+    if work.empty:
+        return pd.DataFrame(columns=cols)
+
+    if "today_record_count" in work.columns:
+        if "last_start_time" not in work.columns:
+            if "start_timestamp" in work.columns:
+                work["last_start_time"] = work["start_timestamp"]
+            elif "end_timestamp" in work.columns:
+                work["last_start_time"] = work["end_timestamp"]
+            else:
+                work["last_start_time"] = ""
+        if "employee_name" not in work.columns:
+            work["employee_name"] = ""
+        out = work[cols].copy()
+        out["today_record_count"] = pd.to_numeric(out["today_record_count"], errors="coerce").fillna(0).astype(int)
+        out["last_start_time"] = out["last_start_time"].fillna("").astype(str)
+        out["employee_name"] = out["employee_name"].fillna("").astype(str)
+        out = out[out["today_record_count"] > 0].copy()
+        return out.drop_duplicates(subset=["employee_id"], keep="last").sort_values("employee_id")
+
+    prepared = _v30060_prepare_time_record_summary_for_missing(work, target_date)
+    if prepared.empty:
+        return pd.DataFrame(columns=cols)
+    if "employee_name" not in prepared.columns:
+        prepared["employee_name"] = ""
+    grp = prepared.groupby("employee_id", dropna=False).agg(
+        employee_name=("employee_name", "last"),
+        today_record_count=("employee_id", "size"),
+        last_start_time=("start_timestamp", "max"),
+    ).reset_index()
+    grp["today_record_count"] = pd.to_numeric(grp["today_record_count"], errors="coerce").fillna(0).astype(int)
+    grp["last_start_time"] = grp["last_start_time"].fillna("").astype(str)
+    return grp[cols].sort_values("employee_id")
+
+
+def _v30062_load_time_record_employee_index_for_missing(target_date: str, *, force_refresh: bool = False) -> pd.DataFrame:
+    """Load the single-day 01/02 employee index used by 07 missing-list comparison.
+
+    This intentionally does not load the 02 history table/page data.  Neon only receives
+    a small indexed query for one date; the missing-list merge is done locally in pandas.
+    """
+    d = _date_to_text(target_date)
+    now_ts = datetime.now().timestamp()
+    cache = st.session_state.get(V30062_TIME_INDEX_CACHE_KEY, {})
+    if not force_refresh and isinstance(cache, dict) and cache.get("date") == d:
+        age = now_ts - float(cache.get("ts", 0) or 0)
+        cached_df = cache.get("df")
+        if age <= V30062_TIME_INDEX_TTL_SECONDS and isinstance(cached_df, pd.DataFrame):
+            return cached_df.copy()
+
+    raw = pd.DataFrame()
+    if load_daily_record_employee_index_sql is not None:
+        try:
+            raw = load_daily_record_employee_index_sql(d)
+        except Exception:
+            raw = pd.DataFrame()
+    if raw is None or not isinstance(raw, pd.DataFrame) or raw.empty:
+        raw = _v30055_load_time_records_summary_for_date(d)
+    out = _v30062_normalize_time_record_employee_index(raw, d)
+    st.session_state[V30062_TIME_INDEX_CACHE_KEY] = {"date": d, "ts": now_ts, "df": out.copy()}
+    return out
+
+
+def _build_missing_today_df(employee_df: pd.DataFrame, target_date: str, *, force_refresh: bool = False) -> pd.DataFrame:
     # V65：今日未紀錄名單改用 04 人員權威檔 + 02/01 工時權威檔即時計算。
     # 不再查 SQLite employees 快取，避免 Reboot / GitHub 永久檔已更新但 SQLite 快取未同步，造成缺勤人數誤顯示 0。
     emp = ensure_cols(employee_df)
@@ -1063,23 +1137,13 @@ def _build_missing_today_df(employee_df: pd.DataFrame, target_date: str) -> pd.D
         out["today_record_count"] = 0
         return out[["employee_id", "employee_name", "department", "title", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]]
 
-    rec = _v30055_load_time_records_summary_for_date(target_date)
-    if rec is None or not isinstance(rec, pd.DataFrame) or rec.empty or "employee_id" not in rec.columns:
+    time_idx = _v30062_load_time_record_employee_index_for_missing(target_date, force_refresh=force_refresh)
+    if time_idx is None or not isinstance(time_idx, pd.DataFrame) or time_idx.empty or "employee_id" not in time_idx.columns:
         emp["last_start_time"] = ""
         emp["today_record_count"] = 0
         return emp[["employee_id", "employee_name", "department", "title", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]].sort_values("employee_id")
 
-    rec = _v30060_prepare_time_record_summary_for_missing(rec, target_date)
-    if rec.empty:
-        emp["last_start_time"] = ""
-        emp["today_record_count"] = 0
-        return emp[["employee_id", "employee_name", "department", "title", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]].sort_values("employee_id")
-
-    grp = rec.groupby("employee_id", dropna=False).agg(
-        last_start_time=("start_timestamp", "max"),
-        today_record_count=("employee_id", "size"),
-    ).reset_index()
-    out = emp.merge(grp, on="employee_id", how="left")
+    out = emp.merge(time_idx[["employee_id", "last_start_time", "today_record_count"]], on="employee_id", how="left")
     out["today_record_count"] = pd.to_numeric(out["today_record_count"], errors="coerce").fillna(0).astype(int)
     out["last_start_time"] = out["last_start_time"].fillna("").astype(str)
     out = out[out["today_record_count"] == 0].copy()
@@ -1311,7 +1375,7 @@ if mt1.button("重新計算今日未紀錄 / Refresh Missing Today", use_contain
         st.session_state.pop(MISSING_TODAY_ERROR_KEY, None)
         with st.spinner("正在重新計算今日未紀錄名單 / Recalculating missing today..."):
             current_attendance_df = _current_internal_df() if STATE_KEY in st.session_state else ensure_cols(load_employees())
-            missing_today_df = _build_missing_today_df(current_attendance_df, today)
+            missing_today_df = _build_missing_today_df(current_attendance_df, today, force_refresh=True)
         st.session_state[MISSING_TODAY_DF_KEY] = missing_today_df
         st.session_state[MISSING_TODAY_LOADED_KEY] = True
         st.session_state[MISSING_TODAY_TS_KEY] = today
@@ -1332,7 +1396,7 @@ if _err:
 
 df = st.session_state.get(MISSING_TODAY_DF_KEY, pd.DataFrame()) if st.session_state.get(MISSING_TODAY_LOADED_KEY, False) else pd.DataFrame()
 st.metric("今日未紀錄人數 / Missing Records", f"{len(df):,}")
-st.caption("V300.60：今日未紀錄名單只在按下『重新計算今日未紀錄』後查詢；人數 = 啟用 + 在廠 + 今日出勤人員中，今日 01/02 工時紀錄筆數為 0 的人數。")
+st.caption("V300.62：未紀錄比對以當日出勤名單對照 01/02 工時權威表的單日員工索引；Neon 只做小型 indexed read，merge/count 在前台 session 內完成。")
 if st.session_state.get(MISSING_TODAY_LOADED_KEY, False):
     render_table(df, "missing_today_v202", editable=False, height=460)
 else:
