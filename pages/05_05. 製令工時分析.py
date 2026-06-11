@@ -17,6 +17,10 @@ from services.duration_service import hours_to_hms
 from services.timezone_service import today_date
 from services.analysis_filter_service import load_analysis_filters, save_analysis_filters
 from services.master_data_service import load_work_orders, load_employees
+try:
+    from services.large_table_query_service import load_history_filter_options_sql
+except Exception:
+    load_history_filter_options_sql = None
 
 st.set_page_config(page_title="05. 製令工時分析", page_icon="📊", layout="wide")
 apply_theme()
@@ -36,6 +40,7 @@ V69_DF_KEY = "_spt_v69_05_base_df"
 V69_FILTER_SIG_KEY = "_spt_v69_05_filter_signature"
 V30030_SUMMARY_CACHE_KEY = "_spt_v30030_05_summary_bundle"
 V30030_EXCEL_CACHE_PREFIX = "_spt_v30030_05_excel_"
+V30071_FILTER_OPTIONS_CACHE_KEY = "_spt_v30071_05_filter_options_cache"
 if FILTER_KEY not in st.session_state:
     st.session_state[FILTER_KEY] = load_analysis_filters()
 filters = dict(st.session_state[FILTER_KEY])
@@ -119,6 +124,112 @@ def _safe_unique(df: pd.DataFrame, col: str, selected: list[str] | None = None) 
         if x and x not in vals:
             vals.append(x)
     return vals
+
+
+def _v30071_clean_option(value) -> str:
+    text = str(value or "").strip()
+    return "" if text.lower() in {"none", "nan", "nat", "null"} else text
+
+
+def _v30071_merge_options(*sources) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for src in sources:
+        if src is None:
+            continue
+        if isinstance(src, pd.Series):
+            values = src.dropna().tolist()
+        elif isinstance(src, (list, tuple, set)):
+            values = list(src)
+        else:
+            values = [src]
+        for value in values:
+            text = _v30071_clean_option(value)
+            if text and text not in seen:
+                out.append(text)
+                seen.add(text)
+    return sorted(out)
+
+
+def _v30071_filter_selected(filters_map: dict, key: str) -> list[str]:
+    value = (filters_map or {}).get(key, [])
+    if isinstance(value, str):
+        return [value] if value.strip() else []
+    if isinstance(value, (list, tuple, set)):
+        return [str(x).strip() for x in value if str(x).strip()]
+    return []
+
+
+def _v30071_df_options(df: pd.DataFrame, col: str) -> list[str]:
+    if isinstance(df, pd.DataFrame) and not df.empty and col in df.columns:
+        return _v30071_merge_options(df[col])
+    return []
+
+
+def _v30071_load_analysis_filter_options_cached(start_value, end_value, filters_map: dict, last_df: pd.DataFrame | None = None) -> dict[str, list[str]]:
+    """Load 05 filter options without scanning full 02 history records.
+
+    V69 stopped loading time_records on page open for speed, but the filter
+    option widgets still depended on base_df.  The result was many empty
+    multiselects.  This helper keeps the fast page-open behavior: small master
+    tables provide master options, and a date-bounded DISTINCT query supplies
+    time-record-only fields such as process/status.
+    """
+    key = (str(start_value or ""), str(end_value or ""))
+    cache = st.session_state.get(V30071_FILTER_OPTIONS_CACHE_KEY)
+    if isinstance(cache, dict) and cache.get("key") == key and isinstance(cache.get("options"), dict):
+        base_options = {str(k): list(v or []) for k, v in cache.get("options", {}).items()}
+    else:
+        base_options: dict[str, list[str]] = {
+            "work_order": [], "part_no": [], "type_name": [], "customer": [], "assembly_location": [],
+            "process_name": [], "employee_id": [], "employee_name": [], "department": [], "title": [], "status": [],
+        }
+        try:
+            wo = load_work_orders(active_only=False)
+            if isinstance(wo, pd.DataFrame) and not wo.empty:
+                base_options["work_order"] = _v30071_merge_options(base_options["work_order"], _v30071_df_options(wo, "work_order"))
+                base_options["part_no"] = _v30071_merge_options(base_options["part_no"], _v30071_df_options(wo, "part_no"))
+                base_options["type_name"] = _v30071_merge_options(base_options["type_name"], _v30071_df_options(wo, "type_name"))
+                base_options["customer"] = _v30071_merge_options(base_options["customer"], _v30071_df_options(wo, "customer"))
+                base_options["assembly_location"] = _v30071_merge_options(base_options["assembly_location"], _v30071_df_options(wo, "assembly_location"))
+        except Exception:
+            pass
+        try:
+            emp = load_employees(active_only=False)
+            if isinstance(emp, pd.DataFrame) and not emp.empty:
+                base_options["employee_id"] = _v30071_merge_options(base_options["employee_id"], _v30071_df_options(emp, "employee_id"))
+                base_options["employee_name"] = _v30071_merge_options(base_options["employee_name"], _v30071_df_options(emp, "employee_name"))
+                base_options["department"] = _v30071_merge_options(base_options["department"], _v30071_df_options(emp, "department"))
+                base_options["title"] = _v30071_merge_options(base_options["title"], _v30071_df_options(emp, "title"))
+        except Exception:
+            pass
+        if callable(load_history_filter_options_sql):
+            try:
+                time_opts = load_history_filter_options_sql(start_value, end_value, limit_per_column=5000)
+                if isinstance(time_opts, dict):
+                    for col in ["work_order", "part_no", "type_name", "assembly_location", "process_name", "employee_id", "employee_name", "status"]:
+                        base_options[col] = _v30071_merge_options(base_options.get(col, []), time_opts.get(col, []))
+            except Exception:
+                pass
+        base_options["status"] = _v30071_merge_options(base_options.get("status", []), [x for x in STATUS_OPTIONS if x != "全部"])
+        st.session_state[V30071_FILTER_OPTIONS_CACHE_KEY] = {"key": key, "options": dict(base_options)}
+
+    # Always merge current saved selections and the last queried df so defaults
+    # remain selectable even if the date range changed or master data is partial.
+    option_map = dict(base_options)
+    selected_key_map = {
+        "work_order": "work_orders", "part_no": "part_nos", "type_name": "type_names", "customer": "customers",
+        "assembly_location": "assembly_locations", "process_name": "process_names", "employee_id": "employee_ids",
+        "employee_name": "employee_names", "department": "departments", "title": "titles",
+    }
+    for col, filter_key in selected_key_map.items():
+        option_map[col] = _v30071_merge_options(option_map.get(col, []), _v30071_df_options(last_df, col), _v30071_filter_selected(filters_map, filter_key))
+    option_map["status"] = _v30071_merge_options(option_map.get("status", []), _v30071_df_options(last_df, "status"), [str((filters_map or {}).get("status_filter") or "")])
+    return option_map
+
+
+def _v30071_options(options_map: dict[str, list[str]], col: str, selected: list[str] | None = None) -> list[str]:
+    return _v30071_merge_options(options_map.get(col, []), selected or [])
 
 
 def _clean_filter_list(values) -> list[str]:
@@ -507,11 +618,13 @@ def _v30030_build_analysis_bundle(source_df: pd.DataFrame, filters: dict) -> dic
 
 start_saved = _parse_date(filters.get("start_date"), today_date() - timedelta(days=30))
 end_saved = _parse_date(filters.get("end_date"), today_date())
-# V69: do not query time_records just to open the analysis page or render filter widgets.
-# Reuse the last queried dataframe for option lists; otherwise keep options empty except saved selections.
+# V69: do not query time_records detail rows just to open the analysis page.
+# V300.71: still preload lightweight filter option lists from master data and
+# date-bounded SQL DISTINCT so multiselects are usable without full history scans.
 base_df = st.session_state.get(V69_DF_KEY, pd.DataFrame())
 if not isinstance(base_df, pd.DataFrame):
     base_df = pd.DataFrame()
+analysis_option_values = _v30071_load_analysis_filter_options_cached(start_saved, end_saved, filters, base_df)
 
 with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=True):
     st.caption("所有條件按「套用篩選」後才重新運算，避免每點一下就卡頓；條件會永久記錄。")
@@ -523,20 +636,20 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
         top_n = r1c4.selectbox("Top N", TOP_OPTIONS, index=TOP_OPTIONS.index(filters.get("top_n", "Top 20")) if filters.get("top_n", "Top 20") in TOP_OPTIONS else 1)
 
         r2c1, r2c2, r2c3, r2c4 = st.columns(4)
-        selected_wo = r2c1.multiselect("製令 / Work Order", _safe_unique(base_df, "work_order", filters.get("work_orders")), default=filters.get("work_orders", []))
-        selected_pn = r2c2.multiselect("P/N", _safe_unique(base_df, "part_no", filters.get("part_nos")), default=filters.get("part_nos", []))
-        selected_type = r2c3.multiselect("機型 / Type", _safe_unique(base_df, "type_name", filters.get("type_names")), default=filters.get("type_names", []))
-        selected_customer = r2c4.multiselect("客戶 / Customer", _safe_unique(base_df, "customer", filters.get("customers")), default=filters.get("customers", []))
+        selected_wo = r2c1.multiselect("製令 / Work Order", _v30071_options(analysis_option_values, "work_order", filters.get("work_orders")), default=filters.get("work_orders", []))
+        selected_pn = r2c2.multiselect("P/N", _v30071_options(analysis_option_values, "part_no", filters.get("part_nos")), default=filters.get("part_nos", []))
+        selected_type = r2c3.multiselect("機型 / Type", _v30071_options(analysis_option_values, "type_name", filters.get("type_names")), default=filters.get("type_names", []))
+        selected_customer = r2c4.multiselect("客戶 / Customer", _v30071_options(analysis_option_values, "customer", filters.get("customers")), default=filters.get("customers", []))
 
         r3c1, r3c2, r3c3, r3c4 = st.columns(4)
-        selected_loc = r3c1.multiselect("組立地點 / Assembly", _safe_unique(base_df, "assembly_location", filters.get("assembly_locations")), default=filters.get("assembly_locations", []))
-        selected_process = r3c2.multiselect("工段名稱 / Process", _safe_unique(base_df, "process_name", filters.get("process_names")), default=filters.get("process_names", []))
-        selected_emp_id = r3c3.multiselect("工號 / Employee ID", _safe_unique(base_df, "employee_id", filters.get("employee_ids")), default=filters.get("employee_ids", []))
-        selected_emp_name = r3c4.multiselect("姓名 / Name", _safe_unique(base_df, "employee_name", filters.get("employee_names")), default=filters.get("employee_names", []))
+        selected_loc = r3c1.multiselect("組立地點 / Assembly", _v30071_options(analysis_option_values, "assembly_location", filters.get("assembly_locations")), default=filters.get("assembly_locations", []))
+        selected_process = r3c2.multiselect("工段名稱 / Process", _v30071_options(analysis_option_values, "process_name", filters.get("process_names")), default=filters.get("process_names", []))
+        selected_emp_id = r3c3.multiselect("工號 / Employee ID", _v30071_options(analysis_option_values, "employee_id", filters.get("employee_ids")), default=filters.get("employee_ids", []))
+        selected_emp_name = r3c4.multiselect("姓名 / Name", _v30071_options(analysis_option_values, "employee_name", filters.get("employee_names")), default=filters.get("employee_names", []))
 
         r4c1, r4c2, r4c3, r4c4 = st.columns(4)
-        selected_dept = r4c1.multiselect("單位 / Department", _safe_unique(base_df, "department", filters.get("departments")), default=filters.get("departments", []))
-        selected_title = r4c2.multiselect("職稱 / Title", _safe_unique(base_df, "title", filters.get("titles")), default=filters.get("titles", []))
+        selected_dept = r4c1.multiselect("單位 / Department", _v30071_options(analysis_option_values, "department", filters.get("departments")), default=filters.get("departments", []))
+        selected_title = r4c2.multiselect("職稱 / Title", _v30071_options(analysis_option_values, "title", filters.get("titles")), default=filters.get("titles", []))
         status_filter = r4c3.selectbox("狀態 / Status", STATUS_OPTIONS, index=STATUS_OPTIONS.index(filters.get("status_filter", "全部")) if filters.get("status_filter", "全部") in STATUS_OPTIONS else 0)
         anomaly_filter = r4c4.selectbox("異常篩選 / Exception", ANOMALY_OPTIONS, index=ANOMALY_OPTIONS.index(filters.get("anomaly_filter", "全部")) if filters.get("anomaly_filter", "全部") in ANOMALY_OPTIONS else 0)
 

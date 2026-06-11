@@ -19,6 +19,19 @@ except Exception:
             st.caption(subtitle)
 
 from services.crud_table_service import load_work_orders, save_work_orders, get_conn, ensure_tables, now_text
+try:
+    from services.table_ui_service import apply_column_order, load_widths, load_column_order, save_widths, save_column_order
+except Exception:
+    def apply_column_order(table_key, df):
+        return df
+    def load_widths(table_key):
+        return {}
+    def load_column_order(table_key):
+        return []
+    def save_widths(table_key, widths):
+        return None
+    def save_column_order(table_key, order):
+        return None
 
 try:
     from services.work_order_sync_settings_service import (
@@ -73,6 +86,153 @@ DISPLAY_COLUMNS = {
 }
 DISPLAY_TO_INTERNAL = {v: k for k, v in DISPLAY_COLUMNS.items()}
 EDITOR_COLS = [DISPLAY_COLUMNS[c] for c in COLS]
+V30067_WORK_ORDER_TABLE_KEY = "03_work_order_editor_main_v30067"
+
+def _v30067_width(table_key: str, col: str, default: str = "medium"):
+    try:
+        widths = load_widths(table_key)
+        raw = widths.get(str(col), default) if isinstance(widths, dict) else default
+        if isinstance(raw, (int, float)):
+            return max(60, min(700, int(raw)))
+        val = str(raw or default).strip()
+        if val in {"small", "medium", "large"}:
+            return val
+        if val.replace(".", "", 1).isdigit():
+            return max(60, min(700, int(float(val))))
+        return default
+    except Exception:
+        return default
+
+
+def _v30071_safe_widget_part(text: str) -> str:
+    return re.sub(r"[^0-9A-Za-z_\u4e00-\u9fff]+", "_", str(text or "table")).strip("_") or "table"
+
+
+def _v30071_current_column_order(table_key: str, df: pd.DataFrame) -> list[str]:
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return []
+    current = [str(c) for c in df.columns]
+    current_set = set(current)
+    try:
+        saved = [str(c) for c in (load_column_order(table_key) or [])]
+    except Exception:
+        saved = []
+    out: list[str] = []
+    seen: set[str] = set()
+    for col in saved:
+        if col in current_set and col not in seen:
+            out.append(col)
+            seen.add(col)
+    for col in current:
+        if col not in seen:
+            out.append(col)
+            seen.add(col)
+    return out
+
+
+def _v30071_render_work_order_column_settings(table_key: str, df: pd.DataFrame, title: str) -> None:
+    """03 page-local column settings using the same lightweight style as 02 History.
+
+    The old 03 panel rendered every column as width/order number inputs immediately.
+    This version keeps only one page-owned panel, shows a lightweight header by
+    default, and builds the editor only after the user explicitly opens it.
+    """
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return
+    safe_key = _v30071_safe_widget_part(table_key)
+    current_cols = [str(c) for c in df.columns]
+    with st.expander(title, expanded=False):
+        st.caption("此區只管理 03 製令清單表格的欄位順序與欄寬；不會修改製令資料。只有按下『套用並永久儲存欄位設定』才會寫入。")
+        open_editor = st.checkbox(
+            "開啟欄位設定編輯器 / Open column settings editor",
+            value=False,
+            key=f"v30071_work_order_column_settings_open_{safe_key}",
+        )
+        if not open_editor:
+            st.caption(f"目前表格共有 {len(current_cols)} 個欄位。為避免每次開啟製令管理都重建欄位設定編輯器，請需要調整時再開啟。")
+            return
+
+        try:
+            widths = {str(k): int(float(v)) for k, v in (load_widths(table_key) or {}).items() if str(k) in current_cols}
+        except Exception:
+            widths = {}
+        ordered = _v30071_current_column_order(table_key, df) or current_cols
+        settings_rows = []
+        for col in ordered:
+            if col in current_cols:
+                settings_rows.append({"欄位 / Column": col, "欄寬 / Width": int(widths.get(col, 140))})
+        if not settings_rows:
+            settings_rows = [{"欄位 / Column": c, "欄寬 / Width": int(widths.get(c, 140))} for c in current_cols]
+
+        with st.form(f"v30071_work_order_column_settings_form_{safe_key}", clear_on_submit=False):
+            order_text = st.text_area(
+                "欄位順序 / Column order（每行一個欄位；上方越前面越靠左）",
+                value="\n".join([str(r["欄位 / Column"]) for r in settings_rows]),
+                height=190,
+                key=f"v30071_work_order_column_order_text_{safe_key}",
+            )
+            try:
+                width_df = st.data_editor(
+                    pd.DataFrame(settings_rows),
+                    use_container_width=True,
+                    hide_index=True,
+                    num_rows="fixed",
+                    key=f"v30071_work_order_width_editor_{safe_key}",
+                    column_config={
+                        "欄位 / Column": st.column_config.Column("欄位 / Column"),
+                        "欄寬 / Width": st.column_config.NumberColumn("欄寬 / Width", min_value=60, max_value=700, step=10),
+                    },
+                    disabled=["欄位 / Column"],
+                    height=260,
+                )
+            except Exception:
+                width_df = pd.DataFrame(settings_rows)
+                st.caption("欄寬表格暫時無法載入，將沿用目前欄寬。")
+            b1, b2 = st.columns([1.5, 1])
+            apply_settings = b1.form_submit_button("✅ 套用並永久儲存欄位設定 / Apply & Save", type="primary", use_container_width=True)
+            reset_settings = b2.form_submit_button("↺ 恢復預設順序 / Reset order", use_container_width=True)
+
+        if apply_settings:
+            raw_order = [x.strip() for x in str(order_text or "").splitlines() if x.strip()]
+            seen: set[str] = set()
+            clean_order: list[str] = []
+            for col in raw_order:
+                if col in current_cols and col not in seen:
+                    clean_order.append(col)
+                    seen.add(col)
+            for col in current_cols:
+                if col not in seen:
+                    clean_order.append(col)
+                    seen.add(col)
+            clean_widths: dict[str, int] = {}
+            try:
+                for _, row in width_df.iterrows():
+                    col = str(row.get("欄位 / Column", "")).strip()
+                    if col not in current_cols:
+                        continue
+                    try:
+                        width = int(float(row.get("欄寬 / Width", 140)))
+                    except Exception:
+                        width = 140
+                    clean_widths[col] = max(60, min(700, width))
+            except Exception:
+                clean_widths = {c: int(widths.get(c, 140)) for c in current_cols}
+            try:
+                save_widths(table_key, clean_widths)
+                save_column_order(table_key, clean_order)
+                st.success("03 製令清單欄位設定已套用並永久儲存。")
+                rerun()
+            except Exception as exc:
+                st.error(f"欄位設定儲存失敗：{exc}")
+        elif reset_settings:
+            try:
+                save_column_order(table_key, current_cols)
+                save_widths(table_key, {c: int(widths.get(c, 140)) for c in current_cols})
+                st.success("已恢復 03 製令清單預設欄位順序。")
+                rerun()
+            except Exception as exc:
+                st.error(f"恢復預設失敗：{exc}")
+
 BOOL_INTERNAL_COLS = ["_delete", "is_active"]
 BOOL_DISPLAY_COLS = [DISPLAY_COLUMNS[c] for c in BOOL_INTERNAL_COLS]
 
@@ -148,6 +308,23 @@ def _to_editor_df(df: pd.DataFrame) -> pd.DataFrame:
 
 def _from_editor_df(df: pd.DataFrame) -> pd.DataFrame:
     return ensure_cols(df)
+
+
+def _v30067_work_order_column_config(table_key: str) -> dict:
+    """03 page-owned column configuration tied to the page-local Column Settings panel."""
+    return {
+        DISPLAY_COLUMNS["_delete"]: st.column_config.CheckboxColumn("刪除 / Delete", width=_v30067_width(table_key, DISPLAY_COLUMNS["_delete"], "medium")),
+        DISPLAY_COLUMNS["id"]: st.column_config.NumberColumn("ID / ID", disabled=True, width=_v30067_width(table_key, DISPLAY_COLUMNS["id"], "small")),
+        DISPLAY_COLUMNS["work_order"]: st.column_config.TextColumn("製令 / Work Order", required=True, width=_v30067_width(table_key, DISPLAY_COLUMNS["work_order"], "medium")),
+        DISPLAY_COLUMNS["part_no"]: st.column_config.TextColumn("P/N / Part No.", width=_v30067_width(table_key, DISPLAY_COLUMNS["part_no"], "medium")),
+        DISPLAY_COLUMNS["type_name"]: st.column_config.TextColumn("機型 / Type", width=_v30067_width(table_key, DISPLAY_COLUMNS["type_name"], "large")),
+        DISPLAY_COLUMNS["assembly_location"]: st.column_config.TextColumn("組立地點 / Assembly Location", width=_v30067_width(table_key, DISPLAY_COLUMNS["assembly_location"], "medium")),
+        DISPLAY_COLUMNS["customer"]: st.column_config.TextColumn("客戶 / Customer", width=_v30067_width(table_key, DISPLAY_COLUMNS["customer"], "medium")),
+        DISPLAY_COLUMNS["note"]: st.column_config.TextColumn("備註 / Note", width=_v30067_width(table_key, DISPLAY_COLUMNS["note"], "large")),
+        DISPLAY_COLUMNS["is_active"]: st.column_config.CheckboxColumn("啟用 / Active", width=_v30067_width(table_key, DISPLAY_COLUMNS["is_active"], "medium")),
+        DISPLAY_COLUMNS["created_at"]: st.column_config.TextColumn("建立時間 / Created At", disabled=True, width=_v30067_width(table_key, DISPLAY_COLUMNS["created_at"], "medium")),
+        DISPLAY_COLUMNS["updated_at"]: st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width=_v30067_width(table_key, DISPLAY_COLUMNS["updated_at"], "medium")),
+    }
 
 
 def _commit_current_editor_widget_state() -> None:
@@ -740,13 +917,24 @@ with tab1:
         _commit_current_editor_widget_state()
         st.session_state[STATE_KEY] = _current_internal_df()
     editor_df = _to_editor_df(st.session_state[STATE_KEY])
+    editor_df = apply_column_order(V30067_WORK_ORDER_TABLE_KEY, editor_df)
+    _v30071_render_work_order_column_settings(V30067_WORK_ORDER_TABLE_KEY, editor_df, title="▤ 03 製令清單欄位設定 / Work Order Column Settings")
     submitted_work_orders = False
     edited = None
     if not work_order_edit_enabled:
-        st.dataframe(editor_df, hide_index=True, use_container_width=True, height=560, column_order=EDITOR_COLS)
+        st.dataframe(
+            editor_df,
+            hide_index=True,
+            use_container_width=True,
+            height=560,
+            key="v30067_work_order_readonly_preview",
+            column_order=[c for c in EDITOR_COLS if c in editor_df.columns],
+            column_config=_v30067_work_order_column_config(V30067_WORK_ORDER_TABLE_KEY),
+        )
     else:
         # V120：穩定編輯模式。把 data_editor 與儲存按鈕放在同一個 form，
         # 避免每修改一格就 rerun 跳回頁面上方；批次按鈕與原儲存邏輯不變。
+        # V300.67：03 改用與 01/04/07 同概念的頁面本地欄位設定，只保留一組欄位設定面板。
         with st.form("v120_work_order_stable_editor_form", clear_on_submit=False):
             edited = st.data_editor(
                 editor_df,
@@ -754,20 +942,8 @@ with tab1:
                 use_container_width=True,
                 num_rows="dynamic",
                 height=560,
-                column_order=EDITOR_COLS,
-                column_config={
-                    DISPLAY_COLUMNS["_delete"]: st.column_config.CheckboxColumn("刪除 / Delete", width="medium"),
-                    DISPLAY_COLUMNS["id"]: st.column_config.NumberColumn("ID / ID", disabled=True, width="small"),
-                    DISPLAY_COLUMNS["work_order"]: st.column_config.TextColumn("製令 / Work Order", required=True, width="medium"),
-                    DISPLAY_COLUMNS["part_no"]: st.column_config.TextColumn("P/N / Part No.", width="medium"),
-                    DISPLAY_COLUMNS["type_name"]: st.column_config.TextColumn("機型 / Type", width="large"),
-                    DISPLAY_COLUMNS["assembly_location"]: st.column_config.TextColumn("組立地點 / Assembly Location", width="medium"),
-                    DISPLAY_COLUMNS["customer"]: st.column_config.TextColumn("客戶 / Customer", width="medium"),
-                    DISPLAY_COLUMNS["note"]: st.column_config.TextColumn("備註 / Note", width="large"),
-                    DISPLAY_COLUMNS["is_active"]: st.column_config.CheckboxColumn("啟用 / Active", width="medium"),
-                    DISPLAY_COLUMNS["created_at"]: st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
-                    DISPLAY_COLUMNS["updated_at"]: st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
-                },
+                column_order=[c for c in EDITOR_COLS if c in editor_df.columns],
+                column_config=_v30067_work_order_column_config(V30067_WORK_ORDER_TABLE_KEY),
                 key=_editor_key(),
                 disabled=False,
             )
