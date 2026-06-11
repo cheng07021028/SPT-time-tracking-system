@@ -337,13 +337,15 @@ def save_work_orders(df: pd.DataFrame) -> dict[str, Any]:
 def save_employees(df: pd.DataFrame) -> dict[str, Any]:
     """Persist 04 employee master data through the Neon/PostgreSQL authority table.
 
-    V300.29: mirror the 03 work-order fast path for employees. The old path did
-    one SELECT plus one write per row, so large paste/Excel saves could issue
-    hundreds of Neon calls and increase the chance of repeated-submit symptoms.
-    The new path reads existing employee keys once, prepares all insert/update/
-    soft-delete operations in memory, then writes them in one transaction. UI,
-    soft-delete behavior, reboot durability, and last-row-wins semantics are
-    preserved.
+    V300.56: harden the V300.29 batch path against PostgreSQL UniqueViolation.
+    The previous fast path still built plain INSERT statements after a pre-read
+    of existing employee_id values. If a duplicate employee_id existed in the
+    editor payload, or another Streamlit session inserted the same employee_id
+    between the pre-read and the transaction, PostgreSQL could raise
+    psycopg.errors.UniqueViolation and crash the page. This version keeps the
+    same UI and authority rules, but writes non-deleted rows through an atomic
+    INSERT ... ON CONFLICT(employee_id) DO UPDATE path and de-duplicates the
+    incoming payload before opening the transaction.
     """
     _ensure_runtime_columns()
     work = _normalize(df, EMPLOYEE_COLS, EMP_DISPLAY_TO_INTERNAL)
@@ -358,6 +360,7 @@ def save_employees(df: pd.DataFrame) -> dict[str, Any]:
         existing_df = pd.DataFrame()
 
     existing_by_emp: dict[str, int] = {}
+    existing_emp_by_id: dict[int, str] = {}
     existing_by_id: set[int] = set()
     if not existing_df.empty:
         for _, old in existing_df.iterrows():
@@ -365,19 +368,39 @@ def save_employees(df: pd.DataFrame) -> dict[str, Any]:
             old_emp = _text(old.get("employee_id"))
             if old_id is not None:
                 existing_by_id.add(old_id)
+                existing_emp_by_id[old_id] = old_emp
             if old_emp and old_id is not None and old_emp not in existing_by_emp:
                 existing_by_emp[old_emp] = old_id
 
-    operations: list[tuple[str, Iterable[Any]]] = []
+    # V300.56: last-row-wins de-duplication before DB writes. This prevents a
+    # single save click from generating several INSERT/UPDATE operations for the
+    # same employee_id and also matches the existing paste/import behavior.
+    staged: dict[str, dict[str, Any]] = {}
+    staged_order: list[str] = []
     for _, row in work.iterrows():
         emp_id = _text(row.get("employee_id"))
         name = _text(row.get("employee_name"))
-        if not emp_id or not name:
+        rid = _int_or_none(row.get("id"))
+        delete_flag = _bool(row.get("_delete"))
+        if not emp_id and not rid:
             result["skipped"] += 1
             continue
-        rid = _int_or_none(row.get("id"))
+        if not delete_flag and (not emp_id or not name):
+            result["skipped"] += 1
+            continue
+        key = emp_id or f"__id__{rid}"
+        if key not in staged:
+            staged_order.append(key)
+        staged[key] = {"row": row, "rid": rid, "emp_id": emp_id, "delete": delete_flag}
 
-        if _bool(row.get("_delete")):
+    operations: list[tuple[str, Iterable[Any]]] = []
+    for key in staged_order:
+        item = staged[key]
+        row = item["row"]
+        rid = item["rid"]
+        emp_id = item["emp_id"]
+
+        if item["delete"]:
             if rid:
                 operations.append((
                     "UPDATE employees SET deleted_at=?, deleted_by='admin', delete_reason='04 人員名單刪除', updated_at=? WHERE id=? AND (deleted_at IS NULL OR deleted_at='')",
@@ -385,15 +408,18 @@ def save_employees(df: pd.DataFrame) -> dict[str, Any]:
                 ))
                 if rid in existing_by_id:
                     result["deleted"] += 1
-            else:
+            elif emp_id:
                 operations.append((
                     "UPDATE employees SET deleted_at=?, deleted_by='admin', delete_reason='04 人員名單刪除', updated_at=? WHERE employee_id=? AND (deleted_at IS NULL OR deleted_at='')",
                     (now, now, emp_id),
                 ))
                 if emp_id in existing_by_emp:
                     result["deleted"] += 1
+            else:
+                result["skipped"] += 1
             continue
 
+        name = _text(row.get("employee_name"))
         department = _text(row.get("department"))
         title = _text(row.get("title"))
         active_val = 1 if _bool(row.get("is_active"), True) else 0
@@ -401,7 +427,15 @@ def save_employees(df: pd.DataFrame) -> dict[str, Any]:
         today_val = 1 if _bool(row.get("is_today_attendance"), True) else 0
         note = _text(row.get("note"))
 
-        if rid:
+        # If the user edits an existing row's employee_id, preserve that row when
+        # the new employee_id is not already used. If it is already used by a
+        # different row, skip instead of crashing with UniqueViolation.
+        old_emp_for_id = existing_emp_by_id.get(rid) if rid else None
+        if rid and old_emp_for_id and old_emp_for_id != emp_id:
+            conflict_id = existing_by_emp.get(emp_id)
+            if conflict_id is not None and conflict_id != rid:
+                result["skipped"] += 1
+                continue
             operations.append((
                 """
                 UPDATE employees SET employee_id=?, employee_name=?, department=?, title=?, is_active=?, active=?, is_in_factory=?, is_today_attendance=?, note=?, updated_at=?, deleted_at='', deleted_by='', delete_reason=''
@@ -410,30 +444,38 @@ def save_employees(df: pd.DataFrame) -> dict[str, Any]:
                 (emp_id, name, department, title, active_val, active_val, factory_val, today_val, note, now, rid),
             ))
             result["updated"] += 1
+            existing_by_emp.pop(old_emp_for_id, None)
             existing_by_emp[emp_id] = rid
-            existing_by_id.add(rid)
+            existing_emp_by_id[rid] = emp_id
             continue
 
+        # V300.56: atomic upsert. This handles existing rows, soft-deleted rows,
+        # duplicate paste rows after staging, and concurrent inserts from another
+        # browser/session without surfacing UniqueViolation to the user.
+        operations.append((
+            """
+            INSERT INTO employees(employee_id, employee_name, department, title, is_active, active, is_in_factory, is_today_attendance, note, created_at, updated_at, deleted_at, deleted_by, delete_reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '', '')
+            ON CONFLICT(employee_id) DO UPDATE SET
+                employee_name=excluded.employee_name,
+                department=excluded.department,
+                title=excluded.title,
+                is_active=excluded.is_active,
+                active=excluded.active,
+                is_in_factory=excluded.is_in_factory,
+                is_today_attendance=excluded.is_today_attendance,
+                note=excluded.note,
+                updated_at=excluded.updated_at,
+                deleted_at='',
+                deleted_by='',
+                delete_reason=''
+            """,
+            (emp_id, name, department, title, active_val, active_val, factory_val, today_val, note, now, now),
+        ))
         if emp_id in existing_by_emp:
-            operations.append((
-                """
-                UPDATE employees SET employee_name=?, department=?, title=?, is_active=?, active=?, is_in_factory=?, is_today_attendance=?, note=?, updated_at=?, deleted_at='', deleted_by='', delete_reason=''
-                WHERE employee_id=?
-                """,
-                (name, department, title, active_val, active_val, factory_val, today_val, note, now, emp_id),
-            ))
             result["updated"] += 1
         else:
-            operations.append((
-                """
-                INSERT INTO employees(employee_id, employee_name, department, title, is_active, active, is_in_factory, is_today_attendance, note, created_at, updated_at, deleted_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
-                """,
-                (emp_id, name, department, title, active_val, active_val, factory_val, today_val, note, now, now),
-            ))
             result["inserted"] += 1
-            # Preserve old row-order semantics for duplicated employee_id values
-            # in the same paste/import: first row inserts, later rows update it.
             existing_by_emp[emp_id] = -1
 
     if operations:
@@ -441,9 +483,9 @@ def save_employees(df: pd.DataFrame) -> dict[str, Any]:
             operations,
             mark_changed=True,
             reason="04 人員名單批次儲存",
-            source_sql="SAVE_EMPLOYEES_BATCH",
+            source_sql="SAVE_EMPLOYEES_BATCH_V30056_UPSERT",
         )
-    _save_log("SAVE_EMPLOYEES", "employees", f"人員儲存 inserted={result['inserted']} updated={result['updated']} deleted={result['deleted']}")
+    _save_log("SAVE_EMPLOYEES", "employees", f"人員儲存 inserted={result['inserted']} updated={result['updated']} deleted={result['deleted']} skipped={result['skipped']}")
     clear_query_cache()
     clear_master_data_cache()
     return result
