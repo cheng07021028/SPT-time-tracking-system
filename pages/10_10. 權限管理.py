@@ -347,6 +347,29 @@ ACCOUNT_EDITOR_COLUMNS = [
     "更新時間 / Updated At",
 ]
 
+# V300.51：Account Editor 實際送進 st.data_editor 的欄位改用英文內部 key。
+# 原因：部分 Streamlit 版本會把 dataframe 欄名與 column_config label 合併顯示；
+# 若 dataframe 欄名本身就是「帳號 / Username」，就可能顯示成「帳號 / Username / 帳號 / Username」。
+# 因此畫面表格使用 internal key，column_config 才負責顯示中英 label；送出後再轉回既有中文欄名，
+# 不改 save_users()、force_password_change、Account Editor 儲存邏輯與 Neon 權威資料。
+ACCOUNT_EDITOR_INTERNAL_MAP = {
+    "delete": "刪除 / Delete",
+    "username": "帳號 / Username",
+    "password_status": "密碼狀態 / Password Status",
+    "force_password_change": "強制改密碼 / Force Change",
+    "new_password": "新密碼 / New Password",
+    "employee_id": "工號 / Employee ID",
+    "display_name": "姓名 / Display Name",
+    "email": "Email",
+    "role_code": "角色 / Role",
+    "is_active": "啟用 / Active",
+    "note": "備註 / Note",
+    "last_login": "最後登入 / Last Login",
+    "updated_at": "更新時間 / Updated At",
+}
+ACCOUNT_EDITOR_DISPLAY_TO_INTERNAL = {v: k for k, v in ACCOUNT_EDITOR_INTERNAL_MAP.items()}
+ACCOUNT_EDITOR_INTERNAL_COLUMNS = list(ACCOUNT_EDITOR_INTERNAL_MAP.keys())
+
 
 # ===== V95 FAST RAW EDITOR HELPER =====
 def _v95_raw_data_editor(data=None, *args, **kwargs):
@@ -461,9 +484,12 @@ def _selected_delete_usernames(df: pd.DataFrame, editor_key: str) -> list[str]:
     if isinstance(state, dict):
         edited_rows = state.get("edited_rows", {}) or {}
         for row_idx, changes in edited_rows.items():
-            if not isinstance(changes, dict) or "刪除 / Delete" not in changes:
+            if not isinstance(changes, dict):
                 continue
-            if not _as_bool_value(changes.get("刪除 / Delete"), default=False):
+            delete_keys = [k for k in changes.keys() if _v30047_canonical_account_editor_col(k) == "刪除 / Delete"]
+            if not delete_keys:
+                continue
+            if not any(_as_bool_value(changes.get(k), default=False) for k in delete_keys):
                 continue
             try:
                 idx = int(row_idx)
@@ -574,13 +600,19 @@ def _v30047_canonical_account_editor_col(col) -> str:
         "登入帳號 / Username": "帳號 / Username",
         "使用者 / Username": "帳號 / Username",
         "Force Change": "強制改密碼 / Force Change",
+        "delete": "刪除 / Delete",
+        "username": "帳號 / Username",
         "force_password_change": "強制改密碼 / Force Change",
         "password_status": "密碼狀態 / Password Status",
         "new_password": "新密碼 / New Password",
         "employee_id": "工號 / Employee ID",
         "display_name": "姓名 / Display Name",
+        "email": "Email",
         "role_code": "角色 / Role",
         "is_active": "啟用 / Active",
+        "note": "備註 / Note",
+        "last_login": "最後登入 / Last Login",
+        "updated_at": "更新時間 / Updated At",
     }
     if s0 in alias_map:
         return alias_map[s0]
@@ -633,6 +665,75 @@ def _v30047_normalize_account_editor_df(df: pd.DataFrame | None) -> pd.DataFrame
     ordered = [c for c in ACCOUNT_EDITOR_COLUMNS if c in out.columns]
     other_cols = [c for c in out.columns if c not in ordered]
     return out[ordered + other_cols].reset_index(drop=True)
+
+
+
+def _v30051_account_editor_to_internal(df: pd.DataFrame | None) -> pd.DataFrame:
+    """Convert the Account Editor dataframe to safe internal column keys for st.data_editor.
+
+    This fixes duplicated bilingual headers without changing the existing save path.
+    All downstream services still receive the original display columns after submit.
+    """
+    display_df = _v30047_normalize_account_editor_df(df)
+    out = pd.DataFrame(index=display_df.index)
+    for internal, display_col in ACCOUNT_EDITOR_INTERNAL_MAP.items():
+        if display_col in display_df.columns:
+            out[internal] = display_df[display_col]
+        else:
+            out[internal] = _blank_user_row().get(display_col, "")
+    # Keep any future/unknown columns after the safe internal keys.
+    for col in display_df.columns:
+        if col not in ACCOUNT_EDITOR_DISPLAY_TO_INTERNAL and col not in out.columns:
+            out[col] = display_df[col]
+    return out.reset_index(drop=True)
+
+
+def _v30051_account_editor_from_internal(df: pd.DataFrame | None) -> pd.DataFrame:
+    """Convert st.data_editor internal-key dataframe back to the existing bilingual columns."""
+    src = pd.DataFrame(df).copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    if src.empty:
+        return _v30047_normalize_account_editor_df(src)
+    out = pd.DataFrame(index=src.index)
+    used = set()
+    for internal, display_col in ACCOUNT_EDITOR_INTERNAL_MAP.items():
+        if internal in src.columns:
+            out[display_col] = src[internal]
+            used.add(internal)
+        elif display_col in src.columns:
+            out[display_col] = src[display_col]
+            used.add(display_col)
+    for col in src.columns:
+        if col not in used:
+            out[_v30047_canonical_account_editor_col(col)] = src[col]
+    return _v30047_normalize_account_editor_df(out)
+
+
+def _v30051_account_editor_column_config() -> dict:
+    """Column config for Account Editor using internal keys + single bilingual labels."""
+    return {
+        "delete": st.column_config.CheckboxColumn("刪除 / Delete"),
+        "username": st.column_config.TextColumn("帳號 / Username", required=True),
+        "password_status": st.column_config.TextColumn(
+            "密碼狀態 / Password Status",
+            help="可直接輸入新密碼；******** 或提示文字代表維持原密碼",
+        ),
+        "force_password_change": st.column_config.CheckboxColumn(
+            "強制改密碼 / Force Change",
+            help="勾選後，該帳號下次登入必須變更密碼。",
+        ),
+        "new_password": st.column_config.TextColumn(
+            "新密碼 / New Password",
+            help="要改密碼才填寫；新增帳號必填",
+        ),
+        "employee_id": st.column_config.TextColumn("工號 / Employee ID"),
+        "display_name": st.column_config.TextColumn("姓名 / Display Name", required=True),
+        "email": st.column_config.TextColumn("Email"),
+        "role_code": st.column_config.SelectboxColumn("角色 / Role", options=ROLE_OPTIONS, required=True),
+        "is_active": st.column_config.CheckboxColumn("啟用 / Active"),
+        "note": st.column_config.TextColumn("備註 / Note"),
+        "last_login": st.column_config.TextColumn("最後登入 / Last Login", disabled=True),
+        "updated_at": st.column_config.TextColumn("更新時間 / Updated At", disabled=True),
+    }
 
 
 def _users_for_editor() -> pd.DataFrame:
@@ -1349,34 +1450,20 @@ if _selected_permission_section == "帳號密碼總表 / Account Password Master
         # 啟動編輯後才建立 data_editor，且放在 form 內，編輯時不寫 Neon、不重算、不重讀。
         if account_edit_enabled:
             with st.form("v102_account_editor_commit_form", clear_on_submit=False):
-                edited_users = _v95_raw_data_editor(
-                    draft_df,
+                editor_input_df = _v30051_account_editor_to_internal(draft_df)
+                edited_users_internal = _v95_raw_data_editor(
+                    editor_input_df,
                     key=account_editor_key,
                     use_container_width=True,
                     num_rows="fixed",
                     hide_index=True,
                     disabled=False,
                     height=360,
-                    column_order=[c for c in ACCOUNT_EDITOR_COLUMNS if c in draft_df.columns] + [c for c in draft_df.columns if c not in ACCOUNT_EDITOR_COLUMNS],
-                    column_config={
-                        # V300.47：不要再把同一個中英標題傳給 column_config，
-                        # 部分 Streamlit 版本會顯示成「欄名 / label」而造成標題重複。
-                        # 這裡只指定欄位型別/選項，標題直接使用 dataframe 欄名。
-                        "刪除 / Delete": st.column_config.CheckboxColumn(),
-                        "帳號 / Username": st.column_config.TextColumn(required=True),
-                        "密碼狀態 / Password Status": st.column_config.TextColumn(help="可直接輸入新密碼；******** 或提示文字代表維持原密碼"),
-                        "強制改密碼 / Force Change": st.column_config.CheckboxColumn(help="勾選後，該帳號下次登入必須變更密碼。"),
-                        "新密碼 / New Password": st.column_config.TextColumn(help="要改密碼才填寫；新增帳號必填"),
-                        "工號 / Employee ID": st.column_config.TextColumn(),
-                        "姓名 / Display Name": st.column_config.TextColumn(required=True),
-                        "Email": st.column_config.TextColumn(),
-                        "角色 / Role": st.column_config.SelectboxColumn(options=ROLE_OPTIONS, required=True),
-                        "啟用 / Active": st.column_config.CheckboxColumn(),
-                        "備註 / Note": st.column_config.TextColumn(),
-                        "最後登入 / Last Login": st.column_config.TextColumn(disabled=True),
-                        "更新時間 / Updated At": st.column_config.TextColumn(disabled=True),
-                    },
+                    column_order=[c for c in ACCOUNT_EDITOR_INTERNAL_COLUMNS if c in editor_input_df.columns]
+                    + [c for c in editor_input_df.columns if c not in ACCOUNT_EDITOR_INTERNAL_COLUMNS],
+                    column_config=_v30051_account_editor_column_config(),
                 )
+                edited_users = _v30051_account_editor_from_internal(edited_users_internal)
 
                 submitted_accounts = st.form_submit_button(
                     "▣ 套用並儲存帳號密碼總表 / Apply and Save Account Master",
