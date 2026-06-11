@@ -386,8 +386,33 @@ def restore_table_ui_settings_from_permanent(force: bool = False) -> dict[str, A
     return {"ok": restored > 0, "restored": restored, "source": payload.get("source"), "score": payload.get("score")}
 
 
+def _v30057_is_already_display_label(col: str) -> bool:
+    """Return True when a column name is already a user-facing bilingual label.
+
+    Several pages pass display columns such as "工號 / Employee ID" into the
+    shared render_table() helper.  The old fallback generated f"{col} / {col}"
+    for unknown columns, so an already-bilingual column became
+    "工號 / Employee ID / 工號 / Employee ID" in Streamlit headers.
+    """
+    text = str(col or "").strip()
+    if not text:
+        return False
+    if " / " in text:
+        return True
+    # Some legacy columns used slash without spaces. Keep the check conservative
+    # so plain ids like "work_order" still get COLUMN_LABELS mapping.
+    if re.search(r"[\u4e00-\u9fff].*/.*[A-Za-z]", text):
+        return True
+    return False
+
+
 def label_for(col: str) -> str:
-    return COLUMN_LABELS.get(col, f"{col} / {col}")
+    col_text = str(col)
+    if col_text in COLUMN_LABELS:
+        return COLUMN_LABELS[col_text]
+    if _v30057_is_already_display_label(col_text):
+        return col_text
+    return f"{col_text} / {col_text}"
 
 
 def ensure_table_ui_schema() -> None:
@@ -2840,3 +2865,22 @@ def audit_v87_data_editor_type_compatibility() -> dict[str, Any]:
     }
 
 # =============== END V87 DATA_EDITOR TYPE-COMPATIBLE COLUMN CONFIG FIX ===============
+
+# ================= V300.57 DUPLICATE DISPLAY HEADER FIX =================
+def audit_v30057_duplicate_display_header_fix() -> dict[str, Any]:
+    samples = [
+        "刪除 / Delete",
+        "ID / ID",
+        "工號 / Employee ID",
+        "姓名 / Name",
+        "employee_id",
+    ]
+    return {
+        "version": "V300.57_DUPLICATE_DISPLAY_HEADER_FIX",
+        "fix": "label_for_returns_existing_bilingual_labels_without_appending_again",
+        "samples": {s: label_for(s) for s in samples},
+        "affected_path": "shared render_table / build_column_config headers",
+        "data_write_flow_changed": False,
+    }
+# =============== END V300.57 DUPLICATE DISPLAY HEADER FIX ===============
+
