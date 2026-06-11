@@ -234,6 +234,34 @@ def _v30059_employee_column_config(table_key: str) -> dict:
     }
 
 
+def _v30064_streamlit_original(name: str):
+    """Use Streamlit's original table renderer for this page's own settings panel.
+
+    04 already renders the new V300.59 Column Settings panel through
+    table_ui_service.render_width_settings().  The global column_settings_service
+    monkey patch would otherwise add a second old panel directly above the same
+    table.  Bypassing only this table render keeps the new panel as the single
+    source of UI column preferences and does not change saved employee data.
+    """
+    attr = "_ORIGINAL_DATA_EDITOR" if name == "data_editor" else "_ORIGINAL_DATAFRAME"
+    try:
+        from services import column_settings_service as _css
+        func = getattr(_css, attr, None)
+        if callable(func):
+            return func
+    except Exception:
+        pass
+    return getattr(st, name)
+
+
+def _v30064_dataframe_no_global(data=None, *args, **kwargs):
+    return _v30064_streamlit_original("dataframe")(data, *args, **kwargs)
+
+
+def _v30064_data_editor_no_global(data=None, *args, **kwargs):
+    return _v30064_streamlit_original("data_editor")(data, *args, **kwargs)
+
+
 def _commit_current_editor_widget_state() -> None:
     """V67: commit data_editor widget delta into this page draft before any buttons/KPI read it.
 
@@ -512,6 +540,12 @@ with tab1:
     if b4.button("☐ 今日出勤取消 / Clear Attendance", use_container_width=True, disabled=not employee_edit_enabled, key="v64_employee_attendance_all_off"):
         _bulk_set_bool_column("is_today_attendance", False)
 
+    m1, m2 = st.columns(2)
+    if m1.button("☑ 納入未紀錄全選 / Include Missing All", use_container_width=True, disabled=not employee_edit_enabled, key="v30064_employee_include_missing_all_on"):
+        _bulk_set_bool_column("include_in_missing_records", True)
+    if m2.button("☐ 納入未紀錄取消 / Clear Include Missing", use_container_width=True, disabled=not employee_edit_enabled, key="v30064_employee_include_missing_all_off"):
+        _bulk_set_bool_column("include_in_missing_records", False)
+
     st.warning("勾選「刪除 / Delete」後按下儲存，才會真正刪除資料。工號 / Employee ID、姓名 / Name 為必填。取消『納入未紀錄統計』可讓幹部/主管不列入 07 Missing Records。")
     e1, e2 = st.columns(2)
     if e1.button("⟰ 準備目前人員名單下載 / Prepare Export", use_container_width=True, key="v68_prepare_employee_export"):
@@ -534,7 +568,7 @@ with tab1:
     submitted_employees = False
     edited = None
     if not employee_edit_enabled:
-        st.dataframe(
+        _v30064_dataframe_no_global(
             table_df,
             hide_index=True,
             use_container_width=True,
@@ -545,7 +579,7 @@ with tab1:
         # V300.59：使用內部欄位 key 交給 data_editor，避免中英雙語欄名被 Streamlit 再疊一次。
         # 儲存時仍由 _from_editor_df() 轉回既有內部結構，不改 save_employees()。
         with st.form("v120_employee_stable_editor_form", clear_on_submit=False):
-            edited = st.data_editor(
+            edited = _v30064_data_editor_no_global(
                 table_df,
                 hide_index=True,
                 use_container_width=True,
