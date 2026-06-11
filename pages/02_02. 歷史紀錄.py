@@ -161,6 +161,95 @@ def _v30027_reset_history_filters_cached() -> dict:
     return saved
 
 
+# === V300.70 02 HISTORY FILTER OPTIONS SQL CACHE BEGIN ===
+V30070_HISTORY_FILTER_OPTIONS_CACHE_KEY = "v30070_02_history_filter_options_cache"
+V30070_HISTORY_STATUS_FALLBACK = ["作業中", "下班", "暫停", "完工", "已結束", "結束", "補登結束"]
+
+
+def _v30070_clean_option_text(value) -> str:
+    try:
+        if value is None or pd.isna(value):
+            return ""
+    except Exception:
+        if value is None:
+            return ""
+    text = str(value).strip()
+    if text.lower() in {"", "none", "nan", "nat", "null", "<na>"}:
+        return ""
+    return text
+
+
+def _v30070_merge_options(*sources) -> list[str]:
+    out: list[str] = []
+    for src in sources:
+        if src is None:
+            continue
+        if isinstance(src, str):
+            values = [src]
+        else:
+            try:
+                values = list(src)
+            except Exception:
+                values = [src]
+        for raw in values:
+            text = _v30070_clean_option_text(raw)
+            if text and text not in out:
+                out.append(text)
+    return out
+
+
+def _v30070_options_from_df(df: pd.DataFrame | None) -> dict[str, list[str]]:
+    cols = [
+        "work_order", "part_no", "type_name", "assembly_location", "process_name",
+        "employee_id", "employee_name", "status",
+    ]
+    out = {c: [] for c in cols}
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return out
+    for col in cols:
+        if col in df.columns:
+            out[col] = _v30070_merge_options(df[col].dropna().astype(str).tolist())
+    return out
+
+
+def _v30070_load_history_filter_options_cached(start_date_value, end_date_value) -> dict[str, list[str]]:
+    """Load lightweight DISTINCT options for 02 filters without loading history rows.
+
+    V259 stopped loading history details when opening 02, which is correct for speed,
+    but process/status options have no master-data source.  The old placeholder `{}`
+    made 工段名稱 / 狀態 display "No options to select" even when time_records had data.
+    This helper uses the existing SQL DISTINCT service once per date range, caches the
+    result in session, and falls back to the current query cache only if SQL is not
+    available.  It does not scan 02 full history and does not write Neon.
+    """
+    key = (str(start_date_value or ""), str(end_date_value or ""))
+    cache = st.session_state.get(V30070_HISTORY_FILTER_OPTIONS_CACHE_KEY)
+    if isinstance(cache, dict) and cache.get("key") == key and isinstance(cache.get("options"), dict):
+        return dict(cache.get("options") or {})
+
+    options: dict[str, list[str]] = {}
+    if callable(load_history_filter_options_sql):
+        try:
+            loaded = load_history_filter_options_sql(start_date_value, end_date_value, limit_per_column=5000)
+            if isinstance(loaded, dict):
+                options = {str(k): _v30070_merge_options(v) for k, v in loaded.items()}
+        except Exception:
+            options = {}
+
+    # Fallback only uses an already-loaded page cache; it never triggers a heavy read.
+    cached_df_options = _v30070_options_from_df(st.session_state.get(V259_HISTORY_DF_KEY))
+    for col, vals in cached_df_options.items():
+        options[col] = _v30070_merge_options(options.get(col, []), vals)
+
+    # Status has a small, stable vocabulary.  Keep it selectable even before the
+    # first successful DISTINCT query; SQL/result filtering still determines rows.
+    options["status"] = _v30070_merge_options(options.get("status", []), V30070_HISTORY_STATUS_FALLBACK)
+
+    st.session_state[V30070_HISTORY_FILTER_OPTIONS_CACHE_KEY] = {"key": key, "options": dict(options)}
+    return dict(options)
+# === V300.70 02 HISTORY FILTER OPTIONS SQL CACHE END ===
+
+
 def _v30027_history_template_bytes() -> bytes:
     cached = st.session_state.get(V30027_HISTORY_TEMPLATE_BYTES_KEY)
     if isinstance(cached, (bytes, bytearray)) and cached:
@@ -1692,12 +1781,12 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
             pn_options = _merge_options(_safe_unique(work_orders, "part_no"), list(_opt.get("part_no", [])) or _safe_unique(base_df, "part_no"))
             type_options = _merge_options(_safe_unique(work_orders, "type_name"), list(_opt.get("type_name", [])) or _safe_unique(base_df, "type_name"))
             loc_options = _merge_options(_safe_unique(work_orders, "assembly_location"), list(_opt.get("assembly_location", [])) or _safe_unique(base_df, "assembly_location"))
-            process_options = list(_opt.get("process_name", [])) or _safe_unique(base_df, "process_name")
+            process_options = _merge_options(list(_opt.get("process_name", [])), _safe_unique(base_df, "process_name"), applied.get("process_names", []))
             emp_id_options = _merge_options(_safe_unique(employees, "employee_id"), list(_opt.get("employee_id", [])) or _safe_unique(base_df, "employee_id"))
             emp_name_options = _merge_options(_safe_unique(employees, "employee_name"), list(_opt.get("employee_name", [])) or _safe_unique(base_df, "employee_name"))
             dept_options = _safe_unique(employees, "department")
             title_options = _safe_unique(employees, "title")
-            status_options = list(_opt.get("status", [])) or _safe_unique(base_df, "status")
+            status_options = _merge_options(list(_opt.get("status", [])), _safe_unique(base_df, "status"), V30070_HISTORY_STATUS_FALLBACK, applied.get("statuses", []))
 
             r2c1, r2c2, r2c3 = st.columns(3)
             work_orders_selected = r2c1.multiselect("製令", wo_options, default=[x for x in applied.get("work_orders", []) if x in wo_options])
@@ -1790,7 +1879,7 @@ _seed_start, _seed_end = _date_range_from_preset(
 # V259: 02 must not load heavy history rows simply because the page is opened.
 # Filter options use 03/04 master data first; history rows are loaded only after
 # the user presses "套用篩選並永久記錄" or the manual refresh button below.
-_history_option_values = {}
+_history_option_values = _v30070_load_history_filter_options_cached(_seed_start, _seed_end)
 base_df = pd.DataFrame()
 _panel_df, history_filters = _render_history_filter_panel(base_df, employees, work_orders, _history_option_values)
 history_filters = _v79_effective_history_filters(history_filters)
