@@ -489,11 +489,16 @@ def _auth_user_upsert_ops(row: dict[str, Any]) -> list[tuple[str, tuple[Any, ...
 
 
 def save_users(rows: list[dict[str,Any]]) -> dict:
+    # V300.48：Account Editor 會先在頁面端過濾出真正有異動的列。
+    # 沒有異動時不要為了 no-op 仍執行 _ensure_schema() / SELECT / cache clear，
+    # 否則「套用並儲存帳號密碼總表」看起來會長時間運轉。
+    input_rows = [dict(r) for r in (rows or []) if isinstance(r, dict)]
+    if not input_rows:
+        return {"ok": True, "saved": 0, "skipped_unchanged": 0, "skipped": [], "backend": "Neon/PostgreSQL", "batch_fastpath": True, "no_op": True}
     _ensure_schema()
     # V300.35：Account Editor / Excel / Paste 可能一次送出多筆帳號。
     # 舊版每筆帳號都先 SELECT 舊值，再 UPDATE/INSERT，500 筆可能造成 500+ 次 Neon SELECT。
     # 現在先一次讀出本批帳號的現有資料，再只把有異動的列批次寫入 transaction。
-    input_rows = [dict(r) for r in (rows or []) if isinstance(r, dict)]
     usernames = [str(r.get("username") or r.get("帳號 / Username") or "").strip() for r in input_rows]
     existing_by_user = _fetch_existing_users_by_username(usernames)
     changed_rows: list[dict[str, Any]] = []
@@ -562,7 +567,12 @@ def save_users(rows: list[dict[str,Any]]) -> dict:
 
 
 def save_account_master(rows: list[dict[str,Any]], delete_usernames: list[str]|None=None) -> dict:
-    res = save_users(rows or [])
+    # V300.48：支援頁面端 delta-save。只有刪除、沒有帳號列異動時，
+    # 不再先呼叫 save_users([]) 觸發任何不必要的 schema/cache 路徑。
+    if rows:
+        res = save_users(rows or [])
+    else:
+        res = {"ok": True, "saved": 0, "skipped_unchanged": 0, "skipped": [], "backend": "Neon/PostgreSQL", "batch_fastpath": True, "no_op": True}
     deleted = delete_users(delete_usernames or []) if delete_usernames else 0
     res["deleted"] = deleted
     return res

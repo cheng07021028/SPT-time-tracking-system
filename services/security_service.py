@@ -4690,3 +4690,190 @@ def audit_v46_security_saver() -> dict[str, Any]:
     }
 
 # ================= END V46 NEON FREE SAVER MODE - SECURITY SETTINGS CACHE =================
+
+# ================= V30049 FORCE PASSWORD CHANGE FINAL HOTPATH FIX =================
+# Problem:
+# - V106 added force-password-change UI, but the later V256 login hot path
+#   overrode authenticate()/require_login() and no longer checked
+#   auth_users.force_password_change / security_users.force_password_change.
+# - Result: 10 權限管理勾選「強制改密碼 / Force Change」後，登入仍可直接進入系統。
+# Fix:
+# - Keep V256 fast login path. After successful login, perform one lightweight
+#   force_password_change lookup and set session flags.
+# - require_login() blocks every module/home until the password is changed.
+# - Password update writes Neon/PostgreSQL authority tables and compatibility mirror.
+# UI/CSS/theme are untouched.
+
+def _v30049_truthy(value: Any, default: bool = False) -> bool:
+    try:
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return float(value) != 0
+        s = str(value).strip().lower()
+        if s in {"1", "true", "yes", "y", "on", "是", "啟用", "active", "checked", "勾選", "需改密碼"}:
+            return True
+        if s in {"0", "false", "no", "n", "off", "否", "停用", "inactive", "unchecked", ""}:
+            return False
+    except Exception:
+        pass
+    return default
+
+
+def _v30049_fetch_force_password_change(username: str) -> bool:
+    uname = str(username or "").strip()
+    if not uname:
+        return False
+    # Prefer the final V256 direct DB helpers because they avoid full schema bootstrap.
+    try:
+        if callable(globals().get("_v256_pg_query_one")) and callable(globals().get("_v256_db_backend")) and _v256_db_backend() == "postgres":
+            row = _v256_pg_query_one(
+                "SELECT force_password_change FROM auth_users WHERE lower(username)=lower(%s) LIMIT 1",
+                (uname,),
+            ) or _v256_pg_query_one(
+                "SELECT force_password_change FROM security_users WHERE lower(username)=lower(%s) LIMIT 1",
+                (uname,),
+            )
+            return _v30049_truthy((row or {}).get("force_password_change"), False)
+    except Exception:
+        pass
+    try:
+        if callable(globals().get("_v256_sqlite_query_one")):
+            row = _v256_sqlite_query_one(
+                "SELECT force_password_change FROM auth_users WHERE lower(username)=lower(?) LIMIT 1",
+                (uname,),
+            ) or _v256_sqlite_query_one(
+                "SELECT force_password_change FROM security_users WHERE lower(username)=lower(?) LIMIT 1",
+                (uname,),
+            )
+            return _v30049_truthy((row or {}).get("force_password_change"), False)
+    except Exception:
+        pass
+    # Last fallback uses the shared DB service; this is only on successful login.
+    try:
+        row = query_one("SELECT force_password_change FROM auth_users WHERE lower(username)=lower(?) LIMIT 1", (uname,)) or query_one("SELECT force_password_change FROM security_users WHERE lower(username)=lower(?) LIMIT 1", (uname,))
+        return _v30049_truthy((row or {}).get("force_password_change"), False)
+    except Exception:
+        return False
+
+
+def _v30049_update_password_and_clear_force(username: str, new_password: str) -> dict[str, Any]:
+    uname = str(username or "").strip()
+    if not uname:
+        return {"ok": False, "error": "missing_username"}
+    pwd_hash = hash_password(str(new_password or ""))
+    now = _now()
+    errors: list[str] = []
+    updated = 0
+    try:
+        if callable(globals().get("_v256_pg_execute")) and callable(globals().get("_v256_db_backend")) and _v256_db_backend() == "postgres":
+            _v256_pg_execute("UPDATE auth_users SET password_hash=%s, force_password_change=0, updated_at=%s WHERE lower(username)=lower(%s)", (pwd_hash, now, uname))
+            _v256_pg_execute("UPDATE security_users SET password_hash=%s, force_password_change=0, updated_at=%s WHERE lower(username)=lower(%s)", (pwd_hash, now, uname))
+            updated = 1
+        elif callable(globals().get("_v256_sqlite_execute")):
+            _v256_sqlite_execute("UPDATE auth_users SET password_hash=?, force_password_change=0, updated_at=? WHERE lower(username)=lower(?)", (pwd_hash, now, uname))
+            _v256_sqlite_execute("UPDATE security_users SET password_hash=?, force_password_change=0, updated_at=? WHERE lower(username)=lower(?)", (pwd_hash, now, uname))
+            updated = 1
+        else:
+            raise RuntimeError("no_fast_db_helper")
+    except Exception as exc:
+        errors.append(str(exc)[:200])
+        try:
+            execute("UPDATE auth_users SET password_hash=?, force_password_change=0, updated_at=? WHERE lower(username)=lower(?)", (pwd_hash, now, uname))
+            execute("UPDATE security_users SET password_hash=?, force_password_change=0, updated_at=? WHERE lower(username)=lower(?)", (pwd_hash, now, uname))
+            updated = 1
+        except Exception as exc2:
+            errors.append(str(exc2)[:200])
+    try:
+        clear_permission_cache(uname)
+    except Exception:
+        pass
+    return {"ok": bool(updated), "updated": updated, "errors": errors}
+
+
+def _v30049_render_force_password_change() -> None:
+    uname = str(st.session_state.get("auth_username") or st.session_state.get("auth_force_password_change_username") or "").strip()
+    st.markdown("### 🔐 強制變更密碼 / Force Password Change")
+    st.warning("此帳號已在 10｜權限管理勾選『強制改密碼 / Force Change』。完成變更前不能進入任何模組。")
+    with st.form("v30049_force_password_change_form", clear_on_submit=False):
+        new_pwd = st.text_input("新密碼 / New Password", type="password")
+        confirm_pwd = st.text_input("確認新密碼 / Confirm New Password", type="password")
+        submitted = st.form_submit_button("儲存新密碼並繼續 / Save Password and Continue", type="primary", use_container_width=True)
+    if submitted:
+        if not new_pwd or not confirm_pwd:
+            st.error("請輸入新密碼並再次確認。")
+            st.stop()
+        if new_pwd != confirm_pwd:
+            st.error("兩次輸入的新密碼不一致。")
+            st.stop()
+        if len(str(new_pwd)) < 4:
+            st.error("新密碼長度至少 4 碼。")
+            st.stop()
+        if str(new_pwd).strip().lower() == uname.lower():
+            st.error("新密碼不可與帳號相同。")
+            st.stop()
+        res = _v30049_update_password_and_clear_force(uname, new_pwd)
+        if res.get("ok"):
+            st.session_state["auth_force_password_change"] = False
+            st.session_state.pop("auth_force_password_change_username", None)
+            try:
+                log_security_event(uname, "PASSWORD_CHANGE", "SUCCESS", "force_password_change_completed_v30049", "10_permissions")
+            except Exception:
+                pass
+            st.success("密碼已更新，強制改密碼狀態已解除。")
+            st.rerun()
+        st.error(f"密碼更新失敗，尚未解除強制改密碼：{res}")
+        st.stop()
+    st.stop()
+
+
+try:
+    _v30049_prev_authenticate = authenticate
+except Exception:
+    _v30049_prev_authenticate = None
+
+
+def authenticate(username: str, password: str) -> tuple[bool, str]:  # type: ignore[override]
+    ok, msg = _v30049_prev_authenticate(username, password) if callable(_v30049_prev_authenticate) else (False, "帳號或密碼錯誤。")
+    if ok:
+        uname = str(st.session_state.get("auth_username") or username or "").strip()
+        force_change = _v30049_fetch_force_password_change(uname)
+        st.session_state["auth_force_password_change"] = bool(force_change)
+        if force_change:
+            st.session_state["auth_force_password_change_username"] = uname
+            return True, "登入成功，請先變更密碼。"
+        st.session_state.pop("auth_force_password_change_username", None)
+    return ok, msg
+
+
+try:
+    _v30049_prev_require_login = require_login
+except Exception:
+    _v30049_prev_require_login = None
+
+
+def require_login(module_code: str = "") -> None:  # type: ignore[override]
+    if not st.session_state.get("auth_logged_in"):
+        if callable(_v30049_prev_require_login):
+            _v30049_prev_require_login(module_code)
+            return
+        render_login_form()
+        st.stop()
+    _check_idle_timeout()
+    if st.session_state.get("auth_force_password_change"):
+        _v30049_render_force_password_change()
+    render_user_bar(module_code)
+
+
+def audit_v30049_force_password_change_final_hotpath_fix() -> dict[str, Any]:
+    return {
+        "version": "V30049_FORCE_PASSWORD_CHANGE_FINAL_HOTPATH_FIX",
+        "wraps_final_authenticate": callable(_v30049_prev_authenticate),
+        "wraps_final_require_login": callable(_v30049_prev_require_login),
+        "neon_write_authority": True,
+        "ui_css_theme_unchanged": True,
+    }
+
+# =============== END V30049 FORCE PASSWORD CHANGE FINAL HOTPATH FIX ===============

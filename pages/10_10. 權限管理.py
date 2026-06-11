@@ -49,7 +49,7 @@ if not st.session_state.get("_spt_v67_permission_bootstrap_ready", False):
         pass
     st.session_state["_spt_v67_permission_bootstrap_ready"] = True
 
-st.caption("V300.46 loaded｜權限管理頁：修正 Paste Data 加入/直接儲存後持續運轉；貼上/匯入成功後清輸入 widget、避免 eager Neon reload、直接儲存加防重複送出。")
+st.caption("V300.48 loaded｜權限管理頁：Account Editor 儲存只送出有異動列，避免套用帳號密碼總表時長時間運轉。")
 
 ROLE_OPTIONS = ["admin", "manager", "leader", "operator", "viewer", "auditor"]
 ACTION_COLS = [a[0] for a in ACTIONS]
@@ -201,7 +201,7 @@ def _v30046_get_editor_base_df() -> pd.DataFrame:
     """
     existing = st.session_state.get("v133_users_df")
     if isinstance(existing, pd.DataFrame):
-        return existing.copy()
+        return _v30047_normalize_account_editor_df(existing)
     return _users_for_editor()
 
 
@@ -325,6 +325,27 @@ ACCOUNT_DISPLAY_COLUMNS = {
     "force_password_change": "強制改密碼 / Force Change",
     "note": "備註 / Note",
 }
+
+# V300.47：Account Editor 欄位順序與標準欄名。
+# Streamlit data_editor 在部分版本會把「資料欄名 + column_config label」同時顯示；
+# 若欄名本身已經是中英雙語，再給同一個中英 label，就會變成
+# 「帳號 / Username / 帳號 / Username」。因此 Account Editor 以資料欄名作為唯一標題，
+# column_config 只負責型別/選項，不再重複指定相同 label。
+ACCOUNT_EDITOR_COLUMNS = [
+    "刪除 / Delete",
+    "帳號 / Username",
+    "密碼狀態 / Password Status",
+    "強制改密碼 / Force Change",
+    "新密碼 / New Password",
+    "工號 / Employee ID",
+    "姓名 / Display Name",
+    "Email",
+    "角色 / Role",
+    "啟用 / Active",
+    "備註 / Note",
+    "最後登入 / Last Login",
+    "更新時間 / Updated At",
+]
 
 
 # ===== V95 FAST RAW EDITOR HELPER =====
@@ -467,17 +488,18 @@ def _v30023_apply_account_editor_delta(base_df: pd.DataFrame, returned_df: pd.Da
     reloads the old authority values.
     """
     if isinstance(returned_df, pd.DataFrame):
-        work = returned_df.copy().reset_index(drop=True)
+        work = _v30047_normalize_account_editor_df(returned_df).reset_index(drop=True)
     elif isinstance(base_df, pd.DataFrame):
-        work = base_df.copy().reset_index(drop=True)
+        work = _v30047_normalize_account_editor_df(base_df).reset_index(drop=True)
     else:
         work = pd.DataFrame()
 
     # Ensure the submitted dataframe has the same visible columns as the current draft.
     if isinstance(base_df, pd.DataFrame) and not base_df.empty:
-        for col in base_df.columns:
+        base_norm = _v30047_normalize_account_editor_df(base_df)
+        for col in base_norm.columns:
             if col not in work.columns:
-                work[col] = base_df[col].values[: len(work)] if len(base_df) >= len(work) else ""
+                work[col] = base_norm[col].values[: len(work)] if len(base_norm) >= len(work) else ""
 
     state = st.session_state.get(editor_key, {})
     if isinstance(state, dict):
@@ -495,9 +517,10 @@ def _v30023_apply_account_editor_delta(base_df: pd.DataFrame, returned_df: pd.Da
             while idx >= len(work):
                 work = pd.concat([work, pd.DataFrame([_blank_user_row()])], ignore_index=True)
             for col, value in changes.items():
-                if col not in work.columns:
-                    work[col] = ""
-                work.at[idx, col] = value
+                canonical_col = _v30047_canonical_account_editor_col(col)
+                if canonical_col not in work.columns:
+                    work[canonical_col] = ""
+                work.at[idx, canonical_col] = value
 
         deleted_rows = state.get("deleted_rows", []) or []
         if deleted_rows:
@@ -514,19 +537,7 @@ def _v30023_apply_account_editor_delta(base_df: pd.DataFrame, returned_df: pd.Da
                 new_row.update(row)
                 work = pd.concat([work, pd.DataFrame([new_row])], ignore_index=True)
 
-    try:
-        work = work.loc[:, ~pd.Index(work.columns).duplicated()].copy()
-    except Exception:
-        pass
-    for _col, _default in [
-        ("刪除 / Delete", False),
-        ("啟用 / Active", True),
-        ("強制改密碼 / Force Change", False),
-    ]:
-        if _col not in work.columns:
-            work[_col] = _default
-        work[_col] = _to_bool_series(work, _col).fillna(bool(_default)).astype(bool)
-    return work.reset_index(drop=True)
+    return _v30047_normalize_account_editor_df(work)
 
 def _blank_user_row() -> dict:
     return {
@@ -544,6 +555,84 @@ def _blank_user_row() -> dict:
         "最後登入 / Last Login": "",
         "更新時間 / Updated At": "",
     }
+
+
+def _v30047_canonical_account_editor_col(col) -> str:
+    """Return the official Account Editor column name.
+
+    This fixes stale session drafts created by previous versions where a bilingual
+    column title could be stored twice, for example:
+    「帳號 / Username / 帳號 / Username」.  It also protects save_users() from
+    reading the wrong column after a rerun.
+    """
+    s0 = str(col or "").strip()
+    if not s0:
+        return s0
+    alias_map = {
+        "密碼 / Password": "新密碼 / New Password",
+        "姓名 / Name": "姓名 / Display Name",
+        "登入帳號 / Username": "帳號 / Username",
+        "使用者 / Username": "帳號 / Username",
+        "Force Change": "強制改密碼 / Force Change",
+        "force_password_change": "強制改密碼 / Force Change",
+        "password_status": "密碼狀態 / Password Status",
+        "new_password": "新密碼 / New Password",
+        "employee_id": "工號 / Employee ID",
+        "display_name": "姓名 / Display Name",
+        "role_code": "角色 / Role",
+        "is_active": "啟用 / Active",
+    }
+    if s0 in alias_map:
+        return alias_map[s0]
+    for canonical in sorted(ACCOUNT_EDITOR_COLUMNS, key=len, reverse=True):
+        if s0 == canonical:
+            return canonical
+        # Streamlit / stored column settings duplication pattern:
+        #   canonical + " / " + canonical
+        # or canonical + " / " + another label.  The data column itself is the
+        # canonical source of truth, so map back to the first canonical segment.
+        if s0.startswith(canonical + " / "):
+            return canonical
+        if s0.count(canonical) >= 2:
+            return canonical
+    return s0
+
+
+def _v30047_normalize_account_editor_df(df: pd.DataFrame | None) -> pd.DataFrame:
+    """Normalize Account Editor dataframe columns and keep Force Change present.
+
+    The page must accept old session_state data, imported rows, and Streamlit
+    data_editor returned rows.  This helper only changes column names/order and
+    safe boolean types; it does not write Neon or change any saved authority data.
+    """
+    src = pd.DataFrame(df).copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    merged: dict[str, pd.Series] = {}
+    for idx, col in enumerate(list(src.columns)):
+        canonical = _v30047_canonical_account_editor_col(col)
+        series = src.iloc[:, idx] if len(src.columns) else pd.Series(dtype=object)
+        if canonical in merged:
+            prev = merged[canonical]
+            try:
+                prev_blank = prev.isna() | prev.astype(str).str.strip().isin(["", "nan", "None", "NONE"])
+                merged[canonical] = prev.where(~prev_blank, series)
+            except Exception:
+                merged[canonical] = prev
+        else:
+            merged[canonical] = series.copy()
+    out = pd.DataFrame(merged) if merged else pd.DataFrame(index=src.index)
+    defaults = _blank_user_row()
+    for col, default in defaults.items():
+        if col not in out.columns:
+            out[col] = default
+    for col, default in [
+        ("刪除 / Delete", False),
+        ("啟用 / Active", True),
+        ("強制改密碼 / Force Change", False),
+    ]:
+        out[col] = _to_bool_series(out, col, default=bool(default)).fillna(bool(default)).astype(bool)
+    ordered = [c for c in ACCOUNT_EDITOR_COLUMNS if c in out.columns]
+    other_cols = [c for c in out.columns if c not in ordered]
+    return out[ordered + other_cols].reset_index(drop=True)
 
 
 def _users_for_editor() -> pd.DataFrame:
@@ -564,7 +653,7 @@ def _users_for_editor() -> pd.DataFrame:
     out["備註 / Note"] = raw.get("note", "")
     out["最後登入 / Last Login"] = raw.get("last_login_at", "")
     out["更新時間 / Updated At"] = raw.get("updated_at", "")
-    return out
+    return _v30047_normalize_account_editor_df(out)
 
 
 def _password_from_editor_row(r: pd.Series) -> str:
@@ -588,6 +677,7 @@ def _password_from_editor_row(r: pd.Series) -> str:
 
 
 def _users_to_service_rows(df: pd.DataFrame) -> list[dict]:
+    df = _v30047_normalize_account_editor_df(df)
     rows = []
     for _, r in df.iterrows():
         rows.append({
@@ -602,6 +692,120 @@ def _users_to_service_rows(df: pd.DataFrame) -> list[dict]:
             "note": str(r.get("備註 / Note", "")).strip(),
         })
     return rows
+
+
+
+
+# ===== V300.48 ACCOUNT EDITOR SAVE DELTA FASTPATH =====
+def _v30048_set_account_authority_baseline(df: pd.DataFrame | None) -> None:
+    """Store the last Neon authority snapshot used by Account Editor.
+
+    Account Editor can contain many rows.  Before V300.48, pressing Apply sent
+    every row to save_users(), so the service still had to compare every account
+    and fetch all submitted usernames from Neon.  This session-local baseline lets
+    the page send only rows that actually changed.  It is not an authority source;
+    Neon remains the authority and the baseline is refreshed on reload/save.
+    """
+    try:
+        st.session_state["v30048_account_authority_df"] = _v30047_normalize_account_editor_df(df).copy()
+    except Exception:
+        st.session_state.pop("v30048_account_authority_df", None)
+
+
+def _v30048_get_account_authority_baseline(default_df: pd.DataFrame | None = None) -> pd.DataFrame:
+    base = st.session_state.get("v30048_account_authority_df")
+    if isinstance(base, pd.DataFrame):
+        return _v30047_normalize_account_editor_df(base)
+    if isinstance(default_df, pd.DataFrame):
+        _v30048_set_account_authority_baseline(default_df)
+        return _v30047_normalize_account_editor_df(default_df)
+    return pd.DataFrame()
+
+
+def _v30048_account_compare_value(v) -> str:
+    if pd.isna(v):
+        return ""
+    if isinstance(v, bool):
+        return "1" if v else "0"
+    return str(v or "").strip()
+
+
+def _v30048_account_changed_rows(current_df: pd.DataFrame, baseline_df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    """Return only Account Editor rows that changed versus the last authority snapshot."""
+    current = _v30047_normalize_account_editor_df(current_df)
+    baseline = _v30047_normalize_account_editor_df(baseline_df)
+    base_rows: dict[str, dict] = {}
+    if isinstance(baseline, pd.DataFrame) and not baseline.empty:
+        for _, br in baseline.iterrows():
+            uname = str(br.get("帳號 / Username", "") or "").strip().lower()
+            if uname:
+                base_rows[uname] = dict(br)
+    compare_cols = [
+        "工號 / Employee ID",
+        "姓名 / Display Name",
+        "Email",
+        "角色 / Role",
+        "啟用 / Active",
+        "強制改密碼 / Force Change",
+        "備註 / Note",
+    ]
+    changed_indexes: list[int] = []
+    new_count = 0
+    edited_count = 0
+    password_count = 0
+    for idx, row in current.iterrows():
+        username = str(row.get("帳號 / Username", "") or "").strip()
+        if not username:
+            continue
+        old = base_rows.get(username.lower())
+        row_changed = old is None
+        if old is None:
+            new_count += 1
+        password = _password_from_editor_row(row)
+        if password:
+            row_changed = True
+            password_count += 1
+        if old is not None:
+            for col in compare_cols:
+                if col in {"啟用 / Active", "強制改密碼 / Force Change"}:
+                    old_val = bool(_to_bool_series(pd.DataFrame([old]), col, default=False).iloc[0])
+                    new_val = bool(_to_bool_series(pd.DataFrame([row]), col, default=False).iloc[0])
+                    if old_val != new_val:
+                        row_changed = True
+                        break
+                else:
+                    if _v30048_account_compare_value(old.get(col, "")) != _v30048_account_compare_value(row.get(col, "")):
+                        row_changed = True
+                        break
+        if row_changed:
+            if old is not None:
+                edited_count += 1
+            changed_indexes.append(idx)
+    changed = current.loc[changed_indexes].copy() if changed_indexes else current.iloc[0:0].copy()
+    return changed.reset_index(drop=True), {
+        "submitted": int(len(current)),
+        "changed": int(len(changed)),
+        "new": int(new_count),
+        "edited": int(edited_count),
+        "password": int(password_count),
+    }
+
+
+def _v30048_prepare_account_post_save_df(df: pd.DataFrame, deleted_usernames: list[str] | None = None) -> pd.DataFrame:
+    """Keep a lightweight local post-save preview instead of immediately reloading Neon."""
+    out = _v30047_normalize_account_editor_df(df)
+    deleted = {str(u or "").strip().lower() for u in (deleted_usernames or []) if str(u or "").strip()}
+    if deleted and "帳號 / Username" in out.columns:
+        out = out.loc[~out["帳號 / Username"].astype(str).str.strip().str.lower().isin(deleted)].copy()
+    if "新密碼 / New Password" in out.columns:
+        out["新密碼 / New Password"] = ""
+    if "密碼狀態 / Password Status" in out.columns:
+        out["密碼狀態 / Password Status"] = out["密碼狀態 / Password Status"].map(
+            lambda v: "********" if str(v or "").strip() not in {"", "新帳號請輸入新密碼"} else str(v or "")
+        )
+        out.loc[out["帳號 / Username"].astype(str).str.strip() != "", "密碼狀態 / Password Status"] = "********"
+    return _v30047_normalize_account_editor_df(out)
+# ===== V300.48 ACCOUNT EDITOR SAVE DELTA FASTPATH END =====
 
 
 def _norm_header(v) -> str:
@@ -707,6 +911,8 @@ def _account_import_to_editor_rows(import_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _merge_users_editor(base_df: pd.DataFrame, new_rows: pd.DataFrame) -> pd.DataFrame:
+    base_df = _v30047_normalize_account_editor_df(base_df)
+    new_rows = _v30047_normalize_account_editor_df(new_rows)
     if base_df is None or base_df.empty:
         return new_rows.copy()
     if new_rows is None or new_rows.empty:
@@ -974,7 +1180,11 @@ if _selected_permission_section == "帳號密碼總表 / Account Password Master
             st.info("目前：唯讀保護。請先啟動編輯，再新增、修改、刪除、匯入或貼上帳號。")
 
     if "v133_users_df" not in st.session_state:
-        st.session_state["v133_users_df"] = _users_for_editor()
+        _v30048_initial_users_df = _users_for_editor()
+        st.session_state["v133_users_df"] = _v30048_initial_users_df.copy()
+        _v30048_set_account_authority_baseline(_v30048_initial_users_df)
+    elif "v30048_account_authority_df" not in st.session_state and isinstance(st.session_state.get("v133_users_df"), pd.DataFrame):
+        _v30048_set_account_authority_baseline(st.session_state.get("v133_users_df"))
 
     with account_tab_edit:
         st.markdown("### 新增帳號專用表單 / Stable Add User Form")
@@ -1018,7 +1228,9 @@ if _selected_permission_section == "帳號密碼總表 / Account Password Master
                 if result.get("saved", 0) > 0:
                     st.success(f"帳號已建立 / Account created：{username}")
                     _v104_cache_clear("users", "permissions")
-                    st.session_state["v133_users_df"] = _users_for_editor()
+                    _v30048_reloaded_users_df = _users_for_editor()
+                    st.session_state["v133_users_df"] = _v30048_reloaded_users_df.copy()
+                    _v30048_set_account_authority_baseline(_v30048_reloaded_users_df)
                     try:
                         from services.column_settings_service import clear_editor_draft
                         clear_editor_draft("account")
@@ -1063,19 +1275,7 @@ if _selected_permission_section == "帳號密碼總表 / Account Password Master
             df0 = st.session_state.get("v133_users_df")
             if not isinstance(df0, pd.DataFrame):
                 df0 = _users_for_editor()
-            df0 = df0.copy()
-            try:
-                df0 = df0.loc[:, ~pd.Index(df0.columns).duplicated()].copy()
-            except Exception:
-                pass
-            for _col, _default in [
-                ("刪除 / Delete", False),
-                ("啟用 / Active", True),
-                ("強制改密碼 / Force Change", False),
-            ]:
-                if _col not in df0.columns:
-                    df0[_col] = _default
-                df0[_col] = _to_bool_series(df0, _col).fillna(bool(_default)).astype(bool)
+            df0 = _v30047_normalize_account_editor_df(df0)
             st.session_state["v133_users_df"] = df0
             return df0
 
@@ -1117,7 +1317,9 @@ if _selected_permission_section == "帳號密碼總表 / Account Password Master
         with c6:
             if st.button("⟳ 重新載入 / Reload", use_container_width=True, key="v56_account_reload"):
                 _v104_cache_clear("users")
-                st.session_state["v133_users_df"] = _users_for_editor()
+                _v30048_reloaded_users_df = _users_for_editor()
+                st.session_state["v133_users_df"] = _v30048_reloaded_users_df.copy()
+                _v30048_set_account_authority_baseline(_v30048_reloaded_users_df)
                 _v56_touch_account_editor()
                 st.rerun()
 
@@ -1155,21 +1357,24 @@ if _selected_permission_section == "帳號密碼總表 / Account Password Master
                     hide_index=True,
                     disabled=False,
                     height=360,
-                    column_order=list(dict.fromkeys(["刪除 / Delete"] + [c for c in draft_df.columns if c != "刪除 / Delete"])),
+                    column_order=[c for c in ACCOUNT_EDITOR_COLUMNS if c in draft_df.columns] + [c for c in draft_df.columns if c not in ACCOUNT_EDITOR_COLUMNS],
                     column_config={
-                        "刪除 / Delete": st.column_config.CheckboxColumn("刪除 / Delete"),
-                        "帳號 / Username": st.column_config.TextColumn("帳號 / Username", required=True),
-                        "密碼狀態 / Password Status": st.column_config.TextColumn("密碼 / Password（輸入修改）", help="可直接輸入新密碼；******** 或提示文字代表維持原密碼"),
-                        "新密碼 / New Password": st.column_config.TextColumn("新密碼 / New Password", help="要改密碼才填寫；新增帳號必填"),
-                        "工號 / Employee ID": st.column_config.TextColumn("工號 / Employee ID"),
-                        "姓名 / Display Name": st.column_config.TextColumn("姓名 / Display Name", required=True),
-                        "Email": st.column_config.TextColumn("Email"),
-                        "角色 / Role": st.column_config.SelectboxColumn("角色 / Role", options=ROLE_OPTIONS, required=True),
-                        "啟用 / Active": st.column_config.CheckboxColumn("啟用 / Active"),
-                        "強制改密碼 / Force Change": st.column_config.CheckboxColumn("強制改密碼 / Force Change"),
-                        "備註 / Note": st.column_config.TextColumn("備註 / Note"),
-                        "最後登入 / Last Login": st.column_config.TextColumn("最後登入 / Last Login", disabled=True),
-                        "更新時間 / Updated At": st.column_config.TextColumn("更新時間 / Updated At", disabled=True),
+                        # V300.47：不要再把同一個中英標題傳給 column_config，
+                        # 部分 Streamlit 版本會顯示成「欄名 / label」而造成標題重複。
+                        # 這裡只指定欄位型別/選項，標題直接使用 dataframe 欄名。
+                        "刪除 / Delete": st.column_config.CheckboxColumn(),
+                        "帳號 / Username": st.column_config.TextColumn(required=True),
+                        "密碼狀態 / Password Status": st.column_config.TextColumn(help="可直接輸入新密碼；******** 或提示文字代表維持原密碼"),
+                        "強制改密碼 / Force Change": st.column_config.CheckboxColumn(help="勾選後，該帳號下次登入必須變更密碼。"),
+                        "新密碼 / New Password": st.column_config.TextColumn(help="要改密碼才填寫；新增帳號必填"),
+                        "工號 / Employee ID": st.column_config.TextColumn(),
+                        "姓名 / Display Name": st.column_config.TextColumn(required=True),
+                        "Email": st.column_config.TextColumn(),
+                        "角色 / Role": st.column_config.SelectboxColumn(options=ROLE_OPTIONS, required=True),
+                        "啟用 / Active": st.column_config.CheckboxColumn(),
+                        "備註 / Note": st.column_config.TextColumn(),
+                        "最後登入 / Last Login": st.column_config.TextColumn(disabled=True),
+                        "更新時間 / Updated At": st.column_config.TextColumn(disabled=True),
                     },
                 )
 
@@ -1180,7 +1385,8 @@ if _selected_permission_section == "帳號密碼總表 / Account Password Master
                     disabled=False,
                 )
         else:
-            preview_cols = [c for c in draft_df.columns if c not in {"新密碼 / New Password", "刪除 / Delete"}]
+            preview_cols = [c for c in ACCOUNT_EDITOR_COLUMNS if c in draft_df.columns and c not in {"新密碼 / New Password", "刪除 / Delete"}]
+            preview_cols += [c for c in draft_df.columns if c not in preview_cols and c not in {"新密碼 / New Password", "刪除 / Delete"}]
             st.dataframe(draft_df[preview_cols].head(200), use_container_width=True, hide_index=True, height=320)
             st.caption("唯讀輕量預覽：啟動編輯後才建立可編輯表格；避免每次進入 10 頁都重建大型 data_editor。")
             edited_users = draft_df.copy()
@@ -1200,7 +1406,7 @@ if _selected_permission_section == "帳號密碼總表 / Account Password Master
         m3.metric("密碼異動 / Password Changes", new_password_count)
 
         if submitted_accounts:
-            df = _v30023_apply_account_editor_delta(draft_df, edited_users, account_editor_key)
+            df = _v30047_normalize_account_editor_df(_v30023_apply_account_editor_delta(draft_df, edited_users, account_editor_key))
             try:
                 df = df.loc[:, ~pd.Index(df.columns).duplicated()].copy()
             except Exception:
@@ -1220,31 +1426,42 @@ if _selected_permission_section == "帳號密碼總表 / Account Password Master
                 save_df = df.loc[~df["帳號 / Username"].astype(str).str.strip().isin(to_delete)].copy()
             else:
                 save_df = df.copy()
-            service_rows = _users_to_service_rows(save_df)
-            if callable(_v94_save_account_master):
-                master_result = _v94_save_account_master(service_rows, delete_usernames=to_delete)
-                result = {"saved": int(master_result.get("saved", 0)), "skipped": master_result.get("skipped", [])}
-                deleted = int(master_result.get("deleted", 0))
+            baseline_df = _v30048_get_account_authority_baseline(draft_df)
+            changed_df, delta_info = _v30048_account_changed_rows(save_df, baseline_df)
+            service_rows = _users_to_service_rows(changed_df)
+            master_result = {}
+            if not service_rows and not to_delete:
+                st.info("沒有偵測到帳號資料異動，未寫入 Neon。/ No account changes detected; Neon write skipped.")
             else:
-                result = save_users(service_rows)
-                deleted = delete_users(to_delete)
-            if to_delete and deleted == 0:
-                st.warning("已偵測到刪除勾選，但未刪除任何帳號；admin 系統帳號不可刪除，其他帳號請確認帳號欄位是否有效。")
-            st.success(f"帳號已儲存：{result['saved']} 筆；刪除：{deleted} 筆 / Accounts saved and deleted")
-            _v125_rec = master_result.get("permission_reconcile") if callable(_v94_save_account_master) and isinstance(master_result, dict) else result.get("permission_reconcile")
-            if isinstance(_v125_rec, dict):
-                st.info(
-                    "權限矩陣已同步核對 / Permission matrix reconciled："
-                    f"帳號 {_v125_rec.get('users', 0)}，權限列 {_v125_rec.get('permissions', 0)}，"
-                    f"補齊 {_v125_rec.get('added', 0)}，修正 {_v125_rec.get('upgraded', 0)}。"
+                if callable(_v94_save_account_master):
+                    master_result = _v94_save_account_master(service_rows, delete_usernames=to_delete)
+                    result = {"saved": int(master_result.get("saved", 0)), "skipped": master_result.get("skipped", [])}
+                    deleted = int(master_result.get("deleted", 0))
+                else:
+                    result = save_users(service_rows) if service_rows else {"saved": 0, "skipped": []}
+                    deleted = delete_users(to_delete)
+                if to_delete and deleted == 0:
+                    st.warning("已偵測到刪除勾選，但未刪除任何帳號；admin 系統帳號不可刪除，其他帳號請確認帳號欄位是否有效。")
+                st.success(
+                    f"帳號已儲存：{result['saved']} 筆；刪除：{deleted} 筆；"
+                    f"本次送出 {delta_info.get('submitted', 0)} 筆，只寫入異動 {delta_info.get('changed', 0)} 筆 / Accounts saved with delta fastpath"
                 )
-            if result.get("skipped"):
-                st.warning("；".join(result["skipped"]))
-            _v104_cache_clear("users", "permissions")
-            st.session_state.pop("v133_users_df", None)
-            st.session_state["v166_account_edit_enabled"] = False
-            _v56_touch_account_editor()
-            st.rerun()
+                _v125_rec = master_result.get("permission_reconcile") if callable(_v94_save_account_master) and isinstance(master_result, dict) else result.get("permission_reconcile")
+                if isinstance(_v125_rec, dict):
+                    st.info(
+                        "權限矩陣已同步核對 / Permission matrix reconciled："
+                        f"帳號 {_v125_rec.get('users', 0)}，權限列 {_v125_rec.get('permissions', 0)}，"
+                        f"補齊 {_v125_rec.get('added', 0)}，修正 {_v125_rec.get('upgraded', 0)}。"
+                    )
+                if result.get("skipped"):
+                    st.warning("；".join(result["skipped"]))
+                _v104_cache_clear("users", "permissions")
+                post_save_df = _v30048_prepare_account_post_save_df(save_df, to_delete)
+                st.session_state["v133_users_df"] = post_save_df.copy()
+                _v30048_set_account_authority_baseline(post_save_df)
+                st.session_state["v166_account_edit_enabled"] = False
+                _v56_touch_account_editor()
+                st.rerun()
 
     with account_tab_excel:
         st.markdown("### Excel 匯入帳號密碼設定 / Import Account Password Settings")
