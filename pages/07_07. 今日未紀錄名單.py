@@ -729,6 +729,21 @@ def _v30059_daily_column_config(table_key: str) -> dict:
     }
 
 
+# V300.61：07 頁已在表格前明確呼叫 render_width_settings()，因此直接 data_editor
+# 必須避開全域 column_settings_service 的 st.data_editor wrapper；否則同一張表會同時出現
+# 「頁面自己的欄位設定」與「全域 wrapper 欄位設定」兩組面板。
+# 這裡只繞過 UI 欄位設定 wrapper，不改資料儲存、按鈕流程、表格欄位或 CSS/theme。
+def _v30061_data_editor_without_global_column_settings(*args, **kwargs):
+    try:
+        from services import column_settings_service as _column_settings_service
+        original = getattr(_column_settings_service, "_ORIGINAL_DATA_EDITOR", None)
+        if original is not None and callable(original):
+            return original(*args, **kwargs)
+    except Exception:
+        pass
+    return st.data_editor(*args, **kwargs)
+
+
 def _save_daily_editor_df(editor_df: pd.DataFrame, target_date: str) -> dict[str, Any]:
     incoming = _from_daily_editor_df(editor_df, target_date)
 
@@ -1113,7 +1128,7 @@ else:
     today_table_df = _v30059_today_table_df(editor_df)
     # V300.59：使用內部欄位 key 交給 data_editor，避免中英雙語欄名被重複顯示。
     with st.form("v120_today_attendance_stable_editor_form", clear_on_submit=False):
-        edited = st.data_editor(
+        edited = _v30061_data_editor_without_global_column_settings(
             today_table_df,
             hide_index=True,
             use_container_width=True,
@@ -1224,7 +1239,7 @@ else:
     render_width_settings(V30059_DAILY_ATTENDANCE_TABLE_KEY, daily_table_df, title="欄位設定 / Column Settings（永久保存）")
     daily_table_df = _v30059_daily_table_df(_daily_view)
     with st.form("v234_daily_attendance_stable_editor_form", clear_on_submit=False):
-        daily_edited = st.data_editor(
+        daily_edited = _v30061_data_editor_without_global_column_settings(
             daily_table_df,
             hide_index=True,
             use_container_width=True,
