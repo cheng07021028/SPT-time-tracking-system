@@ -2884,3 +2884,167 @@ def audit_v30057_duplicate_display_header_fix() -> dict[str, Any]:
     }
 # =============== END V300.57 DUPLICATE DISPLAY HEADER FIX ===============
 
+
+# ================= V300.58 FINAL SHARED DUPLICATE HEADER FIX =================
+# Root cause found after V300.57:
+# some tables pass already bilingual display names (e.g. "工號 / Employee ID")
+# into render_table(), while column_config or persisted column settings can still
+# contain fallback labels generated as f"{col} / {col}".  Fix at the last active
+# shared table layer so every caller benefits without touching data writes.
+def _v30058_label_parts(text: str) -> list[str]:
+    return [p.strip() for p in str(text or "").split(" / ") if str(p).strip()]
+
+
+def _v30058_collapse_repeated_label(text: str) -> str:
+    raw = str(text or "").strip()
+    parts = _v30058_label_parts(raw)
+    if len(parts) >= 4 and len(parts) % 2 == 0:
+        half = len(parts) // 2
+        if parts[:half] == parts[half:]:
+            return " / ".join(parts[:half])
+    return raw
+
+
+def _v30058_is_bilingual_or_display_label(text: str) -> bool:
+    raw = _v30058_collapse_repeated_label(str(text or "").strip())
+    if not raw:
+        return False
+    if " / " in raw:
+        # Any existing display slash should be treated as final user-facing label.
+        # This covers "刪除 / Delete", "ID / ID", "單位 / Department".
+        return True
+    try:
+        return bool(re.search(r"[\u4e00-\u9fff].*/.*[A-Za-z]", raw))
+    except Exception:
+        return False
+
+
+def _v30058_label_for(col: str) -> str:
+    key = str(col or "").strip()
+    collapsed = _v30058_collapse_repeated_label(key)
+    if _v30058_is_bilingual_or_display_label(collapsed):
+        return collapsed
+    mapped = COLUMN_LABELS.get(collapsed)
+    if mapped:
+        return _v30058_collapse_repeated_label(str(mapped))
+    return collapsed if collapsed else key
+
+
+# Override label_for again so any later code path using label_for() is safe.
+def label_for(col: str) -> str:  # type: ignore[override]
+    return _v30058_label_for(col)
+
+
+def build_column_config(table_key: str, df: pd.DataFrame) -> dict:  # type: ignore[override]
+    """Final shared table column_config builder.
+
+    - Do not duplicate already bilingual/display labels.
+    - Preserve width settings.
+    - Keep checkbox columns for true boolean/delete columns.
+    - Use generic Column for other fields to avoid Streamlit dtype errors.
+    """
+    widths = load_widths(table_key)
+    config: dict = {}
+    if not isinstance(df, pd.DataFrame):
+        return config
+    for col in list(df.columns):
+        col_key = str(col)
+        label = _v30058_label_for(col_key)
+        width = int(widths.get(col_key, DEFAULT_WIDTHS.get(col_key, 140)))
+        try:
+            series = df[col] if col in df.columns else None
+            if col_key in BOOLEAN_COLUMNS or col_key.lower() in {"_delete", "delete", "selected"} or _v87_bool_like_series(series):
+                config[col] = _v87_checkbox_column(label, width)
+            else:
+                config[col] = _v87_generic_column(label, width)
+        except Exception:
+            config[col] = _v87_generic_column(label, width)
+    return config
+
+
+# Final render_table override.  Keep the existing UI and data flow, but ensure the
+# editable data_editor does not pass column_order directly.  The dataframe has
+# already been ordered by apply_column_order(), and passing column_order through
+# the global wrapper can cause fallback/retry and duplicate key behavior.
+def render_table(
+    df: pd.DataFrame,
+    table_key: str,
+    *,
+    editable: bool = False,
+    disabled: Iterable[str] | None = None,
+    key: str | None = None,
+    height: int | None = None,
+    num_rows: str = "fixed",
+    show_width_settings: bool = True,
+) -> pd.DataFrame | None:  # type: ignore[override]
+    if df is None:
+        st.info("目前沒有資料 / No data")
+        return None
+    if isinstance(df, pd.DataFrame) and df.empty and not editable:
+        st.info("目前沒有資料 / No data")
+        return None
+
+    if not editable and show_width_settings:
+        render_width_settings(table_key, df)
+
+    source_df = df.copy() if isinstance(df, pd.DataFrame) else df
+    if isinstance(source_df, pd.DataFrame):
+        source_df = apply_column_order(table_key, source_df)
+        if not editable:
+            source_df = _v370_fill_readonly_id_for_display(source_df, editable=False)
+        display_df = _format_duration_columns_for_display(source_df)
+        display_df = _prepare_display_dataframe(display_df)
+    else:
+        display_df = source_df
+
+    cfg = build_column_config(table_key, display_df) if isinstance(display_df, pd.DataFrame) else {}
+    disabled_cols = list(disabled or [])
+    for c in ("work_hours", "total_hours", "avg_hours"):
+        if isinstance(display_df, pd.DataFrame) and c in display_df.columns and c not in disabled_cols:
+            disabled_cols.append(c)
+    if editable:
+        for c in ("id", "ID / ID"):
+            if isinstance(display_df, pd.DataFrame) and c in display_df.columns and c not in disabled_cols:
+                disabled_cols.append(c)
+
+    if editable:
+        return st.data_editor(
+            display_df,
+            use_container_width=True,
+            hide_index=True,
+            column_config=cfg,
+            disabled=disabled_cols,
+            num_rows=num_rows,
+            key=key or f"editor_{table_key}",
+            height=height,
+        )
+
+    visual_order = [str(c) for c in display_df.columns] if isinstance(display_df, pd.DataFrame) else None
+    st.dataframe(
+        display_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config=cfg,
+        column_order=visual_order,
+        height=height,
+        key=key or f"frame_{table_key}",
+    )
+    return None
+
+
+def audit_v30058_shared_table_duplicate_header_final_fix() -> dict[str, Any]:
+    samples = [
+        "刪除 / Delete",
+        "刪除 / Delete / 刪除 / Delete",
+        "ID / ID / ID / ID",
+        "工號 / Employee ID / 工號 / Employee ID",
+        "姓名 / Name / 姓名 / Name",
+        "employee_id",
+    ]
+    return {
+        "version": "V300.58_SHARED_TABLE_DUPLICATE_HEADER_FINAL_FIX",
+        "samples": {s: _v30058_label_for(s) for s in samples},
+        "editable_data_editor_column_order_removed": True,
+        "data_write_flow_changed": False,
+    }
+# =============== END V300.58 FINAL SHARED DUPLICATE HEADER FIX ===============

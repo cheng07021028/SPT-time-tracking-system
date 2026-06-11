@@ -1720,3 +1720,84 @@ def save_settings(settings: Dict[str, Any], *, upload: bool = False) -> None:  #
             _v31_prev_column_save_settings(settings)
 
 # ===== END V31 NEON SINGLE SOURCE COLUMN SETTINGS OVERRIDE =====
+
+# ================= V300.58 COLUMN SETTINGS DUPLICATE HEADER GUARD =================
+# The global column-settings wrapper can also generate duplicated labels for
+# already bilingual display columns.  Keep the existing wrapper/UI, but sanitize
+# labels before they reach Streamlit column_config or the settings editor.
+def _v30058_label_parts(text: str) -> list[str]:
+    return [p.strip() for p in str(text or "").split(" / ") if str(p).strip()]
+
+
+def _v30058_collapse_repeated_label(text: str) -> str:
+    raw = str(text or "").strip()
+    parts = _v30058_label_parts(raw)
+    if len(parts) >= 4 and len(parts) % 2 == 0:
+        half = len(parts) // 2
+        if parts[:half] == parts[half:]:
+            return " / ".join(parts[:half])
+    return raw
+
+
+def _v30058_is_existing_display_label(text: str) -> bool:
+    raw = _v30058_collapse_repeated_label(str(text or "").strip())
+    if not raw:
+        return False
+    if " / " in raw:
+        return True
+    try:
+        return bool(re.search(r"[\u4e00-\u9fff].*/.*[A-Za-z]", raw))
+    except Exception:
+        return False
+
+
+def _v30058_label_for_column(key: str) -> str:
+    col = _v30058_collapse_repeated_label(str(key or "").strip())
+    if _v30058_is_existing_display_label(col):
+        return col
+    mapped = COLUMN_LABELS.get(col)
+    if mapped:
+        return _v30058_collapse_repeated_label(str(mapped))
+    return col if col else str(key or "")
+
+
+def _default_column_setting(col: str) -> Dict[str, Any]:  # type: ignore[override]
+    key = str(col)
+    return {
+        "source": key,
+        "label": _v30058_label_for_column(key),
+        "visible": True,
+        "width": "medium",
+        "order": 999,
+    }
+
+
+def _build_column_config(df: pd.DataFrame, table_setting: Dict[str, Any]) -> Dict[str, Any]:  # type: ignore[override]
+    config = {}
+    col_settings = table_setting.get("columns", {}) if isinstance(table_setting, dict) else {}
+    for col in df.columns:
+        key = str(col)
+        meta = col_settings.get(key, _default_column_setting(key)) if isinstance(col_settings, dict) else _default_column_setting(key)
+        raw_label = meta.get("label") if isinstance(meta, dict) else None
+        label = _v30058_collapse_repeated_label(str(raw_label or _v30058_label_for_column(key)))
+        width = (meta.get("width") if isinstance(meta, dict) else None) or "medium"
+        try:
+            config[col] = st.column_config.Column(label=label, width=width)
+        except Exception:
+            config[col] = label
+    return config
+
+
+def audit_v30058_column_settings_duplicate_header_guard() -> Dict[str, Any]:
+    samples = [
+        "刪除 / Delete",
+        "刪除 / Delete / 刪除 / Delete",
+        "工號 / Employee ID / 工號 / Employee ID",
+        "employee_id",
+    ]
+    return {
+        "version": "V300.58_COLUMN_SETTINGS_DUPLICATE_HEADER_GUARD",
+        "samples": {s: _v30058_label_for_column(s) for s in samples},
+        "data_write_flow_changed": False,
+    }
+# =============== END V300.58 COLUMN SETTINGS DUPLICATE HEADER GUARD ===============
