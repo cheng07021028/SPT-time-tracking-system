@@ -71,13 +71,28 @@ def load_analysis_filters() -> dict[str, Any]:
     return _normalize(filters)
 
 
+def _write_local_filter_cache(payload: dict[str, Any]) -> None:
+    for path in (CONFIG_PATH, STATE_PATH, MODULE_PATH):
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+
+
 def save_analysis_filters(filters: dict[str, Any]) -> None:
     payload = _default_filters(); payload.update(filters or {})
     payload["version"] = "neon-v31"; payload["updated_at"] = now_text()
     if _neon_enabled():
-        from services.neon_authority_service import save_payload
-        save_payload("05_analysis", "analysis_filter_settings", payload, user="SYSTEM")
-        return
-    for path in (CONFIG_PATH, STATE_PATH, MODULE_PATH):
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        try:
+            from services.neon_authority_service import save_payload
+            result = save_payload("05_analysis", "analysis_filter_settings", payload, user="SYSTEM")
+            # Keep a local cache/fallback as well.  Neon remains the authority,
+            # but this prevents a transient AdminShutdown from crashing 05 and
+            # preserves the latest filter locally until Neon is available again.
+            _write_local_filter_cache(payload)
+            return
+        except Exception:
+            _write_local_filter_cache(payload)
+            return
+    _write_local_filter_cache(payload)

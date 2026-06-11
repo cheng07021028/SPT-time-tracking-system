@@ -21,7 +21,7 @@ except Exception:  # pragma: no cover
 from services.theme_service import apply_theme, render_header
 from services.security_service import require_module_access, check_permission
 from services.crud_table_service import load_employees, save_employees
-from services.time_record_service import load_records
+from services.time_record_service import load_records, load_daily_record_summary_sql
 from services.table_ui_service import render_table
 
 st.set_page_config(page_title="07. 今日未紀錄名單", page_icon="⟁️", layout="wide")
@@ -94,6 +94,12 @@ V30032_DAILY_KIND_PREFIX = "records_by_date"
 V30032_SELECTED_MISSING_CACHE_KEY = "v30032_07_selected_missing_cache"
 V30032_SELECTED_MISSING_TTL_SECONDS = 15
 V30032_DAILY_EXCEL_SIG_KEY = "v30032_daily_attendance_excel_sig"
+
+# V300.55：07 Load/Reload 防止一直運轉快速路徑。
+# - Load/Reload 不再多做一次 st.rerun()，避免同一輪載入後又馬上重跑。
+# - 舊版全量 records payload 優先用 SQL jsonb 只取指定日期，避免整包 JSON 下載/解析。
+# - 未紀錄名單改用 08 共用的輕量每日工時 SQL，不再呼叫 load_records() 讀完整欄位。
+V30055_DAILY_LOAD_MESSAGE_KEY = "v30055_07_daily_load_message"
 
 DAILY_COLS = [
     "record_id",
@@ -351,6 +357,78 @@ def _v30032_load_daily_rows_for_date_from_neon(target_date: str) -> list[dict[st
         return None
 
 
+def _v30055_load_legacy_daily_rows_for_date_from_neon_sql(target_date: str) -> list[dict[str, Any]] | None:
+    """Load one date from the old all-date Neon payload without pulling the whole JSON to Python.
+
+    V300.32 already introduced per-date payloads.  Sites that still have only
+    the legacy ``kind='records'`` payload used to hit load_payload() and parse
+    the full historical JSON on every Load/Reload.  On Neon Free this can look
+    like the button never stops.  This SQL extracts only rows whose
+    attendance_date matches target_date.  ``None`` means the optimized fallback
+    was not usable, not that there are rows.
+    """
+    try:
+        from services.neon_authority_service import is_neon_enabled
+        from services.db_service import query_df
+        if not is_neon_enabled():
+            return None
+        d = _date_to_text(target_date)
+        sql = """
+            WITH src AS (
+                SELECT payload::jsonb AS p
+                FROM spt_module_authority
+                WHERE module_key = ? AND kind = 'records' AND deleted_at IS NULL
+                LIMIT 1
+            ), rows AS (
+                SELECT value AS row_payload
+                FROM src, jsonb_array_elements(
+                    CASE
+                        WHEN jsonb_typeof(p->'records') = 'array' THEN p->'records'
+                        WHEN jsonb_typeof(p->'tables'->'daily_attendance') = 'array' THEN p->'tables'->'daily_attendance'
+                        ELSE '[]'::jsonb
+                    END
+                ) AS value
+            )
+            SELECT row_payload::text AS row_payload
+            FROM rows
+            WHERE COALESCE(row_payload->>'attendance_date', '') = ?
+            LIMIT 5000
+        """
+        df = query_df(sql, (DAILY_MODULE_KEY, d))
+        if df is None or not isinstance(df, pd.DataFrame):
+            return None
+        out: list[dict[str, Any]] = []
+        for raw in df.get("row_payload", pd.Series(dtype=str)).tolist():
+            try:
+                val = json.loads(str(raw))
+                if isinstance(val, dict):
+                    out.append(val)
+            except Exception:
+                continue
+        return _normalise_daily_rows(out)
+    except Exception:
+        return None
+
+
+def _v30055_load_time_records_summary_for_date(target_date: str) -> pd.DataFrame:
+    """Lightweight selected-date work summary for 07 missing-list calculations."""
+    try:
+        df = load_daily_record_summary_sql(_date_to_text(target_date))
+        if isinstance(df, pd.DataFrame):
+            return df.copy()
+    except Exception:
+        pass
+    # Last-resort compatibility fallback.  This should normally not run after V300.33.
+    try:
+        df = load_records(start_date=_date_to_text(target_date), end_date=_date_to_text(target_date))
+        if isinstance(df, pd.DataFrame):
+            keep = [c for c in ["employee_id", "employee_name", "work_hours", "end_timestamp", "status", "start_timestamp", "start_time", "start_date"] if c in df.columns]
+            return df[keep].copy() if keep else pd.DataFrame()
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
 def _v30032_save_daily_rows_for_date_to_neon(target_date: str, rows: list[dict[str, Any]], *, reason: str) -> bool:
     """Save only one attendance date to Neon.
 
@@ -485,8 +563,19 @@ def _load_daily_rows_for_date(target_date: str, employee_df: pd.DataFrame) -> pd
     # V300.32：正式 Neon 先讀單日 payload；舊資料尚未轉成單日 payload 時才回退讀 legacy 全量 payload。
     rows = _v30032_load_daily_rows_for_date_from_neon(target_date)
     if rows is None:
-        all_rows = _load_all_daily_attendance_rows()
-        rows = [r for r in all_rows if _date_to_text(r.get("attendance_date")) == target_date]
+        # V300.55：若尚未有單日 payload，先用 Neon SQL 從舊全量 payload 只取指定日期。
+        # 只有非 Neon / SQL fallback 失敗時才回退舊本機 JSON 全量讀取，避免 Load/Reload 長時間運轉。
+        rows = _v30055_load_legacy_daily_rows_for_date_from_neon_sql(target_date)
+        if rows is None:
+            try:
+                from services.neon_authority_service import is_neon_enabled
+                if is_neon_enabled():
+                    rows = []
+                else:
+                    all_rows = _load_all_daily_attendance_rows()
+                    rows = [r for r in all_rows if _date_to_text(r.get("attendance_date")) == target_date]
+            except Exception:
+                rows = []
     if not rows:
         rows = _default_daily_rows_from_employee_master(target_date, employee_df)
     return pd.DataFrame(_normalise_daily_rows(rows), columns=DAILY_COLS)
@@ -595,10 +684,7 @@ def _build_missing_from_daily_attendance(att_df: pd.DataFrame, target_date: str)
         att["last_start_time"] = ""
         att["today_record_count"] = 0
         return att[["employee_id", "employee_name", "department", "title", "attendance_status", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]]
-    try:
-        rec = load_records(start_date=target_date, end_date=target_date)
-    except Exception:
-        rec = pd.DataFrame()
+    rec = _v30055_load_time_records_summary_for_date(target_date)
     if rec is None or not isinstance(rec, pd.DataFrame) or rec.empty or "employee_id" not in rec.columns:
         att["last_start_time"] = ""
         att["today_record_count"] = 0
@@ -817,10 +903,7 @@ def _build_missing_today_df(employee_df: pd.DataFrame, target_date: str) -> pd.D
         out["today_record_count"] = 0
         return out[["employee_id", "employee_name", "department", "title", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]]
 
-    try:
-        rec = load_records(start_date=target_date, end_date=target_date)
-    except Exception:
-        rec = pd.DataFrame()
+    rec = _v30055_load_time_records_summary_for_date(target_date)
     if rec is None or not isinstance(rec, pd.DataFrame) or rec.empty or "employee_id" not in rec.columns:
         emp["last_start_time"] = ""
         emp["today_record_count"] = 0
@@ -959,10 +1042,12 @@ if msg:
 btn1, btn2, btn3, btn4 = st.columns(4)
 if btn1.button("⟳ 載入/重新載入出勤紀錄 / Load / Reload", use_container_width=True, key="v234_daily_reload"):
     _v30032_clear_daily_output_cache()
-    st.session_state[DAILY_STATE_KEY] = _load_daily_rows_for_date(selected_date, current_employee_df)
+    with st.spinner("正在載入所選日期出勤紀錄，請稍候 / Loading selected attendance records..."):
+        loaded_df = _load_daily_rows_for_date(selected_date, current_employee_df)
+    st.session_state[DAILY_STATE_KEY] = loaded_df
     st.session_state[DAILY_LOADED_KEY] = True
     st.session_state[DAILY_REV_KEY] = int(st.session_state.get(DAILY_REV_KEY, 0)) + 1
-    rerun()
+    st.session_state[V30055_DAILY_LOAD_MESSAGE_KEY] = f"已載入 {selected_date} 出勤紀錄 {len(loaded_df):,} 筆。"
 if btn2.button("＋ 依人員名單補齊 / Fill From Employees", use_container_width=True, key="v234_daily_fill_from_employees"):
     _v30032_clear_daily_output_cache()
     base = st.session_state.get(DAILY_STATE_KEY, pd.DataFrame()).copy()
@@ -996,6 +1081,10 @@ if btn4.button("☐ 全部未出勤 / Clear Attendance", use_container_width=Tru
         st.session_state[DAILY_STATE_KEY] = df0
         st.session_state[DAILY_REV_KEY] = int(st.session_state.get(DAILY_REV_KEY, 0)) + 1
         rerun()
+
+_load_msg = st.session_state.pop(V30055_DAILY_LOAD_MESSAGE_KEY, "")
+if _load_msg:
+    st.success(_load_msg)
 
 _daily_editor_key = f"v234_daily_attendance_editor_{selected_date}_{st.session_state.get(DAILY_REV_KEY, 0)}"
 _daily_df = pd.DataFrame(st.session_state.get(DAILY_STATE_KEY, pd.DataFrame()), columns=DAILY_COLS)
