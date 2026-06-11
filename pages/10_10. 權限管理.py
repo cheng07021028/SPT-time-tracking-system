@@ -387,6 +387,25 @@ def _v95_raw_data_editor(data=None, *args, **kwargs):
     except Exception:
         pass
     return st.data_editor(data, *args, **kwargs)
+
+
+def _v30053_raw_dataframe(data=None, *args, **kwargs):
+    """Use Streamlit native dataframe for the local Account Editor preview.
+
+    V300.52 still used st.dataframe for the read-only preview, so the global
+    column-settings wrapper could render its own auto-save settings panel and
+    duplicate the page-local Account Editor behavior.  Account Editor now owns
+    its own explicit Apply/Reset column settings panel, so preview rendering must
+    bypass the global wrapper exactly like the editable data_editor path.
+    """
+    try:
+        import services.column_settings_service as _css
+        _orig = getattr(_css, "_ORIGINAL_DATAFRAME", None)
+        if callable(_orig):
+            return _orig(data, *args, **kwargs)
+    except Exception:
+        pass
+    return st.dataframe(data, *args, **kwargs)
 # ===== V95 FAST RAW EDITOR HELPER END =====
 
 with st.expander("⧠ 權限設定使用說明 / User Guide", expanded=False):
@@ -809,6 +828,264 @@ def _v30052_preview_column_order(df: pd.DataFrame | None) -> list[str]:
     ]
     return [c for c in preferred if c in df.columns] + [c for c in df.columns if c not in preferred]
 # ===== V300.52 ACCOUNT EDITOR PREVIEW HEADER FIX END =====
+
+
+# ===== V300.53 ACCOUNT EDITOR LOCAL COLUMN SETTINGS START =====
+ACCOUNT_EDITOR_TABLE_ID = "10.permissions.account_master"
+ACCOUNT_EDITOR_DEFAULT_LABELS = {
+    "delete": "刪除 / Delete",
+    "username": "帳號 / Username",
+    "password_status": "密碼狀態 / Password Status",
+    "force_password_change": "強制改密碼 / Force Change",
+    "new_password": "新密碼 / New Password",
+    "employee_id": "工號 / Employee ID",
+    "display_name": "姓名 / Display Name",
+    "email": "Email",
+    "role_code": "角色 / Role",
+    "is_active": "啟用 / Active",
+    "note": "備註 / Note",
+    "last_login": "最後登入 / Last Login",
+    "updated_at": "更新時間 / Updated At",
+}
+ACCOUNT_EDITOR_DEFAULT_WIDTHS = {
+    "delete": "small",
+    "username": "medium",
+    "password_status": "medium",
+    "force_password_change": "medium",
+    "new_password": "medium",
+    "employee_id": "medium",
+    "display_name": "medium",
+    "email": "medium",
+    "role_code": "small",
+    "is_active": "small",
+    "note": "large",
+    "last_login": "medium",
+    "updated_at": "medium",
+}
+ACCOUNT_EDITOR_WIDTH_OPTIONS = ["small", "medium", "large"]
+
+
+def _v30053_default_account_column_setting(col: str, order: int) -> dict:
+    key = str(col)
+    return {
+        "source": key,
+        "label": ACCOUNT_EDITOR_DEFAULT_LABELS.get(key, key),
+        "visible": True,
+        "width": ACCOUNT_EDITOR_DEFAULT_WIDTHS.get(key, "medium"),
+        "order": int(order),
+    }
+
+
+def _v30053_load_account_column_setting(columns: list[str]) -> dict:
+    """Load Account Editor column settings without invoking the global wrapper.
+
+    The Account Editor must keep using native st.data_editor for performance and
+    duplicate-header safety.  Therefore it renders its own column-settings panel
+    and stores settings into the same permanent column-settings service, using a
+    stable table id.  This only controls visual order/visibility/width/labels;
+    it does not alter Account Editor data, save_users(), or Neon authority rows.
+    """
+    cols = [str(c) for c in columns]
+    setting = {"columns": {}}
+    try:
+        import services.column_settings_service as _css
+        loader = getattr(_css, "_get_table_setting", None)
+        if callable(loader):
+            loaded = loader(ACCOUNT_EDITOR_TABLE_ID, cols)
+            if isinstance(loaded, dict):
+                setting = dict(loaded)
+    except Exception:
+        setting = {"columns": {}}
+    col_settings = dict(setting.get("columns", {}) if isinstance(setting.get("columns"), dict) else {})
+    for idx, col in enumerate(cols):
+        meta = dict(col_settings.get(col) or _v30053_default_account_column_setting(col, idx))
+        meta.setdefault("source", col)
+        meta.setdefault("label", ACCOUNT_EDITOR_DEFAULT_LABELS.get(col, col))
+        meta.setdefault("visible", True)
+        meta.setdefault("width", ACCOUNT_EDITOR_DEFAULT_WIDTHS.get(col, "medium"))
+        meta.setdefault("order", idx)
+        if col == "delete":
+            meta["visible"] = True
+            meta["order"] = -999
+        col_settings[col] = meta
+    setting["columns"] = col_settings
+    return setting
+
+
+def _v30053_save_account_column_setting(setting: dict) -> None:
+    try:
+        import services.column_settings_service as _css
+        saver = getattr(_css, "_save_table_setting", None)
+        if callable(saver):
+            saver(ACCOUNT_EDITOR_TABLE_ID, setting)
+            return
+    except Exception:
+        pass
+
+
+def _v30053_account_column_order(df: pd.DataFrame | None, setting: dict) -> list[str]:
+    if not isinstance(df, pd.DataFrame):
+        return []
+    col_settings = setting.get("columns", {}) if isinstance(setting.get("columns"), dict) else {}
+    rows = []
+    for idx, col in enumerate([str(c) for c in df.columns]):
+        meta = dict(col_settings.get(col) or _v30053_default_account_column_setting(col, idx))
+        visible = bool(meta.get("visible", True))
+        try:
+            order = int(meta.get("order", idx))
+        except Exception:
+            order = idx
+        if col == "delete":
+            visible = True
+            order = -999
+        rows.append((order, col, visible))
+    rows.sort(key=lambda x: (x[0], x[1]))
+    visible_cols = [col for _, col, visible in rows if visible and col in df.columns]
+    return visible_cols or [str(c) for c in df.columns]
+
+
+def _v30053_label(setting: dict, col: str) -> str:
+    try:
+        meta = (setting.get("columns") or {}).get(str(col), {})
+        label = str(meta.get("label") or "").strip()
+        if label:
+            return label
+    except Exception:
+        pass
+    return ACCOUNT_EDITOR_DEFAULT_LABELS.get(str(col), str(col))
+
+
+def _v30053_width(setting: dict, col: str) -> str:
+    try:
+        meta = (setting.get("columns") or {}).get(str(col), {})
+        width = str(meta.get("width") or "").strip()
+        if width in ACCOUNT_EDITOR_WIDTH_OPTIONS:
+            return width
+    except Exception:
+        pass
+    return ACCOUNT_EDITOR_DEFAULT_WIDTHS.get(str(col), "medium")
+
+
+def _v30053_account_editor_column_config(setting: dict, *, readonly: bool = False) -> dict:
+    """Return Account Editor column_config from explicit local settings."""
+    return {
+        "delete": st.column_config.CheckboxColumn(_v30053_label(setting, "delete"), width=_v30053_width(setting, "delete")),
+        "username": st.column_config.TextColumn(_v30053_label(setting, "username"), required=True, disabled=readonly, width=_v30053_width(setting, "username")),
+        "password_status": st.column_config.TextColumn(
+            _v30053_label(setting, "password_status"),
+            help="可直接輸入新密碼；******** 或提示文字代表維持原密碼",
+            disabled=readonly,
+            width=_v30053_width(setting, "password_status"),
+        ),
+        "force_password_change": st.column_config.CheckboxColumn(
+            _v30053_label(setting, "force_password_change"),
+            help="勾選後，該帳號下次登入必須變更密碼。",
+            disabled=readonly,
+            width=_v30053_width(setting, "force_password_change"),
+        ),
+        "new_password": st.column_config.TextColumn(
+            _v30053_label(setting, "new_password"),
+            help="要改密碼才填寫；新增帳號必填",
+            disabled=readonly,
+            width=_v30053_width(setting, "new_password"),
+        ),
+        "employee_id": st.column_config.TextColumn(_v30053_label(setting, "employee_id"), disabled=readonly, width=_v30053_width(setting, "employee_id")),
+        "display_name": st.column_config.TextColumn(_v30053_label(setting, "display_name"), required=True, disabled=readonly, width=_v30053_width(setting, "display_name")),
+        "email": st.column_config.TextColumn(_v30053_label(setting, "email"), disabled=readonly, width=_v30053_width(setting, "email")),
+        "role_code": st.column_config.SelectboxColumn(_v30053_label(setting, "role_code"), options=ROLE_OPTIONS, required=True, disabled=readonly, width=_v30053_width(setting, "role_code")),
+        "is_active": st.column_config.CheckboxColumn(_v30053_label(setting, "is_active"), disabled=readonly, width=_v30053_width(setting, "is_active")),
+        "note": st.column_config.TextColumn(_v30053_label(setting, "note"), disabled=readonly, width=_v30053_width(setting, "note")),
+        "last_login": st.column_config.TextColumn(_v30053_label(setting, "last_login"), disabled=True, width=_v30053_width(setting, "last_login")),
+        "updated_at": st.column_config.TextColumn(_v30053_label(setting, "updated_at"), disabled=True, width=_v30053_width(setting, "updated_at")),
+    }
+
+
+def _v30053_render_account_column_settings(columns: list[str]) -> dict:
+    """Render Account Editor column settings with explicit Apply/Reset buttons.
+
+    This replaces the hidden/global auto-save settings path for Account Editor.
+    It is intentionally outside the Account Editor form, so Apply/Reset buttons
+    are valid Streamlit buttons and will not submit account data.
+    """
+    cols = [str(c) for c in columns]
+    setting = _v30053_load_account_column_setting(cols)
+    col_settings = dict(setting.get("columns", {}))
+    rows = []
+    for idx, col in enumerate(cols):
+        meta = dict(col_settings.get(col) or _v30053_default_account_column_setting(col, idx))
+        rows.append({
+            "顯示 / Visible": True if col == "delete" else bool(meta.get("visible", True)),
+            "欄位 / Column": col,
+            "標題 / Header": str(meta.get("label") or ACCOUNT_EDITOR_DEFAULT_LABELS.get(col, col)),
+            "順序 / Order": -999 if col == "delete" else int(meta.get("order", idx)),
+            "欄寬 / Width": str(meta.get("width") or ACCOUNT_EDITOR_DEFAULT_WIDTHS.get(col, "medium")),
+        })
+    settings_df = pd.DataFrame(rows)
+    with st.expander("欄位設定 / Column Settings（永久保存）", expanded=False):
+        st.caption("V300.53：帳號總表使用獨立欄位設定。修改後請按『套用欄位設定』才會寫入永久設定；不會自動寫 Neon，也不會提交帳號資料。")
+        edited_settings = _v95_raw_data_editor(
+            settings_df,
+            key="v30053_account_editor_column_settings",
+            use_container_width=True,
+            hide_index=True,
+            height=340,
+            num_rows="fixed",
+            column_config={
+                "顯示 / Visible": st.column_config.CheckboxColumn("顯示 / Visible"),
+                "欄位 / Column": st.column_config.TextColumn("欄位 / Column", disabled=True),
+                "標題 / Header": st.column_config.TextColumn("標題 / Header"),
+                "順序 / Order": st.column_config.NumberColumn("順序 / Order", min_value=-999, step=1),
+                "欄寬 / Width": st.column_config.SelectboxColumn("欄寬 / Width", options=ACCOUNT_EDITOR_WIDTH_OPTIONS),
+            },
+        )
+        a1, a2, a3 = st.columns([1.2, 1.2, 3])
+        with a1:
+            apply_clicked = st.button("套用欄位設定 / Apply Column Settings", key="v30053_apply_account_columns", use_container_width=True)
+        with a2:
+            reset_clicked = st.button("恢復預設欄位 / Reset Defaults", key="v30053_reset_account_columns", use_container_width=True)
+        if apply_clicked:
+            new_cols = {}
+            try:
+                for _, row in pd.DataFrame(edited_settings).iterrows():
+                    col = str(row.get("欄位 / Column", "")).strip()
+                    if col not in cols:
+                        continue
+                    visible = True if col == "delete" else bool(row.get("顯示 / Visible", True))
+                    try:
+                        order = int(row.get("順序 / Order", 999))
+                    except Exception:
+                        order = 999
+                    if col == "delete":
+                        order = -999
+                    width = str(row.get("欄寬 / Width") or ACCOUNT_EDITOR_DEFAULT_WIDTHS.get(col, "medium"))
+                    if width not in ACCOUNT_EDITOR_WIDTH_OPTIONS:
+                        width = ACCOUNT_EDITOR_DEFAULT_WIDTHS.get(col, "medium")
+                    label = str(row.get("標題 / Header") or ACCOUNT_EDITOR_DEFAULT_LABELS.get(col, col)).strip() or ACCOUNT_EDITOR_DEFAULT_LABELS.get(col, col)
+                    new_cols[col] = {
+                        "source": col,
+                        "label": label,
+                        "visible": visible,
+                        "width": width,
+                        "order": order,
+                    }
+                for idx, col in enumerate(cols):
+                    new_cols.setdefault(col, _v30053_default_account_column_setting(col, idx))
+                setting["columns"] = new_cols
+                _v30053_save_account_column_setting(setting)
+                st.success("欄位設定已套用並永久保存。")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"欄位設定套用失敗：{exc}")
+        if reset_clicked:
+            setting["columns"] = {col: _v30053_default_account_column_setting(col, idx) for idx, col in enumerate(cols)}
+            if "delete" in setting["columns"]:
+                setting["columns"]["delete"]["visible"] = True
+                setting["columns"]["delete"]["order"] = -999
+            _v30053_save_account_column_setting(setting)
+            st.success("欄位設定已恢復預設並永久保存。")
+            st.rerun()
+    return _v30053_load_account_column_setting(cols)
+# ===== V300.53 ACCOUNT EDITOR LOCAL COLUMN SETTINGS END =====
 
 
 def _users_for_editor() -> pd.DataFrame:
@@ -1520,9 +1797,17 @@ if _selected_permission_section == "帳號密碼總表 / Account Password Master
 
         account_editor_key = f"v102_account_password_editor_{st.session_state.get('v235_account_editor_rev', 0)}"
         draft_df = _v56_prepare_account_draft()
+        editor_input_df_for_settings = _v30051_account_editor_to_internal(draft_df)
+        account_column_setting = _v30053_render_account_column_settings([
+            c for c in ACCOUNT_EDITOR_INTERNAL_COLUMNS if c in editor_input_df_for_settings.columns
+        ] + [
+            c for c in editor_input_df_for_settings.columns if c not in ACCOUNT_EDITOR_INTERNAL_COLUMNS
+        ])
 
         # V104：唯讀狀態使用輕量表格預覽，不建立重型 data_editor。
         # 啟動編輯後才建立 data_editor，且放在 form 內，編輯時不寫 Neon、不重算、不重讀。
+        # V300.53：Account Editor 使用頁面本地欄位設定面板；編輯與唯讀預覽都套用同一份設定，
+        # 並保留明確「套用欄位設定」按鈕，不再依賴全域 wrapper 自動保存。
         if account_edit_enabled:
             with st.form("v102_account_editor_commit_form", clear_on_submit=False):
                 editor_input_df = _v30051_account_editor_to_internal(draft_df)
@@ -1534,9 +1819,8 @@ if _selected_permission_section == "帳號密碼總表 / Account Password Master
                     hide_index=True,
                     disabled=False,
                     height=360,
-                    column_order=[c for c in ACCOUNT_EDITOR_INTERNAL_COLUMNS if c in editor_input_df.columns]
-                    + [c for c in editor_input_df.columns if c not in ACCOUNT_EDITOR_INTERNAL_COLUMNS],
-                    column_config=_v30051_account_editor_column_config(),
+                    column_order=_v30053_account_column_order(editor_input_df, account_column_setting),
+                    column_config=_v30053_account_editor_column_config(account_column_setting, readonly=False),
                 )
                 edited_users = _v30051_account_editor_from_internal(edited_users_internal)
 
@@ -1548,18 +1832,16 @@ if _selected_permission_section == "帳號密碼總表 / Account Password Master
                 )
         else:
             # V300.52：唯讀預覽也必須使用 internal keys。
-            # V300.51 只修了 editable data_editor；這裡若仍把「帳號 / Username」
-            # 這類雙語欄名送進全域 column-settings wrapper，就會被顯示成
-            # 「帳號 / Username / 帳號 / Username」。
+            # V300.53：使用 native dataframe 避開全域 wrapper，由本頁欄位設定面板負責套用/保存。
             preview_internal_df = _v30052_account_editor_preview_df(draft_df).head(200)
-            st.dataframe(
+            _v30053_raw_dataframe(
                 preview_internal_df,
                 use_container_width=True,
                 hide_index=True,
                 height=320,
                 key="v30052_account_editor_readonly_preview",
-                column_order=_v30052_preview_column_order(preview_internal_df),
-                column_config=_v30052_account_editor_preview_config(),
+                column_order=_v30053_account_column_order(preview_internal_df, account_column_setting),
+                column_config=_v30053_account_editor_column_config(account_column_setting, readonly=True),
             )
             st.caption("唯讀輕量預覽：啟動編輯後才建立可編輯表格；避免每次進入 10 頁都重建大型 data_editor。")
             edited_users = draft_df.copy()
