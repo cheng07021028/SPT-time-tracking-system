@@ -717,12 +717,19 @@ def render_table(
     # table_ui_service 已套用的順序，造成「順序設定後標題欄沒變」。
     visual_order = [str(c) for c in display_df.columns]
     if editable:
+        # V300.54: do not pass column_order to st.data_editor.
+        # The dataframe has already been reordered above by apply_column_order(),
+        # so this parameter is redundant for editable tables.  On some Streamlit
+        # builds the global column-settings wrapper retries data_editor without
+        # column_order after a TypeError; the first failed call may already have
+        # registered the widget key, causing StreamlitDuplicateElementKey inside
+        # forms before the submit buttons are rendered.  Removing the redundant
+        # parameter prevents the retry path while preserving the visible order.
         return st.data_editor(
             display_df,
             use_container_width=True,
             hide_index=True,
             column_config=cfg,
-            column_order=visual_order,
             disabled=disabled_cols,
             num_rows=num_rows,
             key=key or f"editor_{table_key}",
