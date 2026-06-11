@@ -34,6 +34,32 @@ except Exception:
     def require_module_access(module_code: str):
         return True
 
+
+# V300.60：本頁已自行提供「欄位設定 / Column Settings」面板。
+# 直接呼叫 st.data_editor / st.dataframe 會再被全域 column_settings wrapper 包一層，
+# 造成第二個欄位設定面板與標題重複。因此本頁表格一律走原生 Streamlit 函式，
+# 只保留本頁自己的 Apply/Reset 欄位設定，不改任何資料儲存流程。
+def _v30060_raw_data_editor(*args, **kwargs):
+    try:
+        import services.column_settings_service as _spt_col_settings
+        fn = getattr(_spt_col_settings, "_ORIGINAL_DATA_EDITOR", None)
+        if callable(fn):
+            return fn(*args, **kwargs)
+    except Exception:
+        pass
+    return st.data_editor(*args, **kwargs)
+
+
+def _v30060_raw_dataframe(*args, **kwargs):
+    try:
+        import services.column_settings_service as _spt_col_settings
+        fn = getattr(_spt_col_settings, "_ORIGINAL_DATAFRAME", None)
+        if callable(fn):
+            return fn(*args, **kwargs)
+    except Exception:
+        pass
+    return st.dataframe(*args, **kwargs)
+
 st.set_page_config(page_title="04. 人員名單", page_icon="⧉", layout="wide")
 apply_theme()
 require_module_access("04_employees")
@@ -507,7 +533,7 @@ with tab1:
     submitted_employees = False
     edited = None
     if not employee_edit_enabled:
-        st.dataframe(
+        _v30060_raw_dataframe(
             table_df,
             hide_index=True,
             use_container_width=True,
@@ -518,7 +544,7 @@ with tab1:
         # V300.59：使用內部欄位 key 交給 data_editor，避免中英雙語欄名被 Streamlit 再疊一次。
         # 儲存時仍由 _from_editor_df() 轉回既有內部結構，不改 save_employees()。
         with st.form("v120_employee_stable_editor_form", clear_on_submit=False):
-            edited = st.data_editor(
+            edited = _v30060_raw_data_editor(
                 table_df,
                 hide_index=True,
                 use_container_width=True,
@@ -550,7 +576,7 @@ with tab2:
     uploaded = st.file_uploader("上傳人員 Excel", type=["xlsx", "xlsm", "xls"])
     if uploaded is not None:
         source_df = pd.read_excel(uploaded)
-        st.dataframe(source_df, use_container_width=True)
+        _v30060_raw_dataframe(source_df, use_container_width=True)
         st.info("可先確認欄位，再複製到『貼上資料』或『人員清單編輯』處理。")
 
 with tab3:
@@ -583,7 +609,7 @@ with tab3:
                 rerun()
 
             st.markdown("### 解析後資料預覽 / Parsed Preview")
-            st.dataframe(
+            _v30060_raw_dataframe(
                 parsed[["employee_id", "employee_name", "department", "title", "note", "is_active", "is_in_factory", "is_today_attendance"]],
                 use_container_width=True,
                 height=360,
