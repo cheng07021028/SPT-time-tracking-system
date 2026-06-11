@@ -736,6 +736,81 @@ def _v30051_account_editor_column_config() -> dict:
     }
 
 
+
+# ===== V300.52 ACCOUNT EDITOR PREVIEW HEADER FIX START =====
+def _v30052_account_editor_preview_config() -> dict:
+    """Column config for the read-only Account Editor preview.
+
+    The previous V300.51 fix only converted the editable data_editor to internal
+    keys.  The read-only preview still rendered draft_df with bilingual dataframe
+    column names such as "帳號 / Username".  The global column-settings wrapper
+    then generated a fallback label from the same bilingual key, which displayed
+    as "帳號 / Username / 帳號 / Username".  The preview must also render with
+    internal keys and a single explicit label.
+    """
+    return {
+        "username": st.column_config.TextColumn("帳號 / Username"),
+        "password_status": st.column_config.TextColumn("密碼狀態 / Password Status"),
+        "force_password_change": st.column_config.CheckboxColumn("強制改密碼 / Force Change"),
+        "employee_id": st.column_config.TextColumn("工號 / Employee ID"),
+        "display_name": st.column_config.TextColumn("姓名 / Display Name"),
+        "email": st.column_config.TextColumn("Email"),
+        "role_code": st.column_config.TextColumn("角色 / Role"),
+        "is_active": st.column_config.CheckboxColumn("啟用 / Active"),
+        "note": st.column_config.TextColumn("備註 / Note"),
+        "last_login": st.column_config.TextColumn("最後登入 / Last Login"),
+        "updated_at": st.column_config.TextColumn("更新時間 / Updated At"),
+    }
+
+
+def _v30052_account_editor_preview_df(df: pd.DataFrame | None) -> pd.DataFrame:
+    """Return read-only preview rows with safe internal column keys only.
+
+    This does not change session_state, Neon writes, Account Editor saving, or
+    force_password_change logic.  It only changes the dataframe sent to the
+    read-only st.dataframe preview, so Streamlit cannot duplicate bilingual
+    dataframe column names with bilingual labels.
+    """
+    internal_df = _v30051_account_editor_to_internal(df)
+    drop_cols = {"delete", "new_password"}
+    ordered = [
+        "username",
+        "password_status",
+        "force_password_change",
+        "employee_id",
+        "display_name",
+        "email",
+        "role_code",
+        "is_active",
+        "note",
+        "last_login",
+        "updated_at",
+    ]
+    cols = [c for c in ordered if c in internal_df.columns and c not in drop_cols]
+    cols += [c for c in internal_df.columns if c not in cols and c not in drop_cols]
+    return internal_df[cols].reset_index(drop=True)
+
+
+def _v30052_preview_column_order(df: pd.DataFrame | None) -> list[str]:
+    if not isinstance(df, pd.DataFrame):
+        return []
+    preferred = [
+        "username",
+        "password_status",
+        "force_password_change",
+        "employee_id",
+        "display_name",
+        "email",
+        "role_code",
+        "is_active",
+        "note",
+        "last_login",
+        "updated_at",
+    ]
+    return [c for c in preferred if c in df.columns] + [c for c in df.columns if c not in preferred]
+# ===== V300.52 ACCOUNT EDITOR PREVIEW HEADER FIX END =====
+
+
 def _users_for_editor() -> pd.DataFrame:
     raw = pd.DataFrame(_v104_get_users_cached())
     if raw.empty:
@@ -1472,9 +1547,20 @@ if _selected_permission_section == "帳號密碼總表 / Account Password Master
                     disabled=False,
                 )
         else:
-            preview_cols = [c for c in ACCOUNT_EDITOR_COLUMNS if c in draft_df.columns and c not in {"新密碼 / New Password", "刪除 / Delete"}]
-            preview_cols += [c for c in draft_df.columns if c not in preview_cols and c not in {"新密碼 / New Password", "刪除 / Delete"}]
-            st.dataframe(draft_df[preview_cols].head(200), use_container_width=True, hide_index=True, height=320)
+            # V300.52：唯讀預覽也必須使用 internal keys。
+            # V300.51 只修了 editable data_editor；這裡若仍把「帳號 / Username」
+            # 這類雙語欄名送進全域 column-settings wrapper，就會被顯示成
+            # 「帳號 / Username / 帳號 / Username」。
+            preview_internal_df = _v30052_account_editor_preview_df(draft_df).head(200)
+            st.dataframe(
+                preview_internal_df,
+                use_container_width=True,
+                hide_index=True,
+                height=320,
+                key="v30052_account_editor_readonly_preview",
+                column_order=_v30052_preview_column_order(preview_internal_df),
+                column_config=_v30052_account_editor_preview_config(),
+            )
             st.caption("唯讀輕量預覽：啟動編輯後才建立可編輯表格；避免每次進入 10 頁都重建大型 data_editor。")
             edited_users = draft_df.copy()
             submitted_accounts = False
