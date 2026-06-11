@@ -33,32 +33,6 @@ except Exception:
     def load_widths(table_key):
         return {}
 
-
-# V300.60：本頁已自行提供「欄位設定 / Column Settings」面板。
-# 直接呼叫 st.data_editor / st.dataframe 會再被全域 column_settings wrapper 包一層，
-# 造成第二個欄位設定面板與標題重複。因此本頁表格一律走原生 Streamlit 函式，
-# 只保留本頁自己的 Apply/Reset 欄位設定，不改任何資料儲存流程。
-def _v30060_raw_data_editor(*args, **kwargs):
-    try:
-        import services.column_settings_service as _spt_col_settings
-        fn = getattr(_spt_col_settings, "_ORIGINAL_DATA_EDITOR", None)
-        if callable(fn):
-            return fn(*args, **kwargs)
-    except Exception:
-        pass
-    return st.data_editor(*args, **kwargs)
-
-
-def _v30060_raw_dataframe(*args, **kwargs):
-    try:
-        import services.column_settings_service as _spt_col_settings
-        fn = getattr(_spt_col_settings, "_ORIGINAL_DATAFRAME", None)
-        if callable(fn):
-            return fn(*args, **kwargs)
-    except Exception:
-        pass
-    return st.dataframe(*args, **kwargs)
-
 st.set_page_config(page_title="07. 今日未紀錄名單", page_icon="⟁️", layout="wide")
 apply_theme()
 require_module_access("07_missing")
@@ -121,6 +95,8 @@ DAILY_LOADED_KEY = "v69_07_daily_attendance_loaded"
 MISSING_TODAY_DF_KEY = "v69_07_missing_today_df"
 MISSING_TODAY_LOADED_KEY = "v69_07_missing_today_loaded"
 MISSING_TODAY_TS_KEY = "v69_07_missing_today_ts"
+MISSING_TODAY_MESSAGE_KEY = "v30060_07_missing_today_message"
+MISSING_TODAY_ERROR_KEY = "v30060_07_missing_today_error"
 
 # V300.32：07 省 Neon Compute 快速路徑。
 # - 每日出勤紀錄改優先以「單日 payload」讀寫，避免每次儲存整份歷史 JSON。
@@ -815,6 +791,7 @@ def _build_missing_from_daily_attendance(att_df: pd.DataFrame, target_date: str)
             att[c] = False if c in DAILY_BOOL_COLS else ""
     att["employee_id"] = att["employee_id"].fillna("").astype(str).str.strip()
     att = att[(att["employee_id"] != "") & (att["is_in_factory"].map(_to_bool_value)) & (att["is_today_attendance"].map(_to_bool_value))].copy()
+    att = att.drop_duplicates(subset=["employee_id"], keep="last")
     if att.empty:
         att["last_start_time"] = ""
         att["today_record_count"] = 0
@@ -824,16 +801,11 @@ def _build_missing_from_daily_attendance(att_df: pd.DataFrame, target_date: str)
         att["last_start_time"] = ""
         att["today_record_count"] = 0
         return att[["employee_id", "employee_name", "department", "title", "attendance_status", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]].sort_values("employee_id")
-    rec = rec.copy()
-    rec["employee_id"] = rec["employee_id"].fillna("").astype(str).str.strip()
-    rec["__record_date"] = _date_text_series(rec)
-    rec = rec[(rec["employee_id"] != "") & (rec["__record_date"] == str(target_date))].copy()
+    rec = _v30060_prepare_time_record_summary_for_missing(rec, target_date)
     if rec.empty:
         att["last_start_time"] = ""
         att["today_record_count"] = 0
         return att[["employee_id", "employee_name", "department", "title", "attendance_status", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]].sort_values("employee_id")
-    if "start_timestamp" not in rec.columns:
-        rec["start_timestamp"] = rec["start_time"] if "start_time" in rec.columns else ""
     grp = rec.groupby("employee_id", dropna=False).agg(
         last_start_time=("start_timestamp", "max"),
         today_record_count=("employee_id", "size"),
@@ -1018,6 +990,43 @@ def _date_text_series(df: pd.DataFrame) -> pd.Series:
     return pd.Series([""] * len(df), index=df.index, dtype=str)
 
 
+def _v30060_prepare_time_record_summary_for_missing(rec: pd.DataFrame, target_date: str) -> pd.DataFrame:
+    """Normalize the lightweight 01/02 summary before 07 missing-list matching.
+
+    ``load_daily_record_summary_sql(date)`` already filters by the requested date and
+    intentionally returns only a few columns on the Neon fast path.  Older 07 code
+    tried to filter those rows again using start_date/start_timestamp, but the fast
+    summary may not contain either column, so every row became blank-date and was
+    discarded.  In that case we trust the SQL date filter and stamp the requested
+    date into ``__record_date``.
+    """
+    if rec is None or not isinstance(rec, pd.DataFrame) or rec.empty:
+        return pd.DataFrame()
+    out = rec.copy()
+    if "employee_id" not in out.columns:
+        return pd.DataFrame()
+    out["employee_id"] = out["employee_id"].fillna("").astype(str).str.strip()
+    has_date_source = any(c in out.columns for c in ("start_date", "work_date", "start_timestamp"))
+    if has_date_source:
+        out["__record_date"] = _date_text_series(out)
+        out = out[(out["employee_id"] != "") & (out["__record_date"] == _date_to_text(target_date))].copy()
+    else:
+        out = out[out["employee_id"] != ""].copy()
+        out["__record_date"] = _date_to_text(target_date)
+    if out.empty:
+        return out
+    if "start_timestamp" not in out.columns:
+        if "start_time" in out.columns:
+            out["start_timestamp"] = out["start_time"]
+        elif "end_timestamp" in out.columns:
+            # Current lightweight SQL exposes end_timestamp, not start_timestamp.
+            # Keep the old output column stable while still giving operators a useful last activity time.
+            out["start_timestamp"] = out["end_timestamp"]
+        else:
+            out["start_timestamp"] = ""
+    return out
+
+
 def _build_missing_today_df(employee_df: pd.DataFrame, target_date: str) -> pd.DataFrame:
     # V65：今日未紀錄名單改用 04 人員權威檔 + 02/01 工時權威檔即時計算。
     # 不再查 SQLite employees 快取，避免 Reboot / GitHub 永久檔已更新但 SQLite 快取未同步，造成缺勤人數誤顯示 0。
@@ -1032,6 +1041,7 @@ def _build_missing_today_df(employee_df: pd.DataFrame, target_date: str) -> pd.D
     emp = emp[(emp["is_active"]) & (emp["is_in_factory"]) & (emp["is_today_attendance"])].copy()
     emp["employee_id"] = emp["employee_id"].fillna("").astype(str).str.strip()
     emp = emp[emp["employee_id"] != ""].copy()
+    emp = emp.drop_duplicates(subset=["employee_id"], keep="last")
     if emp.empty:
         out = emp.copy()
         out["last_start_time"] = ""
@@ -1044,20 +1054,12 @@ def _build_missing_today_df(employee_df: pd.DataFrame, target_date: str) -> pd.D
         emp["today_record_count"] = 0
         return emp[["employee_id", "employee_name", "department", "title", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]].sort_values("employee_id")
 
-    rec = rec.copy()
-    rec["employee_id"] = rec["employee_id"].fillna("").astype(str).str.strip()
-    rec["__record_date"] = _date_text_series(rec)
-    rec = rec[(rec["employee_id"] != "") & (rec["__record_date"] == str(target_date))].copy()
+    rec = _v30060_prepare_time_record_summary_for_missing(rec, target_date)
     if rec.empty:
         emp["last_start_time"] = ""
         emp["today_record_count"] = 0
         return emp[["employee_id", "employee_name", "department", "title", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]].sort_values("employee_id")
 
-    if "start_timestamp" not in rec.columns:
-        if "start_time" in rec.columns:
-            rec["start_timestamp"] = rec["start_time"]
-        else:
-            rec["start_timestamp"] = ""
     grp = rec.groupby("employee_id", dropna=False).agg(
         last_start_time=("start_timestamp", "max"),
         today_record_count=("employee_id", "size"),
@@ -1111,7 +1113,7 @@ else:
     today_table_df = _v30059_today_table_df(editor_df)
     # V300.59：使用內部欄位 key 交給 data_editor，避免中英雙語欄名被重複顯示。
     with st.form("v120_today_attendance_stable_editor_form", clear_on_submit=False):
-        edited = _v30060_raw_data_editor(
+        edited = st.data_editor(
             today_table_df,
             hide_index=True,
             use_container_width=True,
@@ -1222,7 +1224,7 @@ else:
     render_width_settings(V30059_DAILY_ATTENDANCE_TABLE_KEY, daily_table_df, title="欄位設定 / Column Settings（永久保存）")
     daily_table_df = _v30059_daily_table_df(_daily_view)
     with st.form("v234_daily_attendance_stable_editor_form", clear_on_submit=False):
-        daily_edited = _v30060_raw_data_editor(
+        daily_edited = st.data_editor(
             daily_table_df,
             hide_index=True,
             use_container_width=True,
@@ -1290,14 +1292,32 @@ st.subheader("今日未紀錄名單 / Missing Today")
 today = today_date().strftime("%Y-%m-%d")
 mt1, mt2 = st.columns([1, 3])
 if mt1.button("重新計算今日未紀錄 / Refresh Missing Today", use_container_width=True, key="v69_refresh_missing_today"):
-    current_attendance_df = _current_internal_df() if STATE_KEY in st.session_state else ensure_cols(load_employees())
-    st.session_state[MISSING_TODAY_DF_KEY] = _build_missing_today_df(current_attendance_df, today)
-    st.session_state[MISSING_TODAY_LOADED_KEY] = True
-    st.session_state[MISSING_TODAY_TS_KEY] = today
+    try:
+        st.session_state.pop(MISSING_TODAY_ERROR_KEY, None)
+        with st.spinner("正在重新計算今日未紀錄名單 / Recalculating missing today..."):
+            current_attendance_df = _current_internal_df() if STATE_KEY in st.session_state else ensure_cols(load_employees())
+            missing_today_df = _build_missing_today_df(current_attendance_df, today)
+        st.session_state[MISSING_TODAY_DF_KEY] = missing_today_df
+        st.session_state[MISSING_TODAY_LOADED_KEY] = True
+        st.session_state[MISSING_TODAY_TS_KEY] = today
+        st.session_state[MISSING_TODAY_MESSAGE_KEY] = f"已重新計算 {today} 今日未紀錄：{len(missing_today_df):,} 人。"
+    except Exception as exc:
+        st.session_state[MISSING_TODAY_ERROR_KEY] = f"重新計算失敗：{exc}"
+
+if st.session_state.get(MISSING_TODAY_LOADED_KEY, False) and st.session_state.get(MISSING_TODAY_TS_KEY) != today:
+    st.session_state[MISSING_TODAY_LOADED_KEY] = False
+    st.session_state[MISSING_TODAY_DF_KEY] = pd.DataFrame()
+
+_msg = st.session_state.pop(MISSING_TODAY_MESSAGE_KEY, "")
+_err = st.session_state.pop(MISSING_TODAY_ERROR_KEY, "")
+if _msg:
+    mt2.success(_msg)
+if _err:
+    mt2.error(_err)
 
 df = st.session_state.get(MISSING_TODAY_DF_KEY, pd.DataFrame()) if st.session_state.get(MISSING_TODAY_LOADED_KEY, False) else pd.DataFrame()
 st.metric("今日未紀錄人數 / Missing Records", f"{len(df):,}")
-st.caption("V69：今日未紀錄名單不再於開頁自動查詢工時紀錄；按『重新計算今日未紀錄』才查詢。")
+st.caption("V300.60：今日未紀錄名單只在按下『重新計算今日未紀錄』後查詢；人數 = 啟用 + 在廠 + 今日出勤人員中，今日 01/02 工時紀錄筆數為 0 的人數。")
 if st.session_state.get(MISSING_TODAY_LOADED_KEY, False):
     render_table(df, "missing_today_v202", editable=False, height=460)
 else:
