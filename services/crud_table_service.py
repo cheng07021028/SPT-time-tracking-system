@@ -20,7 +20,7 @@ except Exception:  # pragma: no cover
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 WORK_ORDER_COLS = ["_delete", "id", "work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active", "created_at", "updated_at"]
-EMPLOYEE_COLS = ["_delete", "id", "employee_id", "employee_name", "department", "title", "is_active", "is_in_factory", "is_today_attendance", "note", "created_at", "updated_at"]
+EMPLOYEE_COLS = ["_delete", "id", "employee_id", "employee_name", "department", "title", "is_active", "is_in_factory", "is_today_attendance", "include_in_missing_records", "note", "created_at", "updated_at"]
 
 WO_DISPLAY_TO_INTERNAL = {
     "刪除 / Delete": "_delete", "ID / ID": "id", "製令 / Work Order": "work_order", "P/N / Part No.": "part_no",
@@ -30,7 +30,7 @@ WO_DISPLAY_TO_INTERNAL = {
 EMP_DISPLAY_TO_INTERNAL = {
     "刪除 / Delete": "_delete", "ID / ID": "id", "工號 / Employee ID": "employee_id", "姓名 / Name": "employee_name",
     "單位 / Department": "department", "職稱 / Title": "title", "啟用 / Active": "is_active", "在廠 / In Factory": "is_in_factory",
-    "今日出勤 / Today Attendance": "is_today_attendance", "備註 / Note": "note", "建立時間 / Created At": "created_at", "更新時間 / Updated At": "updated_at",
+    "今日出勤 / Today Attendance": "is_today_attendance", "納入未紀錄統計 / Include Missing": "include_in_missing_records", "備註 / Note": "note", "建立時間 / Created At": "created_at", "更新時間 / Updated At": "updated_at",
 }
 
 # V68: schema checks are expensive on Neon/PostgreSQL because every check can
@@ -133,7 +133,7 @@ def _ensure_runtime_columns(force: bool = False) -> None:
     ensure_database()
     for ddl in ["work_order_no TEXT", "customer TEXT", "active INTEGER DEFAULT 1", "deleted_at TEXT", "deleted_by TEXT", "delete_reason TEXT"]:
         _add_col("work_orders", ddl)
-    for ddl in ["active INTEGER DEFAULT 1", "is_in_factory INTEGER DEFAULT 1", "is_today_attendance INTEGER DEFAULT 1", "deleted_at TEXT", "deleted_by TEXT", "delete_reason TEXT"]:
+    for ddl in ["active INTEGER DEFAULT 1", "is_in_factory INTEGER DEFAULT 1", "is_today_attendance INTEGER DEFAULT 1", "include_in_missing_records INTEGER DEFAULT 1", "deleted_at TEXT", "deleted_by TEXT", "delete_reason TEXT"]:
         _add_col("employees", ddl)
     _RUNTIME_COLUMNS_READY = True
 
@@ -149,7 +149,7 @@ def _normalize(df: pd.DataFrame | None, cols: list[str], mapping: dict[str, str]
     work = work.rename(columns={c: mapping.get(str(c), str(c)) for c in work.columns})
     aliases = {
         "製令": "work_order", "工單": "work_order", "工號": "employee_id", "姓名": "employee_name",
-        "部門": "department", "單位": "department", "備註": "note", "啟用": "is_active", "在廠": "is_in_factory", "今日出勤": "is_today_attendance",
+        "部門": "department", "單位": "department", "備註": "note", "啟用": "is_active", "在廠": "is_in_factory", "今日出勤": "is_today_attendance", "納入未紀錄統計": "include_in_missing_records", "未紀錄統計": "include_in_missing_records", "免工時統計": "include_in_missing_records",
     }
     work = work.rename(columns={c: aliases.get(str(c), str(c)) for c in work.columns})
     for c in cols:
@@ -194,6 +194,7 @@ def load_employees() -> pd.DataFrame:
                COALESCE(is_active, active, 1) AS is_active,
                COALESCE(is_in_factory, 1) AS is_in_factory,
                COALESCE(is_today_attendance, 1) AS is_today_attendance,
+               COALESCE(include_in_missing_records, 1) AS include_in_missing_records,
                note, created_at, updated_at
         FROM employees
         WHERE deleted_at IS NULL OR deleted_at=''
@@ -207,7 +208,7 @@ def load_employees() -> pd.DataFrame:
         if c not in df.columns:
             df[c] = False if c == "_delete" else ""
     df["_delete"] = False
-    for c in ["is_active", "is_in_factory", "is_today_attendance"]:
+    for c in ["is_active", "is_in_factory", "is_today_attendance", "include_in_missing_records"]:
         df[c] = df[c].map(lambda x: _bool(x, True))
     return _store_cached_df("employees", df[EMPLOYEE_COLS].reset_index(drop=True))
 
@@ -425,6 +426,7 @@ def save_employees(df: pd.DataFrame) -> dict[str, Any]:
         active_val = 1 if _bool(row.get("is_active"), True) else 0
         factory_val = 1 if _bool(row.get("is_in_factory"), True) else 0
         today_val = 1 if _bool(row.get("is_today_attendance"), True) else 0
+        include_missing_val = 1 if _bool(row.get("include_in_missing_records"), True) else 0
         note = _text(row.get("note"))
 
         # If the user edits an existing row's employee_id, preserve that row when
@@ -438,10 +440,10 @@ def save_employees(df: pd.DataFrame) -> dict[str, Any]:
                 continue
             operations.append((
                 """
-                UPDATE employees SET employee_id=?, employee_name=?, department=?, title=?, is_active=?, active=?, is_in_factory=?, is_today_attendance=?, note=?, updated_at=?, deleted_at='', deleted_by='', delete_reason=''
+                UPDATE employees SET employee_id=?, employee_name=?, department=?, title=?, is_active=?, active=?, is_in_factory=?, is_today_attendance=?, include_in_missing_records=?, note=?, updated_at=?, deleted_at='', deleted_by='', delete_reason=''
                 WHERE id=?
                 """,
-                (emp_id, name, department, title, active_val, active_val, factory_val, today_val, note, now, rid),
+                (emp_id, name, department, title, active_val, active_val, factory_val, today_val, include_missing_val, note, now, rid),
             ))
             result["updated"] += 1
             existing_by_emp.pop(old_emp_for_id, None)
@@ -454,8 +456,8 @@ def save_employees(df: pd.DataFrame) -> dict[str, Any]:
         # browser/session without surfacing UniqueViolation to the user.
         operations.append((
             """
-            INSERT INTO employees(employee_id, employee_name, department, title, is_active, active, is_in_factory, is_today_attendance, note, created_at, updated_at, deleted_at, deleted_by, delete_reason)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '', '')
+            INSERT INTO employees(employee_id, employee_name, department, title, is_active, active, is_in_factory, is_today_attendance, include_in_missing_records, note, created_at, updated_at, deleted_at, deleted_by, delete_reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '', '')
             ON CONFLICT(employee_id) DO UPDATE SET
                 employee_name=excluded.employee_name,
                 department=excluded.department,
@@ -464,13 +466,14 @@ def save_employees(df: pd.DataFrame) -> dict[str, Any]:
                 active=excluded.active,
                 is_in_factory=excluded.is_in_factory,
                 is_today_attendance=excluded.is_today_attendance,
+                include_in_missing_records=excluded.include_in_missing_records,
                 note=excluded.note,
                 updated_at=excluded.updated_at,
                 deleted_at='',
                 deleted_by='',
                 delete_reason=''
             """,
-            (emp_id, name, department, title, active_val, active_val, factory_val, today_val, note, now, now),
+            (emp_id, name, department, title, active_val, active_val, factory_val, today_val, include_missing_val, note, now, now),
         ))
         if emp_id in existing_by_emp:
             result["updated"] += 1
