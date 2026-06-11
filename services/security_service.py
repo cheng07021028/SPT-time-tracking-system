@@ -4877,3 +4877,117 @@ def audit_v30049_force_password_change_final_hotpath_fix() -> dict[str, Any]:
     }
 
 # =============== END V30049 FORCE PASSWORD CHANGE FINAL HOTPATH FIX ===============
+
+
+# ================= V300.65 LOGIN HOTPATH AUTH LOG WRITE-THROUGH =================
+# 2026-06-11
+# V256 fast login path intentionally bypassed log_security_event() to keep login fast,
+# but that also meant login success/fail rows were written only to security_login_logs.
+# 11｜登入紀錄 now reads auth_login_logs as the primary authority, so the hot path must
+# write a lightweight row to auth_login_logs as well, without changing login UI or auth rules.
+try:
+    _v30065_prev_v256_login_side_effects = _v256_login_side_effects  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30065_prev_v256_login_side_effects = None
+
+
+def _v30065_session_display_name(username: str = "") -> str:
+    try:
+        return str(st.session_state.get("auth_display_name") or st.session_state.get("display_name") or username or "")
+    except Exception:
+        return str(username or "")
+
+
+def _v30065_auth_log_message(username: str, ok: bool, message: str) -> str:
+    base = str(message or "")
+    try:
+        emp = str(st.session_state.get("auth_employee_id") or "").strip()
+        roles = st.session_state.get("auth_roles", [])
+        role_text = ",".join([str(x) for x in roles]) if isinstance(roles, list) else str(roles or "")
+        if emp and "employee_id=" not in base:
+            base = (base + "; " if base else "") + f"employee_id={emp}"
+        if role_text and "role=" not in base and "roles=" not in base:
+            base = (base + "; " if base else "") + f"roles={role_text}"
+    except Exception:
+        pass
+    return base
+
+
+def _v256_login_side_effects(username: str, ok: bool, message: str) -> None:  # type: ignore[override]
+    """V300.65: write login event to auth_login_logs + compatibility security_login_logs.
+
+    This function is intentionally non-blocking. authenticate() still returns immediately;
+    audit writes are best-effort and must never block login.
+    """
+    username = str(username or "").strip()
+    result = "SUCCESS" if ok else "FAIL"
+    msg = _v30065_auth_log_message(username, ok, message)
+
+    def _worker() -> None:
+        now = _now()
+        display_name = _v30065_session_display_name(username)
+        try:
+            if _v256_db_backend() == "postgres":  # type: ignore[name-defined]
+                if ok:
+                    _v256_pg_execute("UPDATE auth_users SET last_login_at=%s, updated_at=%s WHERE username=%s", (now, now, username))  # type: ignore[name-defined]
+                    _v256_pg_execute("UPDATE security_users SET last_login_at=%s, updated_at=%s WHERE username=%s", (now, now, username))  # type: ignore[name-defined]
+                # Primary authority for 11｜登入紀錄.
+                _v256_pg_execute(  # type: ignore[name-defined]
+                    """
+                    INSERT INTO auth_login_logs
+                    (username, display_name, event_time, event_type, result, module_code, module_name, message, ip_address, user_agent)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    """,
+                    (username, display_name, now, "LOGIN", result, "LOGIN", "Login", msg, "", "streamlit"),
+                )
+                # Compatibility mirror for old 11 queries and legacy tools.
+                _v256_pg_execute(  # type: ignore[name-defined]
+                    """
+                    INSERT INTO security_login_logs
+                    (username, display_name, event_type, result, message, module_code, login_time, created_at)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                    """,
+                    (username, display_name, "LOGIN", result, msg, "LOGIN", now, now),
+                )
+            else:
+                if ok:
+                    _v256_sqlite_execute("UPDATE auth_users SET last_login_at=?, updated_at=? WHERE username=?", (now, now, username))  # type: ignore[name-defined]
+                    _v256_sqlite_execute("UPDATE security_users SET last_login_at=?, updated_at=? WHERE username=?", (now, now, username))  # type: ignore[name-defined]
+                try:
+                    _v256_sqlite_execute(  # type: ignore[name-defined]
+                        """
+                        INSERT INTO auth_login_logs
+                        (username, display_name, event_time, event_type, result, module_code, module_name, message, ip_address, user_agent)
+                        VALUES (?,?,?,?,?,?,?,?,?,?)
+                        """,
+                        (username, display_name, now, "LOGIN", result, "LOGIN", "Login", msg, "", "streamlit"),
+                    )
+                except Exception:
+                    pass
+                _v256_sqlite_execute(  # type: ignore[name-defined]
+                    """
+                    INSERT INTO security_login_logs
+                    (username, display_name, event_type, result, message, module_code, login_time, created_at)
+                    VALUES (?,?,?,?,?,?,?,?)
+                    """,
+                    (username, display_name, "LOGIN", result, msg, "LOGIN", now, now),
+                )
+        except Exception:
+            # Never block login because audit write failed.
+            pass
+
+    try:
+        _v256_threading.Thread(target=_worker, name="SPT-V30065-login-auth-log", daemon=True).start()  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+
+def audit_v30065_login_hotpath_auth_log_write_through() -> dict[str, Any]:
+    return {
+        "version": "V300.65_LOGIN_HOTPATH_AUTH_LOG_WRITE_THROUGH",
+        "writes_auth_login_logs": True,
+        "writes_security_login_logs_compatibility": True,
+        "non_blocking_thread": True,
+        "ui_css_theme_unchanged": True,
+    }
+# ================= END V300.65 LOGIN HOTPATH AUTH LOG WRITE-THROUGH =================

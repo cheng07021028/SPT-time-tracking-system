@@ -4036,3 +4036,505 @@ def audit_v30036_login_logs_compute_fastpath() -> dict[str, Any]:
         "table_exists_cache_items": len(_V30036_TABLE_EXISTS_CACHE),
     }
 # ================= END V300.36 LOGIN LOG COMPUTE FASTPATH =================
+
+
+# ================= V300.65 11 LOGIN LOG AUTHORITY ACTIVE QUERY FIX =================
+# 2026-06-11
+# 問題：
+# - 11｜登入紀錄狀態卡可能顯示 Neon physical/estimated rows，但套用查詢卻為 0。
+# - 部分部署的 auth_login_logs 沒有 created_at/logout_time/idle_seconds/source 欄位，
+#   V300.36 查詢直接引用 a.created_at，導致查詢失敗後 fallback 成空表。
+# - 登入熱路徑 V256 只穩定寫 security_login_logs；11 頁主權威 auth_login_logs
+#   可能沒有同一筆登入事件。
+# 修正：
+# - 查詢改成依實際欄位動態組 SQL，不再硬性引用不存在欄位。
+# - record_login_log 直接寫 Neon/PostgreSQL auth_login_logs，local/JSON 僅作 fallback。
+# - 清除登入紀錄仍是 deleted_at 軟刪除，並保留 V95 system_logs/operation_logs 稽核。
+
+try:
+    _v30065_prev_load_login_logs_with_stats = load_login_logs_with_stats  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30065_prev_load_login_logs_with_stats = None
+try:
+    _v30065_prev_load_login_logs = load_login_logs  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30065_prev_load_login_logs = None
+try:
+    _v30065_prev_get_login_log_stats = get_login_log_stats  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30065_prev_get_login_log_stats = None
+try:
+    _v30065_prev_delete_login_logs_by_date_range = delete_login_logs_by_date_range  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30065_prev_delete_login_logs_by_date_range = None
+try:
+    _v30065_prev_record_login_log = record_login_log  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30065_prev_record_login_log = None
+
+_V30065_LOGIN_COL_CACHE: dict[str, set[str]] = {}
+_V30065_SCHEMA_DELETE_READY = False
+
+
+def _v30065_pg_enabled() -> bool:
+    try:
+        from services.db_service import is_postgres_enabled
+        return bool(is_postgres_enabled())
+    except Exception:
+        return False
+
+
+def _v30065_table_exists(table: str) -> bool:
+    try:
+        if '_v94_table_exists' in globals():
+            return bool(_v94_table_exists(table))  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        from services.db_service import query_one
+        if _v30065_pg_enabled():
+            row = query_one("SELECT 1 AS ok FROM information_schema.tables WHERE table_schema='public' AND table_name=? LIMIT 1", (table,)) or {}
+            return bool(row.get('ok'))
+        conn = get_connection()
+        try:
+            return _table_exists(conn, table)
+        finally:
+            conn.close()
+    except Exception:
+        return False
+
+
+def _v30065_table_columns(table: str) -> set[str]:
+    table = str(table or '').strip()
+    if not table:
+        return set()
+    cached = _V30065_LOGIN_COL_CACHE.get(table)
+    if cached is not None:
+        return set(cached)
+    cols: set[str] = set()
+    try:
+        if _v30065_pg_enabled():
+            from services.db_service import query_df
+            df = query_df(
+                "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=?",
+                (table,),
+            )
+            if df is not None and not df.empty and 'column_name' in df.columns:
+                cols = {str(x) for x in df['column_name'].dropna().tolist()}
+        else:
+            conn = get_connection()
+            try:
+                rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+                cols = {str(r[1]) for r in rows}
+            finally:
+                conn.close()
+    except Exception:
+        cols = set()
+    _V30065_LOGIN_COL_CACHE[table] = set(cols)
+    return cols
+
+
+def _v30065_col_expr(alias: str, cols: set[str], column: str, default_sql: str = "''") -> str:
+    return f"{alias}.{column}" if column in cols else default_sql
+
+
+def _v30065_time_expr(alias: str, cols: set[str], candidates: tuple[str, ...]) -> str:
+    available = [f"{alias}.{c}" for c in candidates if c in cols]
+    if not available:
+        return "''"
+    if len(available) == 1:
+        return available[0]
+    return "COALESCE(" + ", ".join(available) + ")"
+
+
+def _v30065_date_boundaries(start_date=None, end_date=None) -> tuple[str | None, str | None]:
+    try:
+        if '_v94_date_boundaries' in globals():
+            return _v94_date_boundaries(start_date, end_date)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    from datetime import datetime as _dt, timedelta as _td
+    start_txt = str(start_date)[:10] + ' 00:00:00' if start_date else None
+    end_txt = None
+    if end_date:
+        try:
+            end_txt = (_dt.strptime(str(end_date)[:10], '%Y-%m-%d').date() + _td(days=1)).strftime('%Y-%m-%d 00:00:00')
+        except Exception:
+            end_txt = str(end_date)[:10] + ' 23:59:59'
+    return start_txt, end_txt
+
+
+def _v30065_where(alias: str, cols: set[str], time_expr: str, start_date=None, end_date=None, keyword: str = "") -> tuple[str, list[Any]]:
+    where: list[str] = []
+    params: list[Any] = []
+    if 'deleted_at' in cols:
+        where.append(f"({alias}.deleted_at IS NULL OR {alias}.deleted_at='')")
+    else:
+        where.append("1=1")
+    start_txt, end_txt = _v30065_date_boundaries(start_date, end_date)
+    if start_txt and time_expr != "''":
+        where.append(f"{time_expr} >= ?")
+        params.append(start_txt)
+    if end_txt and time_expr != "''":
+        where.append(f"{time_expr} < ?")
+        params.append(end_txt)
+    kw_cols = [c for c in ('username', 'display_name', 'event_type', 'result', 'message', 'module_code') if c in cols]
+    if keyword and kw_cols:
+        k = f"%{str(keyword).strip().lower()}%"
+        where.append("(" + " OR ".join([f"lower(COALESCE({alias}.{c},'')) LIKE ?" for c in kw_cols]) + ")")
+        params.extend([k] * len(kw_cols))
+    return " AND ".join(where), params
+
+
+def _v30065_auth_chunk(start_date=None, end_date=None, keyword: str = "") -> tuple[str, list[Any]] | None:
+    table = 'auth_login_logs'
+    if not _v30065_table_exists(table):
+        return None
+    cols = _v30065_table_columns(table)
+    if not cols:
+        return None
+    alias = 'a'
+    time_expr = _v30065_time_expr(alias, cols, ('event_time', 'login_time', 'created_at'))
+    where, params = _v30065_where(alias, cols, time_expr, start_date, end_date, keyword)
+    id_expr = _v30065_col_expr(alias, cols, 'id', '0')
+    username_expr = _v30065_col_expr(alias, cols, 'username')
+    display_expr = _v30065_col_expr(alias, cols, 'display_name')
+    event_expr = _v30065_col_expr(alias, cols, 'event_type')
+    result_expr = _v30065_col_expr(alias, cols, 'result')
+    logout_expr = _v30065_col_expr(alias, cols, 'logout_time')
+    if 'idle_seconds' in cols:
+        idle_expr = "CASE WHEN a.idle_seconds IS NULL THEN NULL ELSE CAST(a.idle_seconds AS TEXT) END"
+    elif 'idle_minutes' in cols:
+        idle_expr = "CAST(a.idle_minutes AS TEXT)"
+    else:
+        idle_expr = "NULL"
+    module_expr = _v30065_col_expr(alias, cols, 'module_code')
+    message_expr = _v30065_col_expr(alias, cols, 'message')
+    source_expr = "COALESCE(a.source, 'auth_login_logs')" if 'source' in cols else "'auth_login_logs'"
+    ip_expr = _v30065_col_expr(alias, cols, 'ip_address')
+    ua_expr = _v30065_col_expr(alias, cols, 'user_agent')
+    created_expr = _v30065_time_expr(alias, cols, ('created_at', 'event_time', 'login_time'))
+    sql = f"""
+        SELECT {id_expr} AS id, {username_expr} AS username, {display_expr} AS display_name,
+               {event_expr} AS event_type, {result_expr} AS result,
+               {time_expr} AS login_time, {logout_expr} AS logout_time,
+               {idle_expr} AS idle_minutes, {module_expr} AS module_code,
+               {message_expr} AS message, {source_expr} AS source,
+               {ip_expr} AS ip_address, {ua_expr} AS user_agent,
+               {created_expr} AS created_at
+        FROM auth_login_logs {alias}
+        WHERE {where}
+    """
+    return sql, params
+
+
+def _v30065_security_chunk(start_date=None, end_date=None, keyword: str = "") -> tuple[str, list[Any]] | None:
+    table = 'security_login_logs'
+    if not _v30065_table_exists(table):
+        return None
+    cols = _v30065_table_columns(table)
+    if not cols:
+        return None
+    alias = 's'
+    time_expr = _v30065_time_expr(alias, cols, ('login_time', 'event_time', 'created_at'))
+    where, params = _v30065_where(alias, cols, time_expr, start_date, end_date, keyword)
+    id_expr = _v30065_col_expr(alias, cols, 'id', '0')
+    username_expr = _v30065_col_expr(alias, cols, 'username')
+    display_expr = _v30065_col_expr(alias, cols, 'display_name')
+    event_expr = _v30065_col_expr(alias, cols, 'event_type')
+    result_expr = _v30065_col_expr(alias, cols, 'result')
+    logout_expr = _v30065_col_expr(alias, cols, 'logout_time')
+    idle_expr = "CASE WHEN s.idle_seconds IS NULL THEN NULL ELSE CAST(s.idle_seconds AS TEXT) END" if 'idle_seconds' in cols else "NULL"
+    module_expr = _v30065_col_expr(alias, cols, 'module_code')
+    message_expr = _v30065_col_expr(alias, cols, 'message')
+    source_expr = "COALESCE(s.source, 'security_login_logs')" if 'source' in cols else "'security_login_logs'"
+    ua_expr = _v30065_col_expr(alias, cols, 'user_agent')
+    created_expr = _v30065_time_expr(alias, cols, ('created_at', 'login_time', 'event_time'))
+    sql = f"""
+        SELECT {id_expr} AS id, {username_expr} AS username, {display_expr} AS display_name,
+               {event_expr} AS event_type, {result_expr} AS result,
+               {time_expr} AS login_time, {logout_expr} AS logout_time,
+               {idle_expr} AS idle_minutes, {module_expr} AS module_code,
+               {message_expr} AS message, {source_expr} AS source,
+               '' AS ip_address, {ua_expr} AS user_agent,
+               {created_expr} AS created_at
+        FROM security_login_logs {alias}
+        WHERE {where}
+    """
+    return sql, params
+
+
+def _v30065_empty_login_bundle() -> dict[str, Any]:
+    import pandas as _pd
+    return {"logs": _pd.DataFrame(), "stats": {"records": 0, "success": 0, "failed": 0}}
+
+
+def load_login_logs_with_stats(start_date=None, end_date=None, keyword: str = "", limit: int = 1000, event_types=None, results=None, include_legacy: bool = True, **kwargs):  # type: ignore[override]
+    import pandas as _pd
+    lim = max(1, min(int(limit or 300), 2000))
+    try:
+        from services.db_service import query_df
+        chunks: list[str] = []
+        params: list[Any] = []
+        auth = _v30065_auth_chunk(start_date, end_date, keyword)
+        if auth is not None:
+            chunks.append(auth[0]); params.extend(auth[1])
+        if include_legacy:
+            sec = _v30065_security_chunk(start_date, end_date, keyword)
+            if sec is not None:
+                chunks.append(sec[0]); params.extend(sec[1])
+        if not chunks:
+            return _v30065_empty_login_bundle()
+        sql = """
+        WITH raw_login AS (
+        """ + " UNION ALL ".join(chunks) + """
+        ), ranked_login AS (
+            SELECT raw_login.*,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY lower(COALESCE(username,'')), lower(COALESCE(display_name,'')),
+                                    lower(COALESCE(event_type,'')), lower(COALESCE(result,'')),
+                                    COALESCE(login_time,''), lower(COALESCE(module_code,'')), lower(COALESCE(message,''))
+                       ORDER BY CASE WHEN source='auth_login_logs' THEN 0 ELSE 1 END, id DESC
+                   ) AS __rn
+            FROM raw_login
+        ), final_login AS (
+            SELECT * FROM ranked_login WHERE __rn=1
+        )
+        SELECT *,
+               COUNT(*) OVER() AS __total_records,
+               SUM(CASE WHEN upper(COALESCE(result,'')) IN ('OK','SUCCESS','成功') THEN 1 ELSE 0 END) OVER() AS __total_success,
+               SUM(CASE WHEN upper(COALESCE(result,'')) IN ('FAIL','FAILED','ERROR','失敗') THEN 1 ELSE 0 END) OVER() AS __total_failed
+        FROM final_login
+        """
+        if event_types:
+            placeholders = ",".join(["?"] * len(event_types))
+            sql += f" WHERE event_type IN ({placeholders})"
+            params.extend(list(event_types))
+        if results:
+            connector = " AND " if event_types else " WHERE "
+            placeholders = ",".join(["?"] * len(results))
+            sql += f"{connector} result IN ({placeholders})"
+            params.extend(list(results))
+        sql += " ORDER BY CASE WHEN login_time IS NULL OR login_time='' THEN 1 ELSE 0 END, login_time DESC, id DESC LIMIT ?"
+        params.append(lim)
+        df = query_df(sql, tuple(params))
+        if df is None or df.empty:
+            return _v30065_empty_login_bundle()
+        total_records = int(df.get('__total_records', _pd.Series([len(df)])).iloc[0] or 0) if '__total_records' in df.columns else int(len(df))
+        total_success = int(df.get('__total_success', _pd.Series([0])).iloc[0] or 0) if '__total_success' in df.columns else 0
+        total_failed = int(df.get('__total_failed', _pd.Series([0])).iloc[0] or 0) if '__total_failed' in df.columns else 0
+        logs = df.drop(columns=[c for c in ('__rn', '__total_records', '__total_success', '__total_failed') if c in df.columns], errors='ignore').reset_index(drop=True)
+        return {"logs": logs, "stats": {"records": total_records, "success": total_success, "failed": total_failed}}
+    except Exception:
+        if callable(_v30065_prev_load_login_logs_with_stats):
+            try:
+                return _v30065_prev_load_login_logs_with_stats(start_date=start_date, end_date=end_date, keyword=keyword, limit=limit, event_types=event_types, results=results, include_legacy=include_legacy, **kwargs)
+            except Exception:
+                pass
+        return _v30065_empty_login_bundle()
+
+
+def load_login_logs(start_date=None, end_date=None, keyword: str = "", limit: int = 1000, event_types=None, results=None, include_legacy: bool = True, **kwargs):  # type: ignore[override]
+    bundle = load_login_logs_with_stats(start_date=start_date, end_date=end_date, keyword=keyword, limit=limit, event_types=event_types, results=results, include_legacy=include_legacy, **kwargs)
+    logs = bundle.get('logs') if isinstance(bundle, dict) else None
+    if logs is None:
+        import pandas as _pd
+        return _pd.DataFrame()
+    return logs
+
+
+def get_login_log_stats(start_date=None, end_date=None, keyword: str = "") -> dict:  # type: ignore[override]
+    bundle = load_login_logs_with_stats(start_date=start_date, end_date=end_date, keyword=keyword, limit=1, include_legacy=True)
+    return dict(bundle.get('stats') or {"records": 0, "success": 0, "failed": 0}) if isinstance(bundle, dict) else {"records": 0, "success": 0, "failed": 0}
+
+
+def _v30065_ensure_delete_columns_once() -> None:
+    global _V30065_SCHEMA_DELETE_READY
+    if _V30065_SCHEMA_DELETE_READY:
+        return
+    try:
+        if _v30065_pg_enabled():
+            from services import db_service as _db
+            with _db._v25_pg_connect() as conn:  # type: ignore[attr-defined]
+                with conn.cursor() as cur:
+                    for table in ('auth_login_logs', 'security_login_logs'):
+                        for stmt in (
+                            f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS deleted_at TEXT",
+                            f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS deleted_by TEXT",
+                            f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS delete_reason TEXT",
+                        ):
+                            try:
+                                cur.execute(stmt)
+                            except Exception:
+                                pass
+                conn.commit()
+        else:
+            from services.db_service import execute
+            for table in ('auth_login_logs', 'security_login_logs'):
+                for col in ('deleted_at', 'deleted_by', 'delete_reason'):
+                    try:
+                        execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT", ())
+                    except Exception:
+                        pass
+        _V30065_LOGIN_COL_CACHE.clear()
+    except Exception:
+        pass
+    _V30065_SCHEMA_DELETE_READY = True
+
+
+def _v30065_delete_one_table(table: str, alias: str, start_date: str, end_date: str, actor: str, now: str) -> int:
+    if not _v30065_table_exists(table):
+        return 0
+    _v30065_ensure_delete_columns_once()
+    cols = _v30065_table_columns(table)
+    if 'deleted_at' not in cols:
+        return 0
+    time_expr = _v30065_time_expr(alias, cols, ('event_time', 'login_time', 'created_at'))
+    if time_expr == "''":
+        return 0
+    start_txt, end_txt = _v30065_date_boundaries(start_date, end_date)
+    if not start_txt or not end_txt:
+        return 0
+    try:
+        from services.db_service import execute
+        return int(execute(
+            f"""
+            UPDATE {table} {alias}
+            SET deleted_at=?, deleted_by=?, delete_reason='clear_login_logs'
+            WHERE ({alias}.deleted_at IS NULL OR {alias}.deleted_at='')
+              AND {time_expr} >= ?
+              AND {time_expr} < ?
+            """,
+            (now, actor, start_txt, end_txt),
+        ) or 0)
+    except Exception:
+        return 0
+
+
+def delete_login_logs_by_date_range(start_date: str, end_date: str, operator: str = "", **kwargs: Any) -> int:  # type: ignore[override]
+    actor = _v95_current_operator(operator) if '_v95_current_operator' in globals() else str(operator or 'admin')
+    now = _v31_now() if '_v31_now' in globals() else _now()
+    deleted = 0
+    err = ""
+    try:
+        deleted += _v30065_delete_one_table('auth_login_logs', 'a', str(start_date), str(end_date), actor, now)
+        deleted += _v30065_delete_one_table('security_login_logs', 's', str(start_date), str(end_date), actor, now)
+        return int(deleted)
+    except Exception as exc:
+        err = str(exc)
+        raise
+    finally:
+        try:
+            if '_v95_record_login_clear_delete_event' in globals():
+                _v95_record_login_clear_delete_event(start_date, end_date, int(deleted or 0), operator=actor, result='ERROR' if err else 'OK', error=err)
+        except Exception:
+            pass
+
+
+clear_login_logs_by_date_range = delete_login_logs_by_date_range
+clear_login_logs_by_date = delete_login_logs_by_date_range
+clear_login_logs = delete_login_logs_by_date_range
+delete_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_audit_logs_by_date_range = delete_login_logs_by_date_range
+
+
+def _v30065_insert_auth_login_log_neon(row: dict[str, Any]) -> int:
+    if not _v30065_table_exists('auth_login_logs'):
+        return 0
+    cols = _v30065_table_columns('auth_login_logs')
+    desired: list[tuple[str, Any]] = [
+        ('username', row.get('username') or ''),
+        ('display_name', row.get('display_name') or ''),
+        ('event_time', row.get('event_time') or row.get('login_time') or _now()),
+        ('event_type', row.get('event_type') or 'LOGIN'),
+        ('result', row.get('result') or 'SUCCESS'),
+        ('module_code', row.get('module_code') or ''),
+        ('module_name', row.get('module_name') or ''),
+        ('message', row.get('message') or ''),
+        ('ip_address', row.get('ip_address') or ''),
+        ('user_agent', row.get('user_agent') or 'streamlit'),
+        ('source', row.get('source') or 'record_login_log_v30065'),
+        ('created_at', row.get('created_at') or row.get('event_time') or row.get('login_time') or _now()),
+        ('logout_time', row.get('logout_time') or ''),
+        ('idle_seconds', row.get('idle_seconds') if row.get('idle_seconds') not in (None, '') else None),
+    ]
+    insert_cols = [(c, v) for c, v in desired if c in cols]
+    if not insert_cols:
+        return 0
+    names = [c for c, _ in insert_cols]
+    vals = [v for _, v in insert_cols]
+    placeholders = ', '.join(['?'] * len(names))
+    sql = f"INSERT INTO auth_login_logs({', '.join(names)}) VALUES ({placeholders})"
+    try:
+        from services.db_service import execute
+        return int(execute(sql, tuple(vals)) or 0)
+    except Exception:
+        return 0
+
+
+def record_login_log(
+    username: str = "",
+    display_name: str = "",
+    event_type: str = "LOGIN",
+    result: str = "SUCCESS",
+    message: str = "",
+    module_code: str = "",
+    login_time: Optional[str] = None,
+    logout_time: Optional[str] = None,
+    idle_minutes: Optional[float] = None,
+    ip_address: str = "",
+    user_agent: str = "streamlit",
+    **kwargs: Any,
+) -> int:  # type: ignore[override]
+    event_time = str(login_time or kwargs.get('event_time') or kwargs.get('created_at') or _now())
+    row = {
+        'username': username or '',
+        'display_name': display_name or '',
+        'event_time': event_time,
+        'login_time': event_time,
+        'event_type': _normalise_event_type(event_type or 'LOGIN'),
+        'result': _normalise_result(result or 'SUCCESS'),
+        'module_code': module_code or '',
+        'module_name': kwargs.get('module_name') or '',
+        'message': message or '',
+        'ip_address': ip_address or '',
+        'user_agent': user_agent or 'streamlit',
+        'created_at': kwargs.get('created_at') or event_time,
+        'logout_time': logout_time or (event_time if _normalise_event_type(event_type or 'LOGIN') in {'LOGOUT', 'AUTO_LOGOUT', 'POST_RECORD_LOGOUT', 'SESSION_TIMEOUT'} else ''),
+        'idle_seconds': kwargs.get('idle_seconds'),
+        'source': kwargs.get('source') or 'record_login_log_v30065',
+    }
+    if _v30065_pg_enabled():
+        new_id = _v30065_insert_auth_login_log_neon(row)
+        if new_id:
+            return int(new_id)
+    if callable(_v30065_prev_record_login_log):
+        try:
+            return int(_v30065_prev_record_login_log(
+                username=username,
+                display_name=display_name,
+                event_type=event_type,
+                result=result,
+                message=message,
+                module_code=module_code,
+                login_time=login_time,
+                logout_time=logout_time,
+                idle_minutes=idle_minutes,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                **kwargs,
+            ) or 0)
+        except Exception:
+            return 0
+    return 0
+
+
+def audit_v30065_login_log_authority_active_query_fix() -> dict[str, Any]:
+    return {
+        'version': 'V300.65_11_LOGIN_LOG_AUTHORITY_ACTIVE_QUERY_FIX',
+        'dynamic_column_query': True,
+        'auth_login_created_at_not_required': True,
+        'record_login_log_writes_neon_auth_login_logs': True,
+        'delete_is_soft_delete_with_audit': True,
+    }
+# ================= END V300.65 11 LOGIN LOG AUTHORITY ACTIVE QUERY FIX =================
