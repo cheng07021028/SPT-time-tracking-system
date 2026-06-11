@@ -18,6 +18,15 @@ except Exception:
             st.caption(subtitle)
 
 from services.crud_table_service import load_employees, save_employees
+try:
+    from services.table_ui_service import render_width_settings, apply_column_order, load_widths
+except Exception:
+    def render_width_settings(table_key, df, title="欄位設定 / Column Settings（永久保存}"):
+        return None
+    def apply_column_order(table_key, df):
+        return df
+    def load_widths(table_key):
+        return {}
 
 try:
     from services.security_service import require_module_access
@@ -156,6 +165,52 @@ def _from_editor_df(df: pd.DataFrame) -> pd.DataFrame:
     return ensure_cols(df)
 
 
+# V300.59：04 人員名單表格改用「內部欄位 key + 顯示 label」。
+# 避免 Streamlit / column_settings wrapper 把「工號 / Employee ID」再加一次 label，
+# 同時補回明確的「套用欄位設定」按鈕。這只影響表格顯示，不改 save_employees()。
+V30059_EMPLOYEE_TABLE_KEY = "04_employees_master"
+V30059_EMPLOYEE_ORDER = COLS
+
+
+def _v30059_width(table_key: str, col: str, default="medium"):
+    try:
+        widths = load_widths(table_key)
+        value = widths.get(str(col))
+        if value:
+            return int(value)
+    except Exception:
+        pass
+    return default
+
+
+def _v30059_employee_table_df(editor_df: pd.DataFrame) -> pd.DataFrame:
+    work = pd.DataFrame(editor_df).copy() if isinstance(editor_df, pd.DataFrame) else pd.DataFrame()
+    work = work.rename(columns={v: k for k, v in DISPLAY_COLUMNS.items()})
+    work = ensure_cols(work)
+    try:
+        work = apply_column_order(V30059_EMPLOYEE_TABLE_KEY, work)
+    except Exception:
+        pass
+    return work
+
+
+def _v30059_employee_column_config(table_key: str) -> dict:
+    return {
+        "_delete": st.column_config.CheckboxColumn("刪除 / Delete", width=_v30059_width(table_key, "_delete", "medium")),
+        "id": st.column_config.NumberColumn("ID / ID", disabled=True, width=_v30059_width(table_key, "id", "small")),
+        "employee_id": st.column_config.TextColumn("工號 / Employee ID", required=True, width=_v30059_width(table_key, "employee_id", "medium")),
+        "employee_name": st.column_config.TextColumn("姓名 / Name", required=True, width=_v30059_width(table_key, "employee_name", "medium")),
+        "department": st.column_config.TextColumn("單位 / Department", width=_v30059_width(table_key, "department", "medium")),
+        "title": st.column_config.TextColumn("職稱 / Title", width=_v30059_width(table_key, "title", "medium")),
+        "is_active": st.column_config.CheckboxColumn("啟用 / Active", width=_v30059_width(table_key, "is_active", "medium")),
+        "is_in_factory": st.column_config.CheckboxColumn("在廠 / In Factory", width=_v30059_width(table_key, "is_in_factory", "medium")),
+        "is_today_attendance": st.column_config.CheckboxColumn("今日出勤 / Today Attendance", width=_v30059_width(table_key, "is_today_attendance", "medium")),
+        "note": st.column_config.TextColumn("備註 / Note", width=_v30059_width(table_key, "note", "large")),
+        "created_at": st.column_config.TextColumn("建立時間 / Created At", disabled=True, width=_v30059_width(table_key, "created_at", "medium")),
+        "updated_at": st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width=_v30059_width(table_key, "updated_at", "medium")),
+    }
+
+
 def _commit_current_editor_widget_state() -> None:
     """V67: commit data_editor widget delta into this page draft before any buttons/KPI read it.
 
@@ -169,7 +224,7 @@ def _commit_current_editor_widget_state() -> None:
         commit_editor_widget_state_to_session(
             state_key=STATE_KEY,
             editor_key=_editor_key(),
-            to_editor_df=_to_editor_df,
+            to_editor_df=lambda df: _v30059_employee_table_df(_to_editor_df(df)),
             from_editor_df=_from_editor_df,
             ensure_df=ensure_cols,
         )
@@ -446,35 +501,30 @@ with tab1:
         _commit_current_editor_widget_state()
         st.session_state[STATE_KEY] = _current_internal_df()
     editor_df = _to_editor_df(st.session_state[STATE_KEY])
+    table_df = _v30059_employee_table_df(editor_df)
+    render_width_settings(V30059_EMPLOYEE_TABLE_KEY, table_df, title="欄位設定 / Column Settings（永久保存）")
+    table_df = _v30059_employee_table_df(editor_df)
     submitted_employees = False
     edited = None
     if not employee_edit_enabled:
-        st.dataframe(editor_df, hide_index=True, use_container_width=True, height=560, column_order=EDITOR_COLS)
+        st.dataframe(
+            table_df,
+            hide_index=True,
+            use_container_width=True,
+            height=560,
+            column_config=_v30059_employee_column_config(V30059_EMPLOYEE_TABLE_KEY),
+        )
     else:
-        # V120：穩定編輯模式。把 data_editor 與儲存按鈕放在同一個 form，
-        # 避免每修改一格就 rerun 跳回頁面上方；批次按鈕與原儲存邏輯不變。
+        # V300.59：使用內部欄位 key 交給 data_editor，避免中英雙語欄名被 Streamlit 再疊一次。
+        # 儲存時仍由 _from_editor_df() 轉回既有內部結構，不改 save_employees()。
         with st.form("v120_employee_stable_editor_form", clear_on_submit=False):
             edited = st.data_editor(
-                editor_df,
+                table_df,
                 hide_index=True,
                 use_container_width=True,
                 num_rows="dynamic",
                 height=560,
-                column_order=EDITOR_COLS,
-                column_config={
-                    DISPLAY_COLUMNS["_delete"]: st.column_config.CheckboxColumn("刪除 / Delete", width="medium"),
-                    DISPLAY_COLUMNS["id"]: st.column_config.NumberColumn("ID / ID", disabled=True, width="small"),
-                    DISPLAY_COLUMNS["employee_id"]: st.column_config.TextColumn("工號 / Employee ID", required=True, width="medium"),
-                    DISPLAY_COLUMNS["employee_name"]: st.column_config.TextColumn("姓名 / Name", required=True, width="medium"),
-                    DISPLAY_COLUMNS["department"]: st.column_config.TextColumn("單位 / Department", width="medium"),
-                    DISPLAY_COLUMNS["title"]: st.column_config.TextColumn("職稱 / Title", width="medium"),
-                    DISPLAY_COLUMNS["is_active"]: st.column_config.CheckboxColumn("啟用 / Active", width="medium"),
-                    DISPLAY_COLUMNS["is_in_factory"]: st.column_config.CheckboxColumn("在廠 / In Factory", width="medium"),
-                    DISPLAY_COLUMNS["is_today_attendance"]: st.column_config.CheckboxColumn("今日出勤 / Today Attendance", width="medium"),
-                    DISPLAY_COLUMNS["note"]: st.column_config.TextColumn("備註 / Note", width="large"),
-                    DISPLAY_COLUMNS["created_at"]: st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
-                    DISPLAY_COLUMNS["updated_at"]: st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
-                },
+                column_config=_v30059_employee_column_config(V30059_EMPLOYEE_TABLE_KEY),
                 key=_editor_key(),
                 disabled=False,
             )

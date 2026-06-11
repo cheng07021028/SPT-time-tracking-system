@@ -23,6 +23,15 @@ from services.security_service import require_module_access, check_permission
 from services.crud_table_service import load_employees, save_employees
 from services.time_record_service import load_records, load_daily_record_summary_sql
 from services.table_ui_service import render_table
+try:
+    from services.table_ui_service import render_width_settings, apply_column_order, load_widths
+except Exception:
+    def render_width_settings(table_key, df, title="欄位設定 / Column Settings（永久保存)"):
+        return None
+    def apply_column_order(table_key, df):
+        return df
+    def load_widths(table_key):
+        return {}
 
 st.set_page_config(page_title="07. 今日未紀錄名單", page_icon="⟁️", layout="wide")
 apply_theme()
@@ -603,9 +612,13 @@ def _from_daily_editor_df(df: pd.DataFrame, target_date: str) -> pd.DataFrame:
     work = work.rename(columns={c: DAILY_DISPLAY_TO_INTERNAL.get(c, c) for c in work.columns})
     if DAILY_DISPLAY_ROW_NO in work.columns:
         work = work.drop(columns=[DAILY_DISPLAY_ROW_NO], errors="ignore")
+    if "row_no" in work.columns:
+        work = work.drop(columns=["row_no"], errors="ignore")
     if DAILY_DELETE_COL in work.columns:
         work["_delete"] = work[DAILY_DELETE_COL].map(_to_bool_value).fillna(False).astype(bool)
         work = work.drop(columns=[DAILY_DELETE_COL], errors="ignore")
+    elif "_delete" in work.columns:
+        work["_delete"] = work["_delete"].map(_to_bool_value).fillna(False).astype(bool)
     else:
         work["_delete"] = False
     for c in DAILY_COLS:
@@ -616,6 +629,102 @@ def _from_daily_editor_df(df: pd.DataFrame, target_date: str) -> pd.DataFrame:
         work[c] = work[c].map(_to_bool_value).fillna(False).astype(bool)
     work["_delete"] = work["_delete"].map(_to_bool_value).fillna(False).astype(bool)
     return work[DAILY_COLS + ["_delete"]]
+
+
+# V300.59：07 直接 data_editor 表格改用內部欄位 key + 顯示 label。
+# 避免 Streamlit / column_settings wrapper 把中英雙語欄名再疊一次，並補回明確的套用欄位設定按鈕。
+V30059_TODAY_ATTENDANCE_TABLE_KEY = "07_today_attendance_editor"
+V30059_DAILY_ATTENDANCE_TABLE_KEY = "07_daily_attendance_editor"
+V30059_ROW_NO_COL = "row_no"
+V30059_TODAY_INTERNAL_ORDER = [V30059_ROW_NO_COL] + [c for c in COLS if c != "id"]
+V30059_DAILY_INTERNAL_ORDER = ["_delete", V30059_ROW_NO_COL] + DAILY_COLS
+
+
+def _v30059_width(table_key: str, col: str, default="medium"):
+    try:
+        widths = load_widths(table_key)
+        value = widths.get(str(col))
+        if value:
+            return int(value)
+    except Exception:
+        pass
+    return default
+
+
+def _v30059_apply_order(table_key: str, df: pd.DataFrame) -> pd.DataFrame:
+    try:
+        return apply_column_order(table_key, df)
+    except Exception:
+        return df
+
+
+def _v30059_today_table_df(editor_df: pd.DataFrame) -> pd.DataFrame:
+    work = pd.DataFrame(editor_df).copy() if isinstance(editor_df, pd.DataFrame) else pd.DataFrame()
+    work = work.rename(columns={v: k for k, v in DISPLAY_COLUMNS.items()})
+    if DISPLAY_ROW_NO in work.columns:
+        work = work.rename(columns={DISPLAY_ROW_NO: V30059_ROW_NO_COL})
+    for c in V30059_TODAY_INTERNAL_ORDER:
+        if c not in work.columns:
+            work[c] = range(1, len(work) + 1) if c == V30059_ROW_NO_COL else ""
+    work = work[V30059_TODAY_INTERNAL_ORDER]
+    return _v30059_apply_order(V30059_TODAY_ATTENDANCE_TABLE_KEY, work)
+
+
+def _v30059_today_column_config(table_key: str) -> dict:
+    return {
+        V30059_ROW_NO_COL: st.column_config.NumberColumn("序號 / No.", width=_v30059_width(table_key, V30059_ROW_NO_COL, "small")),
+        "employee_id": st.column_config.TextColumn("工號 / Employee ID", width=_v30059_width(table_key, "employee_id", "medium")),
+        "employee_name": st.column_config.TextColumn("姓名 / Name", width=_v30059_width(table_key, "employee_name", "medium")),
+        "department": st.column_config.TextColumn("單位 / Department", width=_v30059_width(table_key, "department", "medium")),
+        "title": st.column_config.TextColumn("職稱 / Title", width=_v30059_width(table_key, "title", "medium")),
+        "is_active": st.column_config.CheckboxColumn("啟用 / Active", width=_v30059_width(table_key, "is_active", "medium")),
+        "is_in_factory": st.column_config.CheckboxColumn("在廠 / In Factory", width=_v30059_width(table_key, "is_in_factory", "medium")),
+        "is_today_attendance": st.column_config.CheckboxColumn("今日出勤 / Today Attendance", width=_v30059_width(table_key, "is_today_attendance", "medium")),
+        "note": st.column_config.TextColumn("備註 / Note", width=_v30059_width(table_key, "note", "large")),
+        "created_at": st.column_config.TextColumn("建立時間 / Created At", width=_v30059_width(table_key, "created_at", "medium")),
+        "updated_at": st.column_config.TextColumn("更新時間 / Updated At", width=_v30059_width(table_key, "updated_at", "medium")),
+    }
+
+
+def _v30059_daily_table_df(daily_view_df: pd.DataFrame) -> pd.DataFrame:
+    work = pd.DataFrame(daily_view_df).copy() if isinstance(daily_view_df, pd.DataFrame) else pd.DataFrame()
+    work = work.rename(columns={v: k for k, v in DAILY_DISPLAY_COLUMNS.items()})
+    if DAILY_DISPLAY_ROW_NO in work.columns:
+        work = work.rename(columns={DAILY_DISPLAY_ROW_NO: V30059_ROW_NO_COL})
+    if DAILY_DELETE_COL in work.columns:
+        work = work.rename(columns={DAILY_DELETE_COL: "_delete"})
+    for c in V30059_DAILY_INTERNAL_ORDER:
+        if c not in work.columns:
+            if c == V30059_ROW_NO_COL:
+                work[c] = range(1, len(work) + 1)
+            elif c in {"_delete", "is_in_factory", "is_today_attendance"}:
+                work[c] = False
+            else:
+                work[c] = ""
+    work = work[V30059_DAILY_INTERNAL_ORDER]
+    return _v30059_apply_order(V30059_DAILY_ATTENDANCE_TABLE_KEY, work)
+
+
+def _v30059_daily_column_config(table_key: str) -> dict:
+    return {
+        "_delete": st.column_config.CheckboxColumn("刪除 / Delete", width=_v30059_width(table_key, "_delete", "small")),
+        V30059_ROW_NO_COL: st.column_config.NumberColumn("序號 / No.", width=_v30059_width(table_key, V30059_ROW_NO_COL, "small")),
+        "employee_id": st.column_config.TextColumn("工號 / Employee ID", width=_v30059_width(table_key, "employee_id", "medium")),
+        "employee_name": st.column_config.TextColumn("姓名 / Name", width=_v30059_width(table_key, "employee_name", "medium")),
+        "department": st.column_config.TextColumn("單位 / Department", width=_v30059_width(table_key, "department", "medium")),
+        "title": st.column_config.TextColumn("職稱 / Title", width=_v30059_width(table_key, "title", "medium")),
+        "attendance_status": st.column_config.SelectboxColumn("出勤狀態 / Attendance Status", options=["出勤", "請假", "公出", "休假", "未出勤", "離職", "其他"], width=_v30059_width(table_key, "attendance_status", "medium")),
+        "is_in_factory": st.column_config.CheckboxColumn("在廠 / In Factory", width=_v30059_width(table_key, "is_in_factory", "medium")),
+        "is_today_attendance": st.column_config.CheckboxColumn("出勤 / Attendance", width=_v30059_width(table_key, "is_today_attendance", "medium")),
+        "check_in_time": st.column_config.TextColumn("到廠時間 / Check In", width=_v30059_width(table_key, "check_in_time", "medium"), help="可填 08:00 或 2026-05-29 08:00"),
+        "check_out_time": st.column_config.TextColumn("離廠時間 / Check Out", width=_v30059_width(table_key, "check_out_time", "medium")),
+        "note": st.column_config.TextColumn("備註 / Note", width=_v30059_width(table_key, "note", "large")),
+        "record_id": st.column_config.TextColumn("紀錄ID / Record ID", width=_v30059_width(table_key, "record_id", "medium")),
+        "attendance_date": st.column_config.TextColumn("日期 / Date", width=_v30059_width(table_key, "attendance_date", "medium")),
+        "created_at": st.column_config.TextColumn("建立時間 / Created At", width=_v30059_width(table_key, "created_at", "medium")),
+        "updated_at": st.column_config.TextColumn("更新時間 / Updated At", width=_v30059_width(table_key, "updated_at", "medium")),
+        "updated_by": st.column_config.TextColumn("更新者 / Updated By", width=_v30059_width(table_key, "updated_by", "medium")),
+    }
 
 
 def _save_daily_editor_df(editor_df: pd.DataFrame, target_date: str) -> dict[str, Any]:
@@ -818,7 +927,7 @@ def _commit_current_editor_widget_state() -> None:
         commit_editor_widget_state_to_session(
             state_key=STATE_KEY,
             editor_key=_editor_key,
-            to_editor_df=_to_editor_df,
+            to_editor_df=lambda df: _v30059_today_table_df(_to_editor_df(df)),
             from_editor_df=_from_editor_df,
             ensure_df=ensure_cols,
         )
@@ -971,29 +1080,18 @@ else:
     _commit_current_editor_widget_state()
     st.session_state[STATE_KEY] = ensure_cols(st.session_state[STATE_KEY])
     editor_df = _to_editor_df(st.session_state[STATE_KEY])
-    # V120：穩定編輯模式。把 data_editor 與儲存按鈕放在同一個 form，
-    # 避免 checkbox / cell edit 每一下都 rerun 跳頁；批次按鈕與原儲存邏輯不變。
+    today_table_df = _v30059_today_table_df(editor_df)
+    render_width_settings(V30059_TODAY_ATTENDANCE_TABLE_KEY, today_table_df, title="欄位設定 / Column Settings（永久保存）")
+    today_table_df = _v30059_today_table_df(editor_df)
+    # V300.59：使用內部欄位 key 交給 data_editor，避免中英雙語欄名被重複顯示。
     with st.form("v120_today_attendance_stable_editor_form", clear_on_submit=False):
         edited = st.data_editor(
-            editor_df,
+            today_table_df,
             hide_index=True,
             use_container_width=True,
             height=460,
-            disabled=[DISPLAY_ROW_NO] + [DISPLAY_COLUMNS[c] for c in ["employee_id", "employee_name", "department", "title", "note", "created_at", "updated_at"]],
-            column_order=EDITOR_COLS,
-            column_config={
-                DISPLAY_ROW_NO: st.column_config.NumberColumn("序號 / No.", width="small"),
-                DISPLAY_COLUMNS["employee_id"]: st.column_config.TextColumn("工號 / Employee ID", width="medium"),
-                DISPLAY_COLUMNS["employee_name"]: st.column_config.TextColumn("姓名 / Name", width="medium"),
-                DISPLAY_COLUMNS["department"]: st.column_config.TextColumn("單位 / Department", width="medium"),
-                DISPLAY_COLUMNS["title"]: st.column_config.TextColumn("職稱 / Title", width="medium"),
-                DISPLAY_COLUMNS["is_active"]: st.column_config.CheckboxColumn("啟用 / Active", width="medium"),
-                DISPLAY_COLUMNS["is_in_factory"]: st.column_config.CheckboxColumn("在廠 / In Factory", width="medium"),
-                DISPLAY_COLUMNS["is_today_attendance"]: st.column_config.CheckboxColumn("今日出勤 / Today Attendance", width="medium"),
-                DISPLAY_COLUMNS["note"]: st.column_config.TextColumn("備註 / Note", width="large"),
-                DISPLAY_COLUMNS["created_at"]: st.column_config.TextColumn("建立時間 / Created At", width="medium"),
-                DISPLAY_COLUMNS["updated_at"]: st.column_config.TextColumn("更新時間 / Updated At", width="medium"),
-            },
+            disabled=[V30059_ROW_NO_COL, "employee_id", "employee_name", "department", "title", "note", "created_at", "updated_at"],
+            column_config=_v30059_today_column_config(V30059_TODAY_ATTENDANCE_TABLE_KEY),
             key=editor_key,
         )
         submitted_today_attendance = st.form_submit_button("▣ 確認儲存今日出勤設定 / Save Today Attendance", type="primary", use_container_width=True)
@@ -1094,45 +1192,25 @@ if not can_edit_daily:
     st.warning("目前帳號沒有 07 今日未紀錄名單編輯權限，只能查看每日出勤紀錄。")
     render_table(_daily_df, "v234_daily_attendance_readonly", editable=False, height=460)
 else:
+    daily_table_df = _v30059_daily_table_df(_daily_view)
+    render_width_settings(V30059_DAILY_ATTENDANCE_TABLE_KEY, daily_table_df, title="欄位設定 / Column Settings（永久保存）")
+    daily_table_df = _v30059_daily_table_df(_daily_view)
     with st.form("v234_daily_attendance_stable_editor_form", clear_on_submit=False):
         daily_edited = st.data_editor(
-            _daily_view,
+            daily_table_df,
             hide_index=True,
             use_container_width=True,
             height=520,
             num_rows="dynamic",
-            column_order=DAILY_EDITOR_COLS,
             disabled=[
-                DAILY_DISPLAY_ROW_NO,
-                DAILY_DISPLAY_COLUMNS["record_id"],
-                DAILY_DISPLAY_COLUMNS["attendance_date"],
-                DAILY_DISPLAY_COLUMNS["created_at"],
-                DAILY_DISPLAY_COLUMNS["updated_at"],
-                DAILY_DISPLAY_COLUMNS["updated_by"],
+                V30059_ROW_NO_COL,
+                "record_id",
+                "attendance_date",
+                "created_at",
+                "updated_at",
+                "updated_by",
             ],
-            column_config={
-                DAILY_DELETE_COL: st.column_config.CheckboxColumn("刪除 / Delete", width="small"),
-                DAILY_DISPLAY_ROW_NO: st.column_config.NumberColumn("序號 / No.", width="small"),
-                DAILY_DISPLAY_COLUMNS["employee_id"]: st.column_config.TextColumn("工號 / Employee ID", width="medium"),
-                DAILY_DISPLAY_COLUMNS["employee_name"]: st.column_config.TextColumn("姓名 / Name", width="medium"),
-                DAILY_DISPLAY_COLUMNS["department"]: st.column_config.TextColumn("單位 / Department", width="medium"),
-                DAILY_DISPLAY_COLUMNS["title"]: st.column_config.TextColumn("職稱 / Title", width="medium"),
-                DAILY_DISPLAY_COLUMNS["attendance_status"]: st.column_config.SelectboxColumn(
-                    "出勤狀態 / Attendance Status",
-                    options=["出勤", "請假", "公出", "休假", "未出勤", "離職", "其他"],
-                    width="medium",
-                ),
-                DAILY_DISPLAY_COLUMNS["is_in_factory"]: st.column_config.CheckboxColumn("在廠 / In Factory", width="medium"),
-                DAILY_DISPLAY_COLUMNS["is_today_attendance"]: st.column_config.CheckboxColumn("出勤 / Attendance", width="medium"),
-                DAILY_DISPLAY_COLUMNS["check_in_time"]: st.column_config.TextColumn("到廠時間 / Check In", width="medium", help="可填 08:00 或 2026-05-29 08:00"),
-                DAILY_DISPLAY_COLUMNS["check_out_time"]: st.column_config.TextColumn("離廠時間 / Check Out", width="medium"),
-                DAILY_DISPLAY_COLUMNS["note"]: st.column_config.TextColumn("備註 / Note", width="large"),
-                DAILY_DISPLAY_COLUMNS["record_id"]: st.column_config.TextColumn("紀錄ID / Record ID", width="medium"),
-                DAILY_DISPLAY_COLUMNS["attendance_date"]: st.column_config.TextColumn("日期 / Date", width="medium"),
-                DAILY_DISPLAY_COLUMNS["created_at"]: st.column_config.TextColumn("建立時間 / Created At", width="medium"),
-                DAILY_DISPLAY_COLUMNS["updated_at"]: st.column_config.TextColumn("更新時間 / Updated At", width="medium"),
-                DAILY_DISPLAY_COLUMNS["updated_by"]: st.column_config.TextColumn("更新者 / Updated By", width="medium"),
-            },
+            column_config=_v30059_daily_column_config(V30059_DAILY_ATTENDANCE_TABLE_KEY),
             key=_daily_editor_key,
         )
         daily_submit = st.form_submit_button("▣ 儲存每日出勤紀錄 / Save Daily Attendance Records", type="primary", use_container_width=True)

@@ -3048,3 +3048,144 @@ def audit_v30058_shared_table_duplicate_header_final_fix() -> dict[str, Any]:
         "data_write_flow_changed": False,
     }
 # =============== END V300.58 FINAL SHARED DUPLICATE HEADER FIX ===============
+
+
+# ================= V300.59 SHARED COLUMN SETTINGS APPLY BUTTON FIX =================
+# 2026-06-11
+# Purpose:
+# - 04 / 07 and all shared render_table() screens need an explicit Apply button
+#   for column settings. Earlier V43/V47 overrides left render_width_settings()
+#   as a no-op in some paths, while direct st.data_editor screens still showed
+#   duplicated labels through their own column_config.
+# - Keep data writes untouched: this saves only UI column widths/order.
+
+def _v30059_col_key(col: Any) -> str:
+    return str(col or '').strip()
+
+
+def _v30059_default_width(col: Any) -> int:
+    key = _v30059_col_key(col)
+    try:
+        value = int(load_widths('__unused__').get(key, DEFAULT_WIDTHS.get(key, 140)))
+    except Exception:
+        value = int(DEFAULT_WIDTHS.get(key, 140)) if isinstance(DEFAULT_WIDTHS, dict) else 140
+    return max(60, min(700, value))
+
+
+def _v30059_safe_int(value: Any, default: int, minimum: int, maximum: int) -> int:
+    try:
+        out = int(float(value))
+    except Exception:
+        out = int(default)
+    return max(int(minimum), min(int(maximum), out))
+
+
+def render_width_settings(table_key: str, df: pd.DataFrame, title: str = '欄位設定 / Column Settings（永久保存）') -> None:  # type: ignore[override]
+    """Explicit Apply/Reset column settings panel for shared tables.
+
+    This replaces the old auto-save/no-op paths. It is intentionally not used
+    inside a Streamlit form.  It only saves table UI preferences (width/order),
+    never business data.
+    """
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return
+    key = str(table_key or 'default').strip() or 'default'
+    try:
+        instance_key = _safe_widget_key_part(f'v30059_{key}_{title}')
+    except Exception:
+        instance_key = ''.join(ch if ch.isalnum() else '_' for ch in f'v30059_{key}_{title}')[:120]
+
+    current_cols = [str(c) for c in df.columns]
+    if not current_cols:
+        return
+    current_set = set(current_cols)
+    try:
+        saved_widths = dict(load_widths(key) or {})
+    except Exception:
+        saved_widths = {}
+    try:
+        saved_order = [str(c) for c in (load_column_order(key) or []) if str(c) in current_set]
+    except Exception:
+        saved_order = []
+    ordered_cols: list[str] = []
+    seen: set[str] = set()
+    for col in saved_order + current_cols:
+        if col in current_set and col not in seen:
+            ordered_cols.append(col)
+            seen.add(col)
+    if not ordered_cols:
+        ordered_cols = list(current_cols)
+
+    with st.expander(title, expanded=False):
+        st.caption('調整後請按「套用欄位設定」。此設定只影響表格顯示欄寬與順序，不會儲存或修改資料。')
+        width_values: dict[str, int] = {}
+        order_values: dict[str, int] = {}
+        max_order = max(len(current_cols), 1)
+        order_index = {c: i + 1 for i, c in enumerate(ordered_cols)}
+        cols_ui = st.columns(4)
+        for idx, col in enumerate(current_cols):
+            safe_col = _safe_widget_key_part(f'{idx}_{col}') if '_safe_widget_key_part' in globals() else str(idx)
+            default_width = _v30059_safe_int(saved_widths.get(col, DEFAULT_WIDTHS.get(col, 140)), 140, 60, 700)
+            default_order = _v30059_safe_int(order_index.get(col, idx + 1), idx + 1, 1, max_order)
+            with cols_ui[idx % 4]:
+                st.markdown(f'**{label_for(col)}**')
+                width_values[col] = st.number_input(
+                    '欄寬 / Width',
+                    min_value=60,
+                    max_value=700,
+                    value=default_width,
+                    step=10,
+                    key=f'v30059_width_{instance_key}_{safe_col}',
+                )
+                order_values[col] = st.number_input(
+                    '順序 / Order',
+                    min_value=1,
+                    max_value=max_order,
+                    value=default_order,
+                    step=1,
+                    key=f'v30059_order_{instance_key}_{safe_col}',
+                )
+        b1, b2 = st.columns(2)
+        if b1.button('套用欄位設定 / Apply Column Settings', key=f'v30059_apply_{instance_key}', use_container_width=True):
+            new_order = [c for c, _ in sorted(order_values.items(), key=lambda kv: (int(kv[1]), str(kv[0])))]
+            try:
+                save_widths(key, {str(k): int(v) for k, v in width_values.items()})
+                save_column_order(key, new_order)
+                try:
+                    refresh_table_ui_settings(key)
+                except Exception:
+                    pass
+                st.success('已套用並永久保存欄位設定。')
+                try:
+                    st.rerun()
+                except Exception:
+                    pass
+            except Exception as exc:
+                st.error(f'欄位設定儲存失敗：{exc}')
+        if b2.button('恢復預設欄位 / Reset Defaults', key=f'v30059_reset_{instance_key}', use_container_width=True):
+            default_widths = {c: int(DEFAULT_WIDTHS.get(c, 140)) if isinstance(DEFAULT_WIDTHS, dict) else 140 for c in current_cols}
+            try:
+                save_widths(key, default_widths)
+                save_column_order(key, current_cols)
+                try:
+                    refresh_table_ui_settings(key)
+                except Exception:
+                    pass
+                st.success('已恢復預設欄位設定。')
+                try:
+                    st.rerun()
+                except Exception:
+                    pass
+            except Exception as exc:
+                st.error(f'恢復預設欄位失敗：{exc}')
+        st.caption(f'表格ID：{key}')
+
+
+def audit_v30059_shared_column_settings_apply_button_fix() -> dict[str, Any]:
+    return {
+        'version': 'V300.59_SHARED_COLUMN_SETTINGS_APPLY_BUTTON_FIX',
+        'render_width_settings_has_apply_button': True,
+        'render_width_settings_saves_only_widths_and_order': True,
+        'business_data_flow_changed': False,
+    }
+# ================= END V300.59 SHARED COLUMN SETTINGS APPLY BUTTON FIX =================
