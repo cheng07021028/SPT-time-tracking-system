@@ -37,6 +37,22 @@ except Exception:
     def load_widths(table_key):
         return {}
 
+
+# V300.68：07 本頁已在表格前方自行渲染新版欄位設定面板。
+# 若再經過全域 column_settings_service 的 monkey patch，畫面會多出第二個
+# 「欄位設定 / Column Settings」。本頁兩個主要 data_editor 改用原始
+# Streamlit data_editor（若全域 patch 尚未安裝，st.data_editor 本身就是原始函式），
+# 只避免重複欄位設定，不改資料儲存、計算或 UI/CSS/theme。
+def _v30068_page_owned_data_editor(*args, **kwargs):
+    try:
+        from services import column_settings_service as _column_settings_service
+        original_editor = getattr(_column_settings_service, "_ORIGINAL_DATA_EDITOR", None)
+        if callable(original_editor):
+            return original_editor(*args, **kwargs)
+    except Exception:
+        pass
+    return st.data_editor(*args, **kwargs)
+
 st.set_page_config(page_title="07. 今日未紀錄名單", page_icon="⟁️", layout="wide")
 apply_theme()
 require_module_access("07_missing")
@@ -1202,7 +1218,7 @@ else:
     today_table_df = _v30059_today_table_df(editor_df)
     # V300.59：使用內部欄位 key 交給 data_editor，避免中英雙語欄名被重複顯示。
     with st.form("v120_today_attendance_stable_editor_form", clear_on_submit=False):
-        edited = st.data_editor(
+        edited = _v30068_page_owned_data_editor(
             today_table_df,
             hide_index=True,
             use_container_width=True,
@@ -1313,7 +1329,7 @@ else:
     render_width_settings(V30059_DAILY_ATTENDANCE_TABLE_KEY, daily_table_df, title="欄位設定 / Column Settings（永久保存）")
     daily_table_df = _v30059_daily_table_df(_daily_view)
     with st.form("v234_daily_attendance_stable_editor_form", clear_on_submit=False):
-        daily_edited = st.data_editor(
+        daily_edited = _v30068_page_owned_data_editor(
             daily_table_df,
             hide_index=True,
             use_container_width=True,
