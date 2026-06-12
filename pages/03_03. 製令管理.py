@@ -1008,6 +1008,56 @@ def _v30072_merge_sync_result_for_editor(current: pd.DataFrame, add_df: pd.DataF
     return ensure_cols(cur)
 
 
+def _v30074_apply_import_delta(parsed: pd.DataFrame, source_label: str = "import") -> dict:
+    """Save Excel/Paste imports using the same delta path as OneDrive and manual edit.
+
+    Before V300.74, the Excel import and pasted-data direct-save buttons still
+    called save_work_orders(parsed) and then reload_data().  On a large master
+    table that meant an import with many unchanged rows still performed a full
+    service comparison and immediately re-read all work orders from Neon.
+
+    This helper compares the incoming rows with the current page baseline first,
+    writes only truly new/changed rows, and refreshes the editor from memory.
+    It does not delete any existing work order because Excel/Paste import is an
+    add/update workflow, not a source-of-truth replacement sync.
+    """
+    incoming = ensure_cols(parsed.copy() if isinstance(parsed, pd.DataFrame) else pd.DataFrame())
+    current = _current_internal_df()
+    add_df, upd_df, _ = _compare_work_orders(incoming, current, collapse_duplicates=True)
+    planned_count = int(len(add_df) + len(upd_df))
+    if planned_count <= 0:
+        return {
+            "inserted": 0,
+            "updated": 0,
+            "deleted": 0,
+            "skipped": 0,
+            "planned_new": 0,
+            "planned_update": 0,
+            "planned_count": 0,
+            "unchanged": int(len(incoming)),
+            "authority_ok": True,
+            "authority_rows": 0,
+            "source_label": source_label,
+        }
+
+    result = _apply_work_order_sync_direct(add_df, upd_df, ensure_cols(pd.DataFrame()), False)
+    try:
+        merged = _v30072_merge_sync_result_for_editor(current, add_df, upd_df, ensure_cols(pd.DataFrame()), False)
+        st.session_state[STATE_KEY] = merged
+        _v30073_set_save_baseline(merged)
+    except Exception:
+        # Fallback keeps correctness if the in-memory merge ever fails; normal path
+        # intentionally avoids this full authority read for speed.
+        reload_data()
+    _refresh_editor_widget()
+    result["planned_new"] = int(len(add_df))
+    result["planned_update"] = int(len(upd_df))
+    result["planned_count"] = planned_count
+    result["unchanged"] = int(max(0, len(incoming) - planned_count))
+    result["source_label"] = source_label
+    return result
+
+
 if STATE_KEY not in st.session_state:
     reload_data()
 
@@ -1155,9 +1205,16 @@ with tab2:
         st.success(f"已解析 {len(parsed)} 筆製令資料。")
         st.dataframe(parsed[["work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active"]], use_container_width=True, height=300)
         if st.button("▣ 確認匯入 Excel 製令 / Import Excel Work Orders", type="primary", use_container_width=True, key="wo_excel_import_confirm_v243", disabled=not st.session_state.get("v253_work_order_edit_enabled", False)):
-            result = save_work_orders(parsed)
-            reload_data()
-            st.success(f"Excel 匯入完成：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}")
+            result = _v30074_apply_import_delta(parsed, "excel")
+            if int(result.get("planned_count", 0) or 0) <= 0:
+                st.info(f"Excel 匯入完成：沒有偵測到需要寫入 Neon 的新增或異動製令；已略過未變更 {result.get('unchanged', 0)} 筆。")
+            else:
+                st.success(
+                    f"Excel 匯入完成：本次送出新增 {result.get('planned_new', 0)}、更新 {result.get('planned_update', 0)}；"
+                    f"實際新增 {result.get('inserted', 0)}、更新 {result.get('updated', 0)}、"
+                    f"刪除 {result.get('deleted', 0)}、略過 {result.get('skipped', 0)}；"
+                    f"未變更 {result.get('unchanged', 0)}。"
+                )
             rerun()
 
 with tab3:
@@ -1184,9 +1241,16 @@ with tab3:
                 st.success("已加入『製令清單編輯』頁，請切回第一個頁籤確認後按儲存。")
 
             if a2.button("▣ 直接儲存貼上資料 / Save Pasted Work Orders", type="primary", use_container_width=True, key="save_pasted_work_orders_v138", disabled=not st.session_state.get("v253_work_order_edit_enabled", False)):
-                result = save_work_orders(parsed)
-                reload_data()
-                st.success(f"貼上資料已儲存：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}")
+                result = _v30074_apply_import_delta(parsed, "paste")
+                if int(result.get("planned_count", 0) or 0) <= 0:
+                    st.info(f"貼上資料已檢查：沒有偵測到需要寫入 Neon 的新增或異動製令；已略過未變更 {result.get('unchanged', 0)} 筆。")
+                else:
+                    st.success(
+                        f"貼上資料已儲存：本次送出新增 {result.get('planned_new', 0)}、更新 {result.get('planned_update', 0)}；"
+                        f"實際新增 {result.get('inserted', 0)}、更新 {result.get('updated', 0)}、"
+                        f"刪除 {result.get('deleted', 0)}、略過 {result.get('skipped', 0)}；"
+                        f"未變更 {result.get('unchanged', 0)}。"
+                    )
                 rerun()
 
             st.markdown("### 解析後資料預覽 / Parsed Preview")
