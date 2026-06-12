@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Iterable
+import json
 import time
 
 import pandas as pd
@@ -223,6 +224,186 @@ def _save_log(action_type: str, table: str, msg: str) -> None:
         pass
 
 
+def _same_text(a: Any, b: Any) -> bool:
+    return _text(a) == _text(b)
+
+
+def _save_work_orders_postgres_bulk(work: pd.DataFrame, now: str) -> dict[str, Any] | None:
+    """Bulk-save 03 work orders on PostgreSQL without one UPDATE per row.
+
+    V300.72: OneDrive mapped sync can pass hundreds or thousands of rows. The
+    previous Neon path built one SQL statement per row, so an unchanged or mostly
+    unchanged Excel file still spent minutes sending UPDATE statements. This
+    function stages the payload in memory, skips unchanged rows, then performs at
+    most two PostgreSQL statements: one JSONB upsert and one array soft-delete.
+    If the direct PostgreSQL path is unavailable, caller falls back to the old
+    execute_transaction path so local SQLite/testing behavior is preserved.
+    """
+    try:
+        if str(get_database_backend()).lower() != "postgresql":
+            return None
+    except Exception:
+        return None
+
+    staged: dict[str, dict[str, Any]] = {}
+    staged_order: list[str] = []
+    result = {"inserted": 0, "updated": 0, "deleted": 0, "skipped": 0, "authority_rows": 0}
+
+    for _, row in work.iterrows():
+        wo = _text(row.get("work_order"))
+        if not wo:
+            result["skipped"] += 1
+            continue
+        if wo not in staged:
+            staged_order.append(wo)
+        staged[wo] = {
+            "work_order": wo,
+            "part_no": _text(row.get("part_no")),
+            "type_name": _text(row.get("type_name")),
+            "assembly_location": _text(row.get("assembly_location")),
+            "customer": _text(row.get("customer")),
+            "note": _text(row.get("note")),
+            "is_active": 1 if _bool(row.get("is_active"), True) else 0,
+            "delete": _bool(row.get("_delete")),
+        }
+
+    if not staged_order:
+        return result
+
+    try:
+        existing_df = query_df(
+            """
+            SELECT id, work_order, part_no, type_name, assembly_location, customer, note,
+                   COALESCE(is_active, active, 1) AS is_active, deleted_at
+            FROM work_orders
+            """,
+            (),
+        )
+    except Exception:
+        return None
+    if not isinstance(existing_df, pd.DataFrame):
+        existing_df = pd.DataFrame()
+
+    existing: dict[str, dict[str, Any]] = {}
+    if not existing_df.empty and "work_order" in existing_df.columns:
+        for _, old in existing_df.iterrows():
+            wo = _text(old.get("work_order"))
+            if wo:
+                existing[wo] = old.to_dict()
+
+    upsert_rows: list[dict[str, Any]] = []
+    delete_keys: list[str] = []
+    for wo in staged_order:
+        row = staged[wo]
+        old = existing.get(wo, {})
+        old_deleted = bool(_text(old.get("deleted_at"))) if old else False
+        if row.get("delete"):
+            if old and not old_deleted:
+                delete_keys.append(wo)
+                result["deleted"] += 1
+            else:
+                result["skipped"] += 1
+            continue
+        changed = not old or old_deleted
+        if old and not old_deleted:
+            for col in ("part_no", "type_name", "assembly_location", "customer", "note"):
+                if not _same_text(row.get(col), old.get(col)):
+                    changed = True
+                    break
+            if not changed and int(_bool(old.get("is_active"), True)) != int(bool(row.get("is_active"))):
+                changed = True
+        if not changed:
+            continue
+        if old:
+            result["updated"] += 1
+        else:
+            result["inserted"] += 1
+        upsert_rows.append({
+            "work_order": row["work_order"],
+            "part_no": row["part_no"],
+            "type_name": row["type_name"],
+            "assembly_location": row["assembly_location"],
+            "customer": row["customer"],
+            "note": row["note"],
+            "is_active": int(row["is_active"]),
+            "created_at": now,
+            "updated_at": now,
+        })
+
+    if not upsert_rows and not delete_keys:
+        result["authority_rows"] = len([1 for _k, old in existing.items() if not _text(old.get("deleted_at"))])
+        return result
+
+    try:
+        from services.db_service import get_connection, mark_data_changed
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                if upsert_rows:
+                    cur.execute(
+                        """
+                        WITH payload AS (
+                            SELECT * FROM jsonb_to_recordset(%s::jsonb) AS x(
+                                work_order text,
+                                part_no text,
+                                type_name text,
+                                assembly_location text,
+                                customer text,
+                                note text,
+                                is_active integer,
+                                created_at text,
+                                updated_at text
+                            )
+                        )
+                        INSERT INTO work_orders(
+                            work_order, work_order_no, part_no, type_name, assembly_location,
+                            customer, note, is_active, active, created_at, updated_at, deleted_at,
+                            deleted_by, delete_reason
+                        )
+                        SELECT work_order, work_order, part_no, type_name, assembly_location,
+                               customer, note, is_active, is_active, created_at, updated_at, '', '', ''
+                        FROM payload
+                        ON CONFLICT (work_order) DO UPDATE SET
+                            work_order_no=EXCLUDED.work_order_no,
+                            part_no=EXCLUDED.part_no,
+                            type_name=EXCLUDED.type_name,
+                            assembly_location=EXCLUDED.assembly_location,
+                            customer=EXCLUDED.customer,
+                            note=EXCLUDED.note,
+                            is_active=EXCLUDED.is_active,
+                            active=EXCLUDED.active,
+                            updated_at=EXCLUDED.updated_at,
+                            deleted_at='',
+                            deleted_by='',
+                            delete_reason=''
+                        """,
+                        (json.dumps(upsert_rows, ensure_ascii=False, default=str),),
+                    )
+                if delete_keys:
+                    cur.execute(
+                        """
+                        UPDATE work_orders
+                        SET deleted_at=%s, deleted_by='admin', delete_reason='03 製令管理刪除', updated_at=%s
+                        WHERE work_order = ANY(%s::text[]) AND (deleted_at IS NULL OR deleted_at='')
+                        """,
+                        (now, now, delete_keys),
+                    )
+            conn.commit()
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        try:
+            mark_data_changed(reason="03 製令管理 PostgreSQL 批次儲存", source_sql="SAVE_WORK_ORDERS_PG_BULK")
+        except Exception:
+            pass
+        result["authority_rows"] = max(0, len([1 for _k, old in existing.items() if not _text(old.get("deleted_at"))]) + result["inserted"] - result["deleted"])
+        return result
+    except Exception:
+        return None
+
+
 def save_work_orders(df: pd.DataFrame) -> dict[str, Any]:
     """Persist 03 work orders through the Neon/PostgreSQL authority table.
 
@@ -235,6 +416,16 @@ def save_work_orders(df: pd.DataFrame) -> dict[str, Any]:
     _ensure_runtime_columns()
     work = _normalize(df, WORK_ORDER_COLS, WO_DISPLAY_TO_INTERNAL)
     now = now_text()
+
+    # V300.72: use a set-based PostgreSQL path for OneDrive/import/editor batch saves.
+    # If direct PG bulk write is unavailable, fall back to the existing portable path.
+    pg_result = _save_work_orders_postgres_bulk(work, now)
+    if pg_result is not None:
+        _save_log("SAVE_WORK_ORDERS", "work_orders", f"製令儲存 inserted={pg_result['inserted']} updated={pg_result['updated']} deleted={pg_result['deleted']} skipped={pg_result.get('skipped', 0)}")
+        clear_query_cache()
+        clear_master_data_cache()
+        return pg_result
+
     result = {"inserted": 0, "updated": 0, "deleted": 0, "skipped": 0}
 
     try:

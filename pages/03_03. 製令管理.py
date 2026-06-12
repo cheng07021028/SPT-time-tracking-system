@@ -737,6 +737,26 @@ def _make_unique_work_order_keys(incoming: pd.DataFrame, src: pd.DataFrame | Non
     }
 
 
+WORK_ORDER_COMPARE_COLS = ["part_no", "type_name", "assembly_location", "customer", "note", "is_active"]
+
+
+def _work_order_row_changed(in_row: pd.Series, cur_row: pd.Series) -> bool:
+    """Return True only when OneDrive source values really differ from authority.
+
+    V300.72: The old OneDrive compare treated every existing work_order as an
+    update candidate. Pressing Apply on an unchanged 1,000-row source therefore
+    generated 1,000 Neon UPDATE statements and could run for minutes.
+    """
+    for col in WORK_ORDER_COMPARE_COLS:
+        if col == "is_active":
+            if _to_bool_value(in_row.get(col, True)) != _to_bool_value(cur_row.get(col, True)):
+                return True
+        else:
+            if _normalize_text(in_row.get(col, "")) != _normalize_text(cur_row.get(col, "")):
+                return True
+    return False
+
+
 def _compare_work_orders(incoming: pd.DataFrame, current: pd.DataFrame, collapse_duplicates: bool = True) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     inc = incoming.copy()
     cur = current.copy()
@@ -755,7 +775,25 @@ def _compare_work_orders(incoming: pd.DataFrame, current: pd.DataFrame, collapse
     inc_keys = set(inc["work_order"].astype(str).str.strip()) if not inc.empty else set()
     add_df = inc[inc["work_order"].astype(str).str.strip().isin(inc_keys - cur_keys)].copy()
     del_df = cur[cur["work_order"].astype(str).str.strip().isin(cur_keys - inc_keys)].copy()
-    upd_df = inc[inc["work_order"].astype(str).str.strip().isin(inc_keys & cur_keys)].copy()
+
+    # V300.72: only rows whose mapped values actually changed are update candidates.
+    # This is the main fix for OneDrive Apply taking several minutes when the source
+    # file is unchanged or mostly unchanged.
+    if not cur.empty and not inc.empty:
+        cur_one = cur.drop_duplicates(subset=["work_order"], keep="last").set_index("work_order", drop=False)
+        changed_mask = []
+        for _, row in inc.iterrows():
+            key = _normalize_text(row.get("work_order", ""))
+            if key not in cur_keys:
+                changed_mask.append(False)
+                continue
+            try:
+                changed_mask.append(_work_order_row_changed(row, cur_one.loc[key]))
+            except Exception:
+                changed_mask.append(True)
+        upd_df = inc[pd.Series(changed_mask, index=inc.index)].copy()
+    else:
+        upd_df = ensure_cols(pd.DataFrame())
     return ensure_cols(add_df), ensure_cols(upd_df), ensure_cols(del_df)
 
 
@@ -811,10 +849,11 @@ def _v136_sync_work_order_authority_from_sqlite(reason: str = "v136_work_order_s
 
 
 def _apply_work_order_sync_direct(add_df: pd.DataFrame, upd_df: pd.DataFrame, del_df: pd.DataFrame, do_delete: bool) -> dict:
-    """V63: apply mapped sync through save_work_orders, not local SQLite.
+    """Apply mapped sync through the Neon/PostgreSQL authority.
 
-    This preserves the page UI and result counters while preventing SQLite/local
-    authority from becoming a second source of truth.
+    V300.72 removes two post-write re-reads from this hot path. The caller already
+    has the current table plus add/update/delete frames, so it can refresh the
+    visible editor from memory and let the next manual reload read authority if needed.
     """
     parts = []
     if add_df is not None and not add_df.empty:
@@ -830,7 +869,7 @@ def _apply_work_order_sync_direct(add_df: pd.DataFrame, upd_df: pd.DataFrame, de
         d["_delete"] = True
         parts.append(d)
     if not parts:
-        return {"inserted": 0, "updated": 0, "deleted": 0, "skipped": 0, "inserted_keys": [], "updated_keys": [], "deleted_keys": [], "authority_ok": True, "authority_rows": len(load_work_orders()), "authority_error": ""}
+        return {"inserted": 0, "updated": 0, "deleted": 0, "skipped": 0, "inserted_keys": [], "updated_keys": [], "deleted_keys": [], "authority_ok": True, "authority_rows": 0, "authority_error": ""}
     merged = pd.concat(parts, ignore_index=True)
     result = save_work_orders(merged)
     return {
@@ -842,9 +881,36 @@ def _apply_work_order_sync_direct(add_df: pd.DataFrame, upd_df: pd.DataFrame, de
         "updated_keys": upd_df.get("work_order", pd.Series(dtype=str)).dropna().astype(str).head(30).tolist() if upd_df is not None and not upd_df.empty else [],
         "deleted_keys": del_df.get("work_order", pd.Series(dtype=str)).dropna().astype(str).head(30).tolist() if do_delete and del_df is not None and not del_df.empty else [],
         "authority_ok": True,
-        "authority_rows": len(load_work_orders()),
+        "authority_rows": int(result.get("authority_rows", 0) or 0),
         "authority_error": "",
     }
+
+
+def _v30072_merge_sync_result_for_editor(current: pd.DataFrame, add_df: pd.DataFrame, upd_df: pd.DataFrame, del_df: pd.DataFrame, do_delete: bool) -> pd.DataFrame:
+    """Refresh the 03 editor from in-memory sync frames without re-reading Neon."""
+    cur = ensure_cols(current.copy()) if isinstance(current, pd.DataFrame) else ensure_cols(pd.DataFrame())
+    cur["work_order"] = cur["work_order"].map(_normalize_text)
+    if do_delete and del_df is not None and not del_df.empty:
+        delete_keys = set(del_df.get("work_order", pd.Series(dtype=str)).map(_normalize_text).tolist())
+        cur = cur[~cur["work_order"].isin(delete_keys)].copy()
+    if upd_df is not None and not upd_df.empty:
+        upd = ensure_cols(upd_df.copy())
+        upd["work_order"] = upd["work_order"].map(_normalize_text)
+        upd_by_key = {str(row.get("work_order", "")): row for _, row in upd.iterrows()}
+        for idx, row in cur.iterrows():
+            key = str(row.get("work_order", ""))
+            if key in upd_by_key:
+                for col in ["part_no", "type_name", "assembly_location", "customer", "note", "is_active"]:
+                    cur.at[idx, col] = upd_by_key[key].get(col, cur.at[idx, col])
+                cur.at[idx, "updated_at"] = now_text()
+    if add_df is not None and not add_df.empty:
+        add = ensure_cols(add_df.copy())
+        add["_delete"] = False
+        add["work_order"] = add["work_order"].map(_normalize_text)
+        cur = pd.concat([cur, add], ignore_index=True)
+    if not cur.empty:
+        cur = cur[cur["work_order"].map(_normalize_text) != ""].drop_duplicates(subset=["work_order"], keep="last").sort_values("work_order").reset_index(drop=True)
+    return ensure_cols(cur)
 
 
 if STATE_KEY not in st.session_state:
@@ -1191,11 +1257,10 @@ with tab4:
                     st.info(msg)
                 else:
                     result = _apply_work_order_sync_direct(add_df, upd_df, del_df, bool(do_delete))
-                    # V136：先用 SQLite 最終結果刷新畫面，再讓 load_work_orders 讀 canonical。
-                    # 避免「實際新增 567」但 editor 還讀到空 canonical。
+                    # V300.72：避免套用後又立即重讀 Neon。這裡直接用本次差異結果刷新畫面；
+                    # 下一次手動重新載入仍會讀取 Neon 權威。
                     try:
-                        latest_df = _v136_load_work_orders_from_sqlite_direct()
-                        st.session_state[STATE_KEY] = ensure_cols(latest_df.assign(_delete=False))
+                        st.session_state[STATE_KEY] = _v30072_merge_sync_result_for_editor(current, add_df, upd_df, del_df, bool(do_delete))
                     except Exception:
                         reload_data()
                     msg = (
