@@ -67,6 +67,7 @@ except Exception:
 STATE_KEY = "v138_work_orders_editor"
 EDITOR_VERSION_KEY = "v253_work_orders_editor_version"
 EDITOR_IGNORE_RETURN_KEY = "v263_work_orders_ignore_next_editor_return"
+BASELINE_KEY = "v30073_work_orders_editor_save_baseline"
 COLS = ["_delete", "id", "work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active", "created_at", "updated_at"]
 
 # V61：表格實際欄名也改成與 10｜權限管理相同的中英雙語欄名。
@@ -519,6 +520,19 @@ def parse_pasted_work_orders(raw: str) -> tuple[pd.DataFrame, bool, list[str]]:
         warnings.append(f"已略過 {dropped} 筆沒有製令的資料列。")
     return ensure_cols(df), has_header, warnings
 
+def _v30073_set_save_baseline(df: pd.DataFrame) -> None:
+    """Keep a clean editor baseline so manual Save only writes changed rows.
+
+    Before V300.73 the 03 manual editor submitted the whole work-order table to
+    save_work_orders(), then immediately reloaded the table from Neon.  With a
+    large master list this made one small edit feel like a full-table sync.
+    This baseline is page-local only; Neon remains the authority.
+    """
+    base = ensure_cols(df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame())
+    base["_delete"] = False
+    st.session_state[BASELINE_KEY] = base.copy().reset_index(drop=True)
+
+
 def reload_data():
     df = load_work_orders()
     df = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame(df)
@@ -527,7 +541,88 @@ def reload_data():
     if "_delete" in df.columns:
         df = df.drop(columns=["_delete"])
     df.insert(0, "_delete", False)
-    st.session_state[STATE_KEY] = ensure_cols(df)
+    df = ensure_cols(df)
+    st.session_state[STATE_KEY] = df
+    _v30073_set_save_baseline(df)
+
+
+def _v30073_row_key(row) -> str:
+    rid = _normalize_text(row.get("id"))
+    if rid and rid.lower() not in {"0", "none", "nan", "nat"}:
+        return f"id:{rid}"
+    wo = _normalize_text(row.get("work_order"))
+    if wo:
+        return f"wo:{wo}"
+    return ""
+
+
+def _v30073_same_work_order_row(new_row, old_row) -> bool:
+    for col in ["work_order", "part_no", "type_name", "assembly_location", "customer", "note"]:
+        if _normalize_text(new_row.get(col)) != _normalize_text(old_row.get(col)):
+            return False
+    return bool(_is_truthy(new_row.get("is_active"))) == bool(_is_truthy(old_row.get("is_active")))
+
+
+def _v30073_build_work_order_save_delta(current_df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    """Return only new/changed/deleted rows from the 03 manual editor.
+
+    The data_editor contains the full master table.  Saving that whole frame is
+    safe but slow on Neon because unchanged rows still need to be inspected.
+    This function compares the current draft with the last authority-loaded
+    baseline and sends only the real delta to the persistence service.
+    """
+    cur = ensure_cols(current_df.copy() if isinstance(current_df, pd.DataFrame) else pd.DataFrame())
+    base = ensure_cols(st.session_state.get(BASELINE_KEY, pd.DataFrame()))
+    base_by_key = {}
+    base_by_wo = {}
+    if not base.empty:
+        for _, old in base.iterrows():
+            key = _v30073_row_key(old)
+            wo = _normalize_text(old.get("work_order"))
+            if key:
+                base_by_key[key] = old
+            if wo:
+                base_by_wo[wo] = old
+
+    rows = []
+    stats = {"new_or_changed": 0, "deleted": 0, "skipped_empty": 0, "unchanged": 0}
+    for _, row in cur.iterrows():
+        row = row.copy()
+        wo = _normalize_text(row.get("work_order"))
+        key = _v30073_row_key(row)
+        marked_delete = bool(_is_truthy(row.get("_delete")))
+        if marked_delete:
+            if key or wo:
+                row["_delete"] = True
+                rows.append(row)
+                stats["deleted"] += 1
+            else:
+                stats["skipped_empty"] += 1
+            continue
+        if not wo:
+            stats["skipped_empty"] += 1
+            continue
+        old = base_by_key.get(key) if key else None
+        if old is None:
+            old = base_by_wo.get(wo)
+        if old is None or not _v30073_same_work_order_row(row, old):
+            row["_delete"] = False
+            rows.append(row)
+            stats["new_or_changed"] += 1
+        else:
+            stats["unchanged"] += 1
+    delta = ensure_cols(pd.DataFrame(rows)) if rows else ensure_cols(pd.DataFrame())
+    return delta, stats
+
+
+def _v30073_editor_display_after_save(current_df: pd.DataFrame) -> pd.DataFrame:
+    df = ensure_cols(current_df.copy() if isinstance(current_df, pd.DataFrame) else pd.DataFrame())
+    if not df.empty:
+        delete_mask = df["_delete"].map(_to_bool_value).fillna(False).astype(bool)
+        df = df.loc[~delete_mask].copy()
+        df["_delete"] = False
+        df = df[df["work_order"].map(_normalize_text) != ""].drop_duplicates(subset=["work_order"], keep="last").reset_index(drop=True)
+    return ensure_cols(df)
 
 
 def render_work_order_summary(df: pd.DataFrame):
@@ -1020,15 +1115,33 @@ with tab1:
 
     if submitted_work_orders:
         current_df = _current_internal_df()
-        delete_mask = current_df["_delete"].map(_to_bool_value).fillna(False).astype(bool)
-        deleted_count = int(delete_mask.sum())
-        save_df = current_df.loc[~delete_mask].drop(columns=["_delete"], errors="ignore").copy()
-        result = save_work_orders(current_df)
-        reload_data()
-        _refresh_editor_widget()
-        st.session_state["v253_work_order_edit_enabled"] = False
-        st.success(f"儲存完成：目前保留/更新 {len(save_df)} 筆，刪除 {deleted_count} 筆，略過 {result.get('skipped', 0)} 筆。")
-        rerun()
+        delta_df, delta_stats = _v30073_build_work_order_save_delta(current_df)
+        deleted_count = int(delta_stats.get("deleted", 0))
+        changed_count = int(delta_stats.get("new_or_changed", 0))
+        skipped_empty = int(delta_stats.get("skipped_empty", 0))
+        if delta_df.empty:
+            display_df = _v30073_editor_display_after_save(current_df)
+            st.session_state[STATE_KEY] = display_df
+            _v30073_set_save_baseline(display_df)
+            _refresh_editor_widget()
+            st.session_state["v253_work_order_edit_enabled"] = False
+            st.info("沒有偵測到需要寫入 Neon 的製令變更；已停止編輯。")
+            rerun()
+        else:
+            result = save_work_orders(delta_df)
+            # V300.73：不要在同一次儲存後 reload_data() 重新全表讀取 Neon。
+            # 本次畫面資料已包含使用者剛完成的變更；下一次手動重新載入仍會讀取權威。
+            display_df = _v30073_editor_display_after_save(current_df)
+            st.session_state[STATE_KEY] = display_df
+            _v30073_set_save_baseline(display_df)
+            _refresh_editor_widget()
+            st.session_state["v253_work_order_edit_enabled"] = False
+            st.success(
+                f"儲存完成：本次送出新增/異動 {changed_count} 筆、刪除 {deleted_count} 筆，"
+                f"略過空白 {skipped_empty + int(result.get('skipped', 0) or 0)} 筆；"
+                f"實際新增 {result.get('inserted', 0)}、更新 {result.get('updated', 0)}、刪除 {result.get('deleted', 0)}。"
+            )
+            rerun()
 
 with tab2:
     st.subheader("Excel 匯入 / Excel Import")

@@ -228,6 +228,18 @@ def _same_text(a: Any, b: Any) -> bool:
     return _text(a) == _text(b)
 
 
+def _work_order_authority_count_fast() -> int:
+    try:
+        row = query_one("SELECT COUNT(*) AS n FROM work_orders WHERE deleted_at IS NULL OR deleted_at=''", ())
+        if isinstance(row, dict):
+            return int(row.get("n", 0) or 0)
+        if row is not None and hasattr(row, "get"):
+            return int(row.get("n", 0) or 0)
+    except Exception:
+        pass
+    return 0
+
+
 def _save_work_orders_postgres_bulk(work: pd.DataFrame, now: str) -> dict[str, Any] | None:
     """Bulk-save 03 work orders on PostgreSQL without one UPDATE per row.
 
@@ -236,8 +248,11 @@ def _save_work_orders_postgres_bulk(work: pd.DataFrame, now: str) -> dict[str, A
     unchanged Excel file still spent minutes sending UPDATE statements. This
     function stages the payload in memory, skips unchanged rows, then performs at
     most two PostgreSQL statements: one JSONB upsert and one array soft-delete.
-    If the direct PostgreSQL path is unavailable, caller falls back to the old
-    execute_transaction path so local SQLite/testing behavior is preserved.
+
+    V300.73: manual editor save now sends only changed rows, so this function
+    also limits the pre-read to the submitted work_order keys instead of scanning
+    the whole work_orders authority table. If the direct PostgreSQL path is
+    unavailable, caller falls back to the existing portable path.
     """
     try:
         if str(get_database_backend()).lower() != "postgresql":
@@ -270,26 +285,41 @@ def _save_work_orders_postgres_bulk(work: pd.DataFrame, now: str) -> dict[str, A
     if not staged_order:
         return result
 
+    # V300.73: pre-read only the submitted keys.  The manual editor sends a
+    # small delta, so a full-table SELECT here made one-cell saves scale with the
+    # total master-data size.
     try:
-        existing_df = query_df(
-            """
-            SELECT id, work_order, part_no, type_name, assembly_location, customer, note,
-                   COALESCE(is_active, active, 1) AS is_active, deleted_at
-            FROM work_orders
-            """,
-            (),
-        )
+        from services.db_service import get_connection
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, work_order, part_no, type_name, assembly_location, customer, note,
+                           COALESCE(is_active, active, 1) AS is_active, deleted_at
+                    FROM work_orders
+                    WHERE work_order = ANY(%s::text[])
+                    """,
+                    (staged_order,),
+                )
+                existing_rows = cur.fetchall()
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     except Exception:
         return None
-    if not isinstance(existing_df, pd.DataFrame):
-        existing_df = pd.DataFrame()
 
     existing: dict[str, dict[str, Any]] = {}
-    if not existing_df.empty and "work_order" in existing_df.columns:
-        for _, old in existing_df.iterrows():
-            wo = _text(old.get("work_order"))
-            if wo:
-                existing[wo] = old.to_dict()
+    for old in existing_rows or []:
+        try:
+            data = dict(old)
+        except Exception:
+            data = old
+        wo = _text(data.get("work_order") if hasattr(data, "get") else "")
+        if wo:
+            existing[wo] = dict(data)
 
     upsert_rows: list[dict[str, Any]] = []
     delete_keys: list[str] = []
@@ -331,7 +361,7 @@ def _save_work_orders_postgres_bulk(work: pd.DataFrame, now: str) -> dict[str, A
         })
 
     if not upsert_rows and not delete_keys:
-        result["authority_rows"] = len([1 for _k, old in existing.items() if not _text(old.get("deleted_at"))])
+        result["authority_rows"] = _work_order_authority_count_fast()
         return result
 
     try:
@@ -398,7 +428,7 @@ def _save_work_orders_postgres_bulk(work: pd.DataFrame, now: str) -> dict[str, A
             mark_data_changed(reason="03 製令管理 PostgreSQL 批次儲存", source_sql="SAVE_WORK_ORDERS_PG_BULK")
         except Exception:
             pass
-        result["authority_rows"] = max(0, len([1 for _k, old in existing.items() if not _text(old.get("deleted_at"))]) + result["inserted"] - result["deleted"])
+        result["authority_rows"] = _work_order_authority_count_fast()
         return result
     except Exception:
         return None
