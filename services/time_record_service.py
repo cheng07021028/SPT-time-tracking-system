@@ -1214,6 +1214,61 @@ def _diff_payload(before: dict[str, Any] | None, after: dict[str, Any]) -> dict[
     return diff
 
 
+def _v30083_import_relevant_diff(before: dict[str, Any] | None, after: dict[str, Any], source_columns: set[str] | None = None) -> dict[str, dict[str, str]]:
+    """Return only meaningful Excel/Paste import changes.
+
+    V300.83: large 02 history imports could finish Neon record_key lookup but
+    then appear frozen because every existing row was treated as changed by
+    internal service-only fields such as ``source`` or import-generated empty
+    ``group_key``.  That forced thousands of UPDATEs even when the Excel file
+    was just a duplicate import.
+
+    For imports, compare user/business fields and recalculated time fields only.
+    Do not update an existing row merely because the import source label changed,
+    and do not clear an existing group_key unless this batch positively detected
+    the row as simultaneous work.
+    """
+    if not before:
+        return {c: {"old": "", "new": _text(after.get(c))} for c in _V73_AUDIT_FIELDS if _text(after.get(c))}
+
+    source_columns = set(source_columns or set())
+    base_fields = [
+        "status", "work_order", "work_order_no", "part_no", "type_name",
+        "process_code", "process_name", "employee_id", "employee_name",
+        "start_action", "start_timestamp", "end_action", "end_timestamp",
+        "remark", "start_date", "start_time", "end_date", "end_time",
+        "work_hours", "work_minutes", "raw_minutes", "average_minutes",
+        "assembly_location",
+    ]
+    compare_fields: list[str] = []
+    seen: set[str] = set()
+    for c in base_fields:
+        if c in TIME_RECORD_COLUMNS and c not in seen:
+            compare_fields.append(c); seen.add(c)
+
+    # Keep simultaneous-work fixes from V300.79, but do not let a normal import
+    # blank out legacy grouping or update every row only because group_key differs.
+    after_group = _text(after.get("group_key"))
+    after_is_group = _truthy(after.get("is_group_work"))
+    before_is_group = _truthy((before or {}).get("is_group_work"))
+    if after_group or after_is_group or before_is_group or "group_key" in source_columns or "is_group_work" in source_columns:
+        for c in ["group_key", "is_group_work"]:
+            if c not in seen:
+                compare_fields.append(c); seen.add(c)
+
+    diff: dict[str, dict[str, str]] = {}
+    for c in compare_fields:
+        # If a source file did not provide a textual field and the normalized
+        # payload has an empty default, do not treat it as a user request to clear
+        # a non-empty DB value.  Recalculated time fields are still compared.
+        if c not in {"work_hours", "work_minutes", "raw_minutes", "average_minutes", "group_key", "is_group_work"}:
+            if c not in source_columns and not _text(after.get(c)) and _text((before or {}).get(c)):
+                continue
+        if not _same_value_for_audit((before or {}).get(c), after.get(c)):
+            diff[c] = {"old": _text((before or {}).get(c)), "new": _text(after.get(c))}
+    return diff
+
+
 def _load_existing_records_map(ids: list[int]) -> dict[int, dict[str, Any]]:
     clean = [int(x) for x in ids if _int_or_none(x) is not None]
     if not clean:
@@ -1603,8 +1658,12 @@ def _v30076_load_records_by_record_key(
         total_chunks = max(len(chunks), 1)
         try:
             for chunk_index, chunk in enumerate(chunks, start=1):
+                # V300.83: use DISTINCT ON so a database that already contains
+                # duplicate record_key rows from older failed imports does not return
+                # a huge duplicate result set and stall the next diff/write stage.
+                order_sql = "ORDER BY record_key, CASE WHEN deleted_at IS NULL OR deleted_at='' THEN 0 ELSE 1 END, id DESC"
                 df = _v30082_query_df_uncached(
-                    f"SELECT {cols} FROM time_records WHERE record_key = ANY(?::text[]){deleted_clause}",
+                    f"SELECT DISTINCT ON (record_key) {cols} FROM time_records WHERE record_key = ANY(?::text[]){deleted_clause} {order_sql}",
                     (list(chunk),),
                 )
                 if isinstance(df, pd.DataFrame) and not df.empty:
@@ -1771,6 +1830,36 @@ def _v30076_bulk_insert_payloads(payloads: list[dict[str, Any]]) -> int:
     return len(payloads)
 
 
+def _v30083_pg_update_from_values(update_cols: tuple[str, ...], rows: list[tuple[Any, ...]]) -> bool:
+    """Fast PostgreSQL batch UPDATE for 02 import chunks.
+
+    ``executemany`` can still behave like many individual UPDATE round trips on
+    Neon.  For import chunks, one UPDATE ... FROM (VALUES ...) statement per
+    changed-column group is much faster and prevents the UI from looking frozen
+    after lookup completed.  SQLite/local testing keeps the previous path.
+    """
+    if not is_postgres_enabled() or not rows:
+        return False
+    cols = list(update_cols)
+    value_cols = ["id"] + cols
+    per_row_placeholders = "(" + ", ".join(["?"] * len(value_cols)) + ")"
+    values_sql = ", ".join([per_row_placeholders] * len(rows))
+    params: list[Any] = []
+    for row in rows:
+        # grouped rows are values for update_cols followed by id
+        params.append(int(row[-1]))
+        params.extend(list(row[:-1]))
+    assignments = ", ".join([f"{c}=v.{c}" for c in cols] + ["version=COALESCE(t.version,1)+1"])
+    aliases = ", ".join(value_cols)
+    sql = (
+        f"UPDATE time_records AS t SET {assignments} "
+        f"FROM (VALUES {values_sql}) AS v({aliases}) "
+        f"WHERE t.id=v.id AND (t.deleted_at IS NULL OR t.deleted_at='')"
+    )
+    execute(sql, tuple(params))
+    return True
+
+
 def _v30076_bulk_update_payloads(update_items: list[tuple[int, dict[str, Any], set[str]]]) -> int:
     if not update_items:
         return 0
@@ -1794,6 +1883,9 @@ def _v30076_bulk_update_payloads(update_items: list[tuple[int, dict[str, Any], s
 
     total = 0
     for update_cols, rows in grouped.items():
+        if _v30083_pg_update_from_values(tuple(update_cols), rows):
+            total += len(rows)
+            continue
         assignments = ", ".join([f"{c}=?" for c in update_cols] + ["version=COALESCE(version,1)+1"])
         sql = f"UPDATE time_records SET {assignments} WHERE id=? AND (deleted_at IS NULL OR deleted_at='')"
         executemany(sql, rows)
@@ -1941,6 +2033,15 @@ def import_time_records(
         if not _text((v or {}).get("deleted_at"))
     }
 
+    _v30080_import_progress(
+        progress_callback,
+        stage="lookup_done",
+        current=len(keys),
+        total=len(keys),
+        message=f"比對 Neon 完成，找到 {len(existing_all_by_key)} 筆既有 key",
+        fraction=0.53,
+    )
+
     inserts: list[dict[str, Any]] = []
     updates: list[tuple[int, dict[str, Any], set[str]]] = []
 
@@ -1953,7 +2054,7 @@ def import_time_records(
                 before = existing_active_by_key.get(key)
             if before:
                 effective_id = _int_or_none(before.get("id"))
-                diff = _diff_payload(before, payload)
+                diff = _v30083_import_relevant_diff(before, payload, source_columns)
                 if not diff:
                     result["skipped"] += 1
                     continue
@@ -1986,6 +2087,14 @@ def import_time_records(
 
     result["to_insert"] = len(inserts)
     result["to_update"] = len(updates)
+    _v30080_import_progress(
+        progress_callback,
+        stage="diff_done",
+        current=len(prepared),
+        total=len(prepared),
+        message=f"差異計算完成：預計新增 {len(inserts)}，預計更新 {len(updates)}，略過 {result.get('skipped', 0)}",
+        fraction=0.70,
+    )
 
     try:
         write_total_chunks = len(list(_v30080_chunks(inserts, batch_size))) + len(list(_v30080_chunks(updates, batch_size)))
@@ -1995,6 +2104,14 @@ def import_time_records(
         if inserts:
             inserted_total = 0
             for insert_chunk in _v30080_chunks(inserts, batch_size):
+                _v30080_import_progress(
+                    progress_callback,
+                    stage="write_insert",
+                    current=inserted_total,
+                    total=len(inserts),
+                    message=f"開始分批新增工時紀錄 {inserted_total}/{len(inserts)}",
+                    fraction=0.70 + 0.25 * (write_done_chunks / max(write_total_chunks, 1)),
+                )
                 inserted_total += _v30076_bulk_insert_payloads(insert_chunk)
                 write_done_chunks += 1
                 _v30080_import_progress(
@@ -2009,6 +2126,14 @@ def import_time_records(
         if updates:
             updated_total = 0
             for update_chunk in _v30080_chunks(updates, batch_size):
+                _v30080_import_progress(
+                    progress_callback,
+                    stage="write_update",
+                    current=updated_total,
+                    total=len(updates),
+                    message=f"開始分批更新工時紀錄 {updated_total}/{len(updates)}",
+                    fraction=0.70 + 0.25 * (write_done_chunks / max(write_total_chunks, 1)),
+                )
                 updated_total += _v30076_bulk_update_payloads(update_chunk)
                 write_done_chunks += 1
                 _v30080_import_progress(

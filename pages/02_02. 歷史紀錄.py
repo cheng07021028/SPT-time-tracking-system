@@ -895,16 +895,21 @@ def _v30080_import_with_progress(import_df: pd.DataFrame, *, recalc: bool, sourc
     status_box = st.empty()
     status_box.info(f"{label}：準備匯入 {total_rows} 筆...")
     started = _time.monotonic()
-    last_ui = {"time": 0.0}
+    last_ui = {"time": 0.0, "stage": ""}
 
     def _callback(event: dict) -> None:
         now = _time.monotonic()
         fraction = float((event or {}).get("fraction") or 0.0)
         fraction = max(0.0, min(1.0, fraction))
-        # Avoid updating the UI too often on large imports.  Always show 100%.
-        if fraction < 1.0 and now - float(last_ui.get("time") or 0.0) < 0.25:
+        stage = str((event or {}).get("stage") or "")
+        # Avoid updating the UI too often on large imports, but always show
+        # stage changes.  V300.83: without this, the screen could remain at
+        # 「比對 Neon 16491/16491」 while the backend had already moved to diff
+        # or the first write chunk.
+        if fraction < 1.0 and stage == str(last_ui.get("stage") or "") and now - float(last_ui.get("time") or 0.0) < 0.25:
             return
         last_ui["time"] = now
+        last_ui["stage"] = stage
         elapsed = now - started
         eta_text = "估算中"
         if fraction > 0.03:
