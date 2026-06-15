@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from io import BytesIO
 import os
 import re
+import time as _time
 import pandas as pd
 from services.timezone_service import today_date
 import streamlit as st
@@ -869,6 +870,76 @@ def _focus_filter_to_import_rows(import_df: pd.DataFrame, label: str = "匯入�
     _add_history_result("info", f"已自動切換 02｜歷史紀錄篩選到{label}日期範圍：{start_d} ~ {end_d}，方便確認全部匯入結果。")
 
 
+
+
+def _v30080_format_seconds(seconds: float) -> str:
+    try:
+        total = max(int(float(seconds or 0)), 0)
+    except Exception:
+        total = 0
+    minutes, sec = divmod(total, 60)
+    if minutes <= 0:
+        return f"{sec} 秒"
+    return f"{minutes} 分 {sec} 秒"
+
+
+def _v30080_import_with_progress(import_df: pd.DataFrame, *, recalc: bool, source: str, label: str) -> dict:
+    """Run 02 history import with visible progress for large Excel/Paste batches.
+
+    V300.80 keeps the authority write logic inside time_record_service, but the
+    page owns Streamlit UI progress and ETA.  This prevents 16k-row imports from
+    looking frozen while still avoiding per-row Neon writes.
+    """
+    total_rows = int(len(import_df)) if isinstance(import_df, pd.DataFrame) else 0
+    progress_bar = st.progress(0)
+    status_box = st.empty()
+    status_box.info(f"{label}：準備匯入 {total_rows} 筆...")
+    started = _time.monotonic()
+    last_ui = {"time": 0.0}
+
+    def _callback(event: dict) -> None:
+        now = _time.monotonic()
+        fraction = float((event or {}).get("fraction") or 0.0)
+        fraction = max(0.0, min(1.0, fraction))
+        # Avoid updating the UI too often on large imports.  Always show 100%.
+        if fraction < 1.0 and now - float(last_ui.get("time") or 0.0) < 0.25:
+            return
+        last_ui["time"] = now
+        elapsed = now - started
+        eta_text = "估算中"
+        if fraction > 0.03:
+            eta = max(0.0, elapsed * (1.0 - fraction) / fraction)
+            eta_text = _v30080_format_seconds(eta)
+        message = str((event or {}).get("message") or "處理中")
+        current = int((event or {}).get("current") or 0)
+        total = int((event or {}).get("total") or 0)
+        detail = f"{message}"
+        if total > 0:
+            detail += f"：{current}/{total}"
+        detail += f"；已用 {_v30080_format_seconds(elapsed)}；預估剩餘 {eta_text}"
+        percent = int(round(fraction * 100))
+        try:
+            progress_bar.progress(percent, text=f"{label}：{detail}")
+        except TypeError:
+            progress_bar.progress(percent)
+        status_box.info(detail)
+
+    try:
+        result = import_time_records(
+            import_df,
+            recalc=recalc,
+            source=source,
+            batch_size=1000,
+            progress_callback=_callback,
+        )
+    finally:
+        elapsed = _time.monotonic() - started
+        try:
+            progress_bar.progress(100, text=f"{label}：匯入流程完成，用時 {_v30080_format_seconds(elapsed)}")
+        except TypeError:
+            progress_bar.progress(100)
+    status_box.success(f"{label}：匯入流程完成，用時 {_v30080_format_seconds(float(result.get('duration_seconds') or elapsed))}")
+    return result
 
 def _download_history_template():
     template = pd.DataFrame([
@@ -2285,9 +2356,10 @@ with tab2:
                     st.info("請先確認下方解析結果。按『確認匯入 Excel 歷史紀錄』後，結果會永久顯示在頁面上方。")
                     if st.button("⟟ 確認匯入 Excel 歷史紀錄 / Import Excel History", type="primary", use_container_width=True, key="history_excel_import_save_v242_top"):
                         import_df = st.session_state.get(HISTORY_IMPORT_PREVIEW_KEY, parsed).copy()
-                        result = import_time_records(import_df, recalc=recalc_excel, source="history_excel_import")
+                        result = _v30080_import_with_progress(import_df, recalc=recalc_excel, source="history_excel_import", label="Excel 歷史紀錄匯入")
                         _parallel_note = f"，同時作業 {int(result.get('parallel_groups', 0) or 0)} 組 / {int(result.get('parallel_records', 0) or 0)} 筆" if int(result.get('parallel_records', 0) or 0) else ""
-                        _add_history_result("success", f"Excel 匯入完成：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}{_parallel_note}。", append=False)
+                        _batch_note = f"，預計新增 {int(result.get('to_insert', 0) or 0)}，預計更新 {int(result.get('to_update', 0) or 0)}，分批 {int(result.get('batch_size', 0) or 0)} 筆/批，用時 {_v30080_format_seconds(float(result.get('duration_seconds', 0) or 0))}"
+                        _add_history_result("success", f"Excel 匯入完成：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}{_parallel_note}{_batch_note}。", append=False)
                         for msg in result.get("errors", [])[:20]:
                             _add_history_result("warning", msg)
                         if result.get("inserted", 0) or result.get("updated", 0):
@@ -2323,9 +2395,10 @@ with tab3:
                 st.success(f"已解析 {len(parsed)} 筆歷史工時資料。")
                 if st.button("▣ 確認匯入貼上歷史紀錄 / Save Pasted History", type="primary", use_container_width=True, key="history_paste_save_v242"):
                     import_df = parsed.copy()
-                    result = import_time_records(import_df, recalc=recalc_paste, source="history_paste_import")
+                    result = _v30080_import_with_progress(import_df, recalc=recalc_paste, source="history_paste_import", label="貼上歷史紀錄匯入")
                     _parallel_note = f"，同時作業 {int(result.get('parallel_groups', 0) or 0)} 組 / {int(result.get('parallel_records', 0) or 0)} 筆" if int(result.get('parallel_records', 0) or 0) else ""
-                    _add_history_result("success", f"貼上資料已匯入：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}{_parallel_note}。", append=False)
+                    _batch_note = f"，預計新增 {int(result.get('to_insert', 0) or 0)}，預計更新 {int(result.get('to_update', 0) or 0)}，分批 {int(result.get('batch_size', 0) or 0)} 筆/批，用時 {_v30080_format_seconds(float(result.get('duration_seconds', 0) or 0))}"
+                    _add_history_result("success", f"貼上資料已匯入：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}{_parallel_note}{_batch_note}。", append=False)
                     for msg in result.get("errors", [])[:20]:
                         _add_history_result("warning", msg)
                     if result.get("inserted", 0) == 0 and result.get("updated", 0) == 0:

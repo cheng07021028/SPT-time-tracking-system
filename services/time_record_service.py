@@ -15,8 +15,9 @@ import os
 import math
 import uuid
 import hashlib
+import time as _time
 from datetime import datetime, timedelta, time as dt_time
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 import pandas as pd
 
@@ -1422,7 +1423,53 @@ def _v30076_import_stable_operation_id(row: dict[str, Any]) -> str:
     return f"hist-{digest}"
 
 
-def _v30076_load_records_by_record_key(record_keys: list[str], *, include_deleted: bool = False) -> dict[str, dict[str, Any]]:
+
+
+def _v30080_import_progress(
+    progress_callback: Callable[[dict[str, Any]], None] | None,
+    *,
+    stage: str,
+    current: int = 0,
+    total: int = 0,
+    message: str = "",
+    fraction: float | None = None,
+) -> None:
+    """Report coarse import progress to the Streamlit page without coupling the service to Streamlit.
+
+    The callback is intentionally optional and best-effort so existing callers
+    keep working.  It lets 02 import large Excel/Paste batches show progress and
+    ETA while the service still owns the Neon diff/write logic.
+    """
+    if progress_callback is None:
+        return
+    try:
+        frac = 0.0 if fraction is None else max(0.0, min(1.0, float(fraction)))
+        progress_callback({
+            "stage": stage,
+            "current": int(current or 0),
+            "total": int(total or 0),
+            "message": _text(message) or stage,
+            "fraction": frac,
+        })
+    except Exception:
+        # UI progress must never break the authority write path.
+        pass
+
+
+def _v30080_chunks(items: list[Any], size: int) -> Iterable[list[Any]]:
+    step = max(int(size or 1000), 1)
+    for i in range(0, len(items), step):
+        yield items[i:i + step]
+
+def _v30076_load_records_by_record_key(
+    record_keys: list[str],
+    *,
+    include_deleted: bool = False,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    progress_start: float = 0.0,
+    progress_end: float = 1.0,
+    progress_message: str = "比對既有工時紀錄",
+) -> dict[str, dict[str, Any]]:
     keys = []
     seen: set[str] = set()
     for key in record_keys or []:
@@ -1433,16 +1480,26 @@ def _v30076_load_records_by_record_key(record_keys: list[str], *, include_delete
     if not keys:
         return {}
     out: dict[str, dict[str, Any]] = {}
-    for i in range(0, len(keys), 200):
-        chunk = keys[i:i + 200]
+    chunks = list(_v30080_chunks(keys, 500))
+    total_chunks = max(len(chunks), 1)
+    deleted_clause = "" if include_deleted else " AND (deleted_at IS NULL OR deleted_at='')"
+    for chunk_index, chunk in enumerate(chunks, start=1):
         ph = ",".join(["?"] * len(chunk))
-        deleted_clause = "" if include_deleted else " AND (deleted_at IS NULL OR deleted_at='')"
         df = _safe_df(f"SELECT {_base_cols()} FROM time_records WHERE record_key IN ({ph}){deleted_clause}", tuple(chunk))
         if isinstance(df, pd.DataFrame) and not df.empty:
             for _, row in df.iterrows():
                 key = _text(row.get("record_key"))
                 if key and key not in out:
                     out[key] = row.to_dict()
+        frac = float(progress_start) + (float(progress_end) - float(progress_start)) * (chunk_index / total_chunks)
+        _v30080_import_progress(
+            progress_callback,
+            stage="lookup",
+            current=min(chunk_index * 500, len(keys)),
+            total=len(keys),
+            message=progress_message,
+            fraction=frac,
+        )
     return out
 
 
@@ -1574,7 +1631,14 @@ def _v30076_bulk_update_payloads(update_items: list[tuple[int, dict[str, Any], s
     return total
 
 
-def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "history_import") -> dict:
+def import_time_records(
+    df: pd.DataFrame,
+    recalc: bool = True,
+    source: str = "history_import",
+    *,
+    batch_size: int = 1000,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+) -> dict:
     """Import 02 history rows using a single diff/batch path.
 
     V300.76 speed fix:
@@ -1587,15 +1651,33 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
     """
     _ensure_time_runtime_columns()
     work = _normalize_df(df)
-    result = {"inserted": 0, "updated": 0, "skipped": 0, "parallel_groups": 0, "parallel_records": 0, "errors": []}
+    started_at = _time.monotonic()
+    batch_size = max(int(batch_size or 1000), 100)
+    result = {
+        "inserted": 0,
+        "updated": 0,
+        "skipped": 0,
+        "parallel_groups": 0,
+        "parallel_records": 0,
+        "prepared": 0,
+        "to_insert": 0,
+        "to_update": 0,
+        "batch_size": batch_size,
+        "duration_seconds": 0.0,
+        "errors": [],
+    }
     if work.empty:
+        result["duration_seconds"] = round(_time.monotonic() - started_at, 2)
         return result
+
+    total_rows = int(len(work))
+    _v30080_import_progress(progress_callback, stage="prepare", current=0, total=total_rows, message="整理匯入資料", fraction=0.02)
 
     source_columns = set(work.attrs.get("_spt_source_columns", set(work.columns)))
     prepared: list[tuple[int, int | None, dict[str, Any]]] = []
     payload_by_key: dict[str, tuple[int, int | None, dict[str, Any]]] = {}
 
-    for idx, row in work.iterrows():
+    for prepare_pos, (idx, row) in enumerate(work.iterrows(), start=1):
         rd = dict(row)
         if (
             not _text(rd.get("employee_id"))
@@ -1634,10 +1716,25 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
             result["skipped"] += 1
             result["errors"].append(f"第 {idx+1} 筆解析失敗：{exc}")
 
+        if prepare_pos == total_rows or prepare_pos % 500 == 0:
+            _v30080_import_progress(
+                progress_callback,
+                stage="prepare",
+                current=prepare_pos,
+                total=total_rows,
+                message="整理匯入資料並建立防重 key",
+                fraction=0.02 + 0.23 * (prepare_pos / max(total_rows, 1)),
+            )
+
     prepared = list(payload_by_key.values())
     if not prepared:
         _cache_clear()
+        result["duration_seconds"] = round(_time.monotonic() - started_at, 2)
+        _v30080_import_progress(progress_callback, stage="done", current=0, total=0, message="沒有可匯入資料", fraction=1.0)
         return result
+
+    result["prepared"] = len(prepared)
+    _v30080_import_progress(progress_callback, stage="parallel", current=0, total=len(prepared), message="偵測同時作業", fraction=0.27)
 
     # V300.79: detect same-employee/same-date/same-process overlapping
     # completed rows inside this import batch and apply the 01 Finish Work
@@ -1645,17 +1742,33 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
     parallel_summary = _v30079_apply_import_parallel_average([payload for _, _, payload in prepared])
     result["parallel_groups"] = int(parallel_summary.get("parallel_groups", 0) or 0)
     result["parallel_records"] = int(parallel_summary.get("parallel_records", 0) or 0)
+    _v30080_import_progress(progress_callback, stage="parallel", current=len(prepared), total=len(prepared), message="同時作業偵測完成", fraction=0.32)
 
     ids = sorted({int(rid) for _, rid, _ in prepared if rid is not None and int(rid) > 0})
     keys = [_text(payload.get("record_key")) for _, _, payload in prepared if _text(payload.get("record_key"))]
+    _v30080_import_progress(progress_callback, stage="lookup", current=0, total=len(keys), message="比對 Neon 既有紀錄", fraction=0.34)
     existing_by_id = _load_existing_records_map(ids)
-    existing_active_by_key = _v30076_load_records_by_record_key(keys, include_deleted=False)
-    existing_all_by_key = _v30076_load_records_by_record_key(keys, include_deleted=True)
+    # V300.80: load all matching keys once, then split active/deleted locally.
+    # Previous V300.76 path queried active and all keys separately, doubling
+    # lookup work on large imports such as 16k rows.
+    existing_all_by_key = _v30076_load_records_by_record_key(
+        keys,
+        include_deleted=True,
+        progress_callback=progress_callback,
+        progress_start=0.36,
+        progress_end=0.52,
+        progress_message="比對 Neon 既有紀錄",
+    )
+    existing_active_by_key = {
+        k: v for k, v in existing_all_by_key.items()
+        if not _text((v or {}).get("deleted_at"))
+    }
 
     inserts: list[dict[str, Any]] = []
     updates: list[tuple[int, dict[str, Any], set[str]]] = []
 
-    for idx, rid, payload in prepared:
+    _v30080_import_progress(progress_callback, stage="diff", current=0, total=len(prepared), message="計算新增 / 更新 / 略過", fraction=0.54)
+    for diff_pos, (idx, rid, payload) in enumerate(prepared, start=1):
         try:
             key = _text(payload.get("record_key"))
             before = existing_by_id.get(int(rid)) if rid is not None and int(rid) > 0 else None
@@ -1684,11 +1797,52 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
             result["skipped"] += 1
             result["errors"].append(f"第 {idx+1} 筆比對失敗：{exc}")
 
+        if diff_pos == len(prepared) or diff_pos % 1000 == 0:
+            _v30080_import_progress(
+                progress_callback,
+                stage="diff",
+                current=diff_pos,
+                total=len(prepared),
+                message="計算新增 / 更新 / 略過",
+                fraction=0.54 + 0.16 * (diff_pos / max(len(prepared), 1)),
+            )
+
+    result["to_insert"] = len(inserts)
+    result["to_update"] = len(updates)
+
     try:
+        write_total_chunks = len(list(_v30080_chunks(inserts, batch_size))) + len(list(_v30080_chunks(updates, batch_size)))
+        write_done_chunks = 0
+        if write_total_chunks == 0:
+            _v30080_import_progress(progress_callback, stage="write", current=0, total=0, message="沒有需要寫入 Neon 的資料", fraction=0.95)
         if inserts:
-            result["inserted"] = _v30076_bulk_insert_payloads(inserts)
+            inserted_total = 0
+            for insert_chunk in _v30080_chunks(inserts, batch_size):
+                inserted_total += _v30076_bulk_insert_payloads(insert_chunk)
+                write_done_chunks += 1
+                _v30080_import_progress(
+                    progress_callback,
+                    stage="write",
+                    current=min(inserted_total, len(inserts)),
+                    total=len(inserts),
+                    message=f"分批新增工時紀錄 {inserted_total}/{len(inserts)}",
+                    fraction=0.70 + 0.25 * (write_done_chunks / max(write_total_chunks, 1)),
+                )
+            result["inserted"] = inserted_total
         if updates:
-            result["updated"] = _v30076_bulk_update_payloads(updates)
+            updated_total = 0
+            for update_chunk in _v30080_chunks(updates, batch_size):
+                updated_total += _v30076_bulk_update_payloads(update_chunk)
+                write_done_chunks += 1
+                _v30080_import_progress(
+                    progress_callback,
+                    stage="write",
+                    current=min(updated_total, len(updates)),
+                    total=len(updates),
+                    message=f"分批更新工時紀錄 {updated_total}/{len(updates)}",
+                    fraction=0.70 + 0.25 * (write_done_chunks / max(write_total_chunks, 1)),
+                )
+            result["updated"] = updated_total
     except Exception as exc:
         # Keep the import page usable if a batch hits a legacy constraint.
         # Fall back to the old single-row path only for rows that actually need
@@ -1718,6 +1872,8 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
                 result["errors"].append(f"逐筆更新失敗：{row_exc}")
 
     _cache_clear()
+    result["duration_seconds"] = round(_time.monotonic() - started_at, 2)
+    _v30080_import_progress(progress_callback, stage="done", current=1, total=1, message="匯入完成", fraction=1.0)
     return result
 
 
