@@ -1463,6 +1463,55 @@ def _v30080_chunks(items: list[Any], size: int) -> Iterable[list[Any]]:
         yield items[i:i + step]
 
 
+def _v30082_set_import_statement_timeout(
+    seconds: int,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    message: str = "調整匯入查詢逾時",
+) -> bool:
+    """Temporarily give large 02 imports enough Neon time without changing page render paths.
+
+    db_service currently opens Neon connections with an 8-second statement_timeout
+    to protect normal 01/02 page renders.  A 16k-row Excel import legitimately
+    needs a longer lookup/write window; otherwise a chunk can timeout, fall back
+    to row-by-row writes, and the UI appears stuck at the previous progress
+    message.  SET only affects the current cached PostgreSQL session.
+    """
+    if not is_postgres_enabled():
+        return False
+    try:
+        ms = max(int(seconds or 8) * 1000, 1000)
+        _v30080_import_progress(
+            progress_callback,
+            stage="import_timeout",
+            current=0,
+            total=1,
+            message=message,
+            fraction=0.335 if seconds and seconds > 8 else 0.99,
+        )
+        execute("SET statement_timeout = ?", (f"{ms}ms",))
+        return True
+    except Exception:
+        return False
+
+
+def _v30082_query_df_uncached(sql: str, params: Iterable[Any] | None = None) -> pd.DataFrame:
+    """Run a PostgreSQL SELECT without db_service's query cache.
+
+    Large import lookups pass a Python list to ANY(%s::text[]).  The generic
+    query cache builds a tuple key from params; a list inside that tuple is
+    unhashable, so the optimized ANY path can fail before SQL reaches Neon and
+    silently fall back to many slower IN queries.  Use db_service's private
+    uncached fetcher when available, and fall back to query_df for SQLite/small
+    portable paths.
+    """
+    if is_postgres_enabled():
+        from services import db_service as _db_service  # local import avoids changing public service API
+        fn = getattr(_db_service, "_v25_pg_fetch_df", None)
+        if callable(fn):
+            return fn(sql, params or ())
+    return query_df(sql, params or ())
+
+
 
 def _v30081_import_lookup_columns() -> str:
     """Columns needed for import duplicate/diff lookup.
@@ -1554,7 +1603,7 @@ def _v30076_load_records_by_record_key(
         total_chunks = max(len(chunks), 1)
         try:
             for chunk_index, chunk in enumerate(chunks, start=1):
-                df = query_df(
+                df = _v30082_query_df_uncached(
                     f"SELECT {cols} FROM time_records WHERE record_key = ANY(?::text[]){deleted_clause}",
                     (list(chunk),),
                 )
@@ -1582,7 +1631,15 @@ def _v30076_load_records_by_record_key(
                 fraction=progress_end,
             )
             return out
-        except Exception:
+        except Exception as exc:
+            _v30080_import_progress(
+                progress_callback,
+                stage="lookup",
+                current=0,
+                total=len(keys),
+                message=f"Neon 快速比對未完成，改用相容批次：{str(exc)[:120]}",
+                fraction=progress_start,
+            )
             # Fallback to portable placeholder chunks below.  Never return an
             # empty map merely because the optimized ANY form is unavailable.
             out = {}
@@ -1766,6 +1823,10 @@ def import_time_records(
     work = _normalize_df(df)
     started_at = _time.monotonic()
     batch_size = max(int(batch_size or 1000), 100)
+    # V300.82: large Excel/Paste imports must not inherit the normal 8s page-render
+    # Neon statement_timeout; otherwise a legitimate 16k-row lookup/write can
+    # timeout and fall back into very slow protective paths.
+    _v30082_set_import_statement_timeout(120, progress_callback, "延長 02 匯入 Neon 查詢/寫入逾時")
     result = {
         "inserted": 0,
         "updated": 0,
@@ -1781,6 +1842,7 @@ def import_time_records(
     }
     if work.empty:
         result["duration_seconds"] = round(_time.monotonic() - started_at, 2)
+        _v30082_set_import_statement_timeout(8, None, "恢復 Neon 查詢逾時")
         return result
 
     total_rows = int(len(work))
@@ -1844,6 +1906,7 @@ def import_time_records(
         _cache_clear()
         result["duration_seconds"] = round(_time.monotonic() - started_at, 2)
         _v30080_import_progress(progress_callback, stage="done", current=0, total=0, message="沒有可匯入資料", fraction=1.0)
+        _v30082_set_import_statement_timeout(8, None, "恢復 Neon 查詢逾時")
         return result
 
     result["prepared"] = len(prepared)
@@ -1988,6 +2051,7 @@ def import_time_records(
     _cache_clear()
     result["duration_seconds"] = round(_time.monotonic() - started_at, 2)
     _v30080_import_progress(progress_callback, stage="done", current=1, total=1, message="匯入完成", fraction=1.0)
+    _v30082_set_import_statement_timeout(8, None, "恢復 Neon 查詢逾時")
     return result
 
 
