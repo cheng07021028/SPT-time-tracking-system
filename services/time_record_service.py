@@ -1820,14 +1820,131 @@ def _v30079_apply_import_parallel_average(payloads: list[dict[str, Any]]) -> dic
     return summary
 
 
-def _v30076_bulk_insert_payloads(payloads: list[dict[str, Any]]) -> int:
-    if not payloads:
+def _v30084_json_value_for_insert(col: str, value: Any) -> Any:
+    """Normalize values for PostgreSQL JSONB bulk insert.
+
+    V300.84: the old INSERT path used db_service.executemany, which can fall
+    back to row-by-row writes on Neon and leaves the UI stuck at
+    "開始分批新增 0/n".  The JSONB path below casts values inside PostgreSQL,
+    so empty strings for numeric columns must be converted before sending.
+    """
+    if col in {"work_hours", "work_minutes", "raw_minutes", "average_minutes"}:
+        try:
+            if value is None or _text(value) == "":
+                return 0.0
+            return float(value)
+        except Exception:
+            return 0.0
+    if col in {"is_group_work", "version"}:
+        try:
+            if value is None or _text(value) == "":
+                return 1 if col == "version" else 0
+            return int(float(value))
+        except Exception:
+            return 1 if col == "version" else 0
+    return _text(value)
+
+
+def _v30084_pg_insert_from_jsonb(payloads: list[dict[str, Any]]) -> int:
+    """Fast PostgreSQL insert for large 02 history imports.
+
+    The previous insert used cursor.executemany through db_service.  When a
+    batch hit a duplicate/type issue it dropped into the slow protected path,
+    while the page still displayed the previous progress message.  This uses
+    one INSERT ... SELECT FROM jsonb_to_recordset statement per chunk and also
+    filters keys already present in time_records, so a missed duplicate does not
+    force a slow row-by-row recovery.
+    """
+    if not is_postgres_enabled() or not payloads:
         return 0
     cols = [c for c in TIME_RECORD_COLUMNS if c != "id"]
+    numeric_cols = {"work_hours", "work_minutes", "raw_minutes", "average_minutes"}
+    integer_cols = {"is_group_work", "version"}
+    type_defs: list[str] = []
+    for c in cols:
+        if c in numeric_cols:
+            typ = "double precision"
+        elif c in integer_cols:
+            typ = "integer"
+        else:
+            typ = "text"
+        type_defs.append(f"{c} {typ}")
+
+    cleaned: list[dict[str, Any]] = []
+    for payload in payloads:
+        row = {c: _v30084_json_value_for_insert(c, payload.get(c, "")) for c in cols}
+        if not _text(row.get("record_key")):
+            continue
+        if not _text(row.get("record_id")):
+            row["record_id"] = _text(row.get("record_key"))
+        if not _text(row.get("operation_id")):
+            row["operation_id"] = _text(row.get("record_key"))
+        if not _text(row.get("created_at")):
+            row["created_at"] = now_text()
+        if not _text(row.get("updated_at")):
+            row["updated_at"] = now_text()
+        cleaned.append(row)
+    if not cleaned:
+        return 0
+
+    select_cols = ", ".join([f"i.{c}" for c in cols])
+    sql = (
+        f"WITH incoming AS ("
+        f"SELECT * FROM jsonb_to_recordset(?::jsonb) AS i({', '.join(type_defs)})"
+        f") "
+        f"INSERT INTO time_records ({', '.join(cols)}) "
+        f"SELECT {select_cols} FROM incoming i "
+        f"WHERE i.record_key IS NOT NULL AND i.record_key <> '' "
+        f"AND NOT EXISTS (SELECT 1 FROM time_records t WHERE t.record_key = i.record_key)"
+    )
+    try:
+        return int(execute(sql, (json.dumps(cleaned, ensure_ascii=False),)) or 0)
+    except Exception:
+        # Some legacy deployments may not support jsonb_to_recordset or may not
+        # have all runtime columns yet.  Let the caller use the portable path.
+        raise
+
+
+def _v30076_bulk_insert_payloads(
+    payloads: list[dict[str, Any]],
+    *,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    progress_base: int = 0,
+    progress_total: int = 0,
+) -> int:
+    if not payloads:
+        return 0
+    if is_postgres_enabled():
+        try:
+            return _v30084_pg_insert_from_jsonb(payloads)
+        except Exception as exc:
+            _v30080_import_progress(
+                progress_callback,
+                stage="write_insert_fallback",
+                current=progress_base,
+                total=progress_total or len(payloads),
+                message=f"批次新增未完成，改用小批次相容新增：{str(exc)[:120]}",
+                fraction=0.70,
+            )
+
+    cols = [c for c in TIME_RECORD_COLUMNS if c != "id"]
     sql = f"INSERT INTO time_records ({', '.join(cols)}) VALUES ({', '.join(['?'] * len(cols))})"
-    rows = [tuple(p.get(c, "") for c in cols) for p in payloads]
-    executemany(sql, rows)
-    return len(payloads)
+    inserted = 0
+    # Portable fallback: use small batches and report progress.  Do not let a
+    # single executemany over thousands of rows leave the UI at 0/n for minutes.
+    for small_index, small in enumerate(_v30080_chunks(payloads, 100), start=1):
+        rows = [tuple(p.get(c, "") for c in cols) for p in small]
+        executemany(sql, rows)
+        inserted += len(small)
+        _v30080_import_progress(
+            progress_callback,
+            stage="write_insert_fallback",
+            current=progress_base + inserted,
+            total=progress_total or len(payloads),
+            message=f"相容小批次新增工時紀錄 {progress_base + inserted}/{progress_total or len(payloads)}",
+            fraction=0.70,
+        )
+    return inserted
 
 
 def _v30083_pg_update_from_values(update_cols: tuple[str, ...], rows: list[tuple[Any, ...]]) -> bool:
@@ -2112,14 +2229,27 @@ def import_time_records(
                     message=f"開始分批新增工時紀錄 {inserted_total}/{len(inserts)}",
                     fraction=0.70 + 0.25 * (write_done_chunks / max(write_total_chunks, 1)),
                 )
-                inserted_total += _v30076_bulk_insert_payloads(insert_chunk)
+                before_inserted = inserted_total
+                n_inserted = _v30076_bulk_insert_payloads(
+                    insert_chunk,
+                    progress_callback=progress_callback,
+                    progress_base=inserted_total,
+                    progress_total=len(inserts),
+                )
+                inserted_total += int(n_inserted or 0)
+                # If the PostgreSQL anti-duplicate insert skipped rows that now
+                # exist in Neon, count them as skipped instead of pretending all
+                # planned rows were inserted.
+                skipped_by_db = max(len(insert_chunk) - int(n_inserted or 0), 0)
+                if skipped_by_db:
+                    result["skipped"] = int(result.get("skipped", 0) or 0) + skipped_by_db
                 write_done_chunks += 1
                 _v30080_import_progress(
                     progress_callback,
                     stage="write",
-                    current=min(inserted_total, len(inserts)),
+                    current=min(before_inserted + len(insert_chunk), len(inserts)),
                     total=len(inserts),
-                    message=f"分批新增工時紀錄 {inserted_total}/{len(inserts)}",
+                    message=f"分批新增工時紀錄 已處理 {min(before_inserted + len(insert_chunk), len(inserts))}/{len(inserts)}，實際新增 {inserted_total}",
                     fraction=0.70 + 0.25 * (write_done_chunks / max(write_total_chunks, 1)),
                 )
             result["inserted"] = inserted_total
@@ -2152,7 +2282,7 @@ def import_time_records(
         result["errors"].append(f"批次寫入失敗，已改用逐筆保護寫入：{exc}")
         result["inserted"] = 0
         result["updated"] = 0
-        for payload in inserts:
+        for pos, payload in enumerate(inserts, start=1):
             try:
                 kind, n = _insert_or_update_payload(payload, None)
                 if kind == "inserted" and n:
@@ -2162,7 +2292,16 @@ def import_time_records(
             except Exception as row_exc:
                 result["skipped"] += 1
                 result["errors"].append(f"逐筆新增失敗：{row_exc}")
-        for rid, payload, changed in updates:
+            if pos == len(inserts) or pos % 100 == 0:
+                _v30080_import_progress(
+                    progress_callback,
+                    stage="write_insert_row_fallback",
+                    current=pos,
+                    total=len(inserts),
+                    message=f"逐筆保護新增 {pos}/{len(inserts)}",
+                    fraction=0.72,
+                )
+        for pos, (rid, payload, changed) in enumerate(updates, start=1):
             try:
                 kind, n = _insert_or_update_payload(payload, rid, changed_fields=changed)
                 if kind == "updated" and n:
@@ -2172,6 +2311,15 @@ def import_time_records(
             except Exception as row_exc:
                 result["skipped"] += 1
                 result["errors"].append(f"逐筆更新失敗：{row_exc}")
+            if pos == len(updates) or pos % 100 == 0:
+                _v30080_import_progress(
+                    progress_callback,
+                    stage="write_update_row_fallback",
+                    current=pos,
+                    total=len(updates),
+                    message=f"逐筆保護更新 {pos}/{len(updates)}",
+                    fraction=0.86,
+                )
 
     _cache_clear()
     result["duration_seconds"] = round(_time.monotonic() - started_at, 2)
