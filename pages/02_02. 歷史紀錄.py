@@ -2271,7 +2271,7 @@ with tab2:
                 st.session_state[HISTORY_IMPORT_PREVIEW_KEY] = parsed.copy()
                 st.session_state[HISTORY_IMPORT_PREVIEW_KEY + "_warnings"] = warnings
                 st.caption("原始 Excel 預覽 / Source Preview")
-                st.dataframe(source_df.head(30), use_container_width=True, height=220)
+                st.dataframe(source_df.head(30), use_container_width=True, height=220, key="history_excel_source_preview_v30075")
                 for msg in warnings:
                     st.warning(msg)
                 if parsed.empty:
@@ -2291,7 +2291,7 @@ with tab2:
                         else:
                             _add_history_result("warning", "這次沒有寫入任何資料。請確認解析預覽中的工號、製令、工段名稱、開始時間戳是否正確。")
                             rerun()
-                    st.dataframe(parsed, use_container_width=True, height=360)
+                    st.dataframe(parsed, use_container_width=True, height=360, key="history_excel_parsed_preview_v30075")
             except Exception as exc:
                 _add_history_result("error", f"Excel 匯入失敗：{exc}", append=False)
                 st.error(f"Excel 匯入失敗：{exc}")
@@ -2332,7 +2332,7 @@ with tab3:
                         _focus_filter_to_import_rows(import_df, "貼上匯入資料")
                     rerun()
                 st.caption("匯入前預覽 / Parsed Preview")
-                st.dataframe(parsed, use_container_width=True, height=360)
+                st.dataframe(parsed, use_container_width=True, height=360, key="history_paste_parsed_preview_v30075")
         else:
             st.info("請先貼上 Excel 資料。")
 
