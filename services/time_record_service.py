@@ -2166,6 +2166,93 @@ def _v30076_bulk_update_payloads(update_items: list[tuple[int, dict[str, Any], s
     return total
 
 
+
+def _v30089_restore_deleted_payload(rid: int, payload: dict[str, Any], changed_fields: set[str] | None = None) -> int:
+    """Restore one soft-deleted history record when the admin explicitly asks.
+
+    This path is only used by 02 Excel/Paste imports when
+    restore_deleted_matching_records=True.  It clears deleted_* tombstone fields
+    and updates the restored row with the incoming Excel/Paste values.  The
+    default import path still skips deleted matches, so admin deletes do not
+    silently resurrect.
+    """
+    allowed = set(TIME_RECORD_COLUMNS) - {"id", "created_at", "version"}
+    fields = [c for c in TIME_RECORD_COLUMNS if c in allowed and c not in {"deleted_at", "deleted_by", "delete_reason"}]
+    row = dict(payload or {})
+    row["deleted_at"] = ""
+    row["deleted_by"] = ""
+    row["delete_reason"] = ""
+    row["updated_at"] = now_text()
+    row["updated_by"] = _text(row.get("updated_by")) or "history_import_restore"
+    update_cols = [c for c in fields if c in allowed]
+    for c in ["deleted_at", "deleted_by", "delete_reason"]:
+        if c in allowed and c not in update_cols:
+            update_cols.append(c)
+    assignments = ", ".join([f"{c}=?" for c in update_cols] + ["version=COALESCE(version,1)+1"])
+    vals = [row.get(c, "") for c in update_cols]
+    vals.append(int(rid))
+    return int(execute(f"UPDATE time_records SET {assignments} WHERE id=?", tuple(vals)) or 0)
+
+
+def _v30089_pg_restore_deleted_from_jsonb(restore_items: list[tuple[int, dict[str, Any], set[str]]]) -> int:
+    """Fast PostgreSQL restore for deleted rows matched by import identity keys."""
+    if not is_postgres_enabled() or not restore_items:
+        return 0
+    cols = [c for c in TIME_RECORD_COLUMNS if c not in {"id", "created_at", "version"}]
+    numeric_cols = {"work_hours", "work_minutes", "raw_minutes", "average_minutes"}
+    integer_cols = {"is_group_work"}
+    type_defs = ["id integer"]
+    for c in cols:
+        if c in numeric_cols:
+            typ = "double precision"
+        elif c in integer_cols:
+            typ = "integer"
+        else:
+            typ = "text"
+        type_defs.append(f"{c} {typ}")
+    cleaned: list[dict[str, Any]] = []
+    for rid, payload, _changed in restore_items:
+        row = {"id": int(rid)}
+        for c in cols:
+            row[c] = _v30084_json_value_for_insert(c, (payload or {}).get(c, ""))
+        row["deleted_at"] = ""
+        row["deleted_by"] = ""
+        row["delete_reason"] = ""
+        row["updated_at"] = now_text()
+        row["updated_by"] = _text(row.get("updated_by")) or "history_import_restore"
+        if not _text(row.get("record_key")):
+            row["record_key"] = _text(row.get("record_id") or row.get("operation_id"))
+        cleaned.append(row)
+    if not cleaned:
+        return 0
+    assignments = ", ".join([f"{c}=i.{c}" for c in cols] + ["version=COALESCE(t.version,1)+1"])
+    sql = (
+        f"WITH incoming AS ("
+        f"SELECT * FROM jsonb_to_recordset(?::jsonb) AS i({', '.join(type_defs)})"
+        f"), upd AS ("
+        f"UPDATE time_records AS t SET {assignments} "
+        f"FROM incoming i WHERE t.id=i.id AND t.deleted_at IS NOT NULL AND t.deleted_at <> '' "
+        f"RETURNING 1"
+        f") SELECT COUNT(*) AS id FROM upd"
+    )
+    return int(execute(sql, (json.dumps(cleaned, ensure_ascii=False),)) or 0)
+
+
+def _v30089_bulk_restore_deleted_payloads(restore_items: list[tuple[int, dict[str, Any], set[str]]]) -> int:
+    if not restore_items:
+        return 0
+    if is_postgres_enabled():
+        try:
+            return int(_v30089_pg_restore_deleted_from_jsonb(restore_items) or 0)
+        except Exception:
+            # Fall through to compatible per-row restore; this is only reached if
+            # the optimized JSONB update is unavailable on the current backend.
+            pass
+    restored = 0
+    for rid, payload, changed in restore_items:
+        restored += int(_v30089_restore_deleted_payload(int(rid), payload, changed_fields=changed) or 0)
+    return restored
+
 def import_time_records(
     df: pd.DataFrame,
     recalc: bool = True,
@@ -2173,6 +2260,7 @@ def import_time_records(
     *,
     batch_size: int = 1000,
     progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    restore_deleted_matching_records: bool = False,
 ) -> dict:
     """Import 02 history rows using a single diff/batch path.
 
@@ -2206,6 +2294,9 @@ def import_time_records(
         "db_duplicate_skipped": 0,
         "identity_matches": 0,
         "duplicate_only": False,
+        "deleted_skipped": 0,
+        "restored_deleted": 0,
+        "restore_deleted_matching_records": bool(restore_deleted_matching_records),
         "errors": [],
     }
     if work.empty:
@@ -2358,6 +2449,7 @@ def import_time_records(
 
     inserts: list[dict[str, Any]] = []
     updates: list[tuple[int, dict[str, Any], set[str]]] = []
+    restores: list[tuple[int, dict[str, Any], set[str]]] = []
 
     _v30080_import_progress(progress_callback, stage="diff", current=0, total=len(prepared), message="計算新增 / 更新 / 略過", fraction=0.54)
     for diff_pos, (idx, rid, payload) in enumerate(prepared, start=1):
@@ -2391,7 +2483,16 @@ def import_time_records(
             if deleted_existing is None and op_identity:
                 deleted_existing = existing_all_by_operation_id.get(op_identity)
             if deleted_existing and _text(deleted_existing.get("deleted_at")):
+                effective_id = _int_or_none(deleted_existing.get("id"))
+                if restore_deleted_matching_records and effective_id is not None:
+                    # V300.89: administrator explicitly requested re-import of
+                    # matching records that were previously soft-deleted.  Restore
+                    # the existing deleted row instead of inserting a duplicate.
+                    restore_fields = set(TIME_RECORD_COLUMNS) - {"id", "created_at", "version"}
+                    restores.append((int(effective_id), payload, restore_fields))
+                    continue
                 result["skipped"] += 1
+                result["deleted_skipped"] = int(result.get("deleted_skipped", 0) or 0) + 1
                 continue
 
             inserts.append(payload)
@@ -2421,10 +2522,36 @@ def import_time_records(
     )
 
     try:
-        write_total_chunks = len(list(_v30080_chunks(inserts, batch_size))) + len(list(_v30080_chunks(updates, batch_size)))
+        write_total_chunks = (
+            len(list(_v30080_chunks(restores, batch_size)))
+            + len(list(_v30080_chunks(inserts, batch_size)))
+            + len(list(_v30080_chunks(updates, batch_size)))
+        )
         write_done_chunks = 0
         if write_total_chunks == 0:
             _v30080_import_progress(progress_callback, stage="write", current=0, total=0, message="沒有需要寫入 Neon 的資料", fraction=0.95)
+        if restores:
+            restored_total = 0
+            for restore_chunk in _v30080_chunks(restores, batch_size):
+                _v30080_import_progress(
+                    progress_callback,
+                    stage="write_restore",
+                    current=restored_total,
+                    total=len(restores),
+                    message=f"開始恢復已刪除工時紀錄 {restored_total}/{len(restores)}",
+                    fraction=0.70 + 0.25 * (write_done_chunks / max(write_total_chunks, 1)),
+                )
+                restored_total += _v30089_bulk_restore_deleted_payloads(restore_chunk)
+                write_done_chunks += 1
+                _v30080_import_progress(
+                    progress_callback,
+                    stage="write_restore",
+                    current=min(restored_total, len(restores)),
+                    total=len(restores),
+                    message=f"恢復已刪除工時紀錄 {restored_total}/{len(restores)}",
+                    fraction=0.70 + 0.25 * (write_done_chunks / max(write_total_chunks, 1)),
+                )
+            result["restored_deleted"] = restored_total
         if inserts:
             inserted_total = 0
             for insert_chunk in _v30080_chunks(inserts, batch_size):
@@ -2490,6 +2617,26 @@ def import_time_records(
         result["errors"].append(f"批次寫入失敗，已改用逐筆保護寫入：{exc}")
         result["inserted"] = 0
         result["updated"] = 0
+        result["restored_deleted"] = 0
+        for pos, (rid, payload, changed) in enumerate(restores, start=1):
+            try:
+                n = _v30089_restore_deleted_payload(int(rid), payload, changed_fields=changed)
+                if n:
+                    result["restored_deleted"] += 1
+                else:
+                    result["skipped"] += 1
+            except Exception as row_exc:
+                result["skipped"] += 1
+                result["errors"].append(f"逐筆恢復已刪除紀錄失敗：{row_exc}")
+            if pos == len(restores) or pos % 100 == 0:
+                _v30080_import_progress(
+                    progress_callback,
+                    stage="write_restore_row_fallback",
+                    current=pos,
+                    total=len(restores),
+                    message=f"逐筆保護恢復已刪除紀錄 {pos}/{len(restores)}",
+                    fraction=0.71,
+                )
         for pos, payload in enumerate(inserts, start=1):
             try:
                 kind, n = _insert_or_update_payload(payload, None)
@@ -2532,6 +2679,7 @@ def import_time_records(
     result["duplicate_only"] = (
         int(result.get("inserted", 0) or 0) == 0
         and int(result.get("updated", 0) or 0) == 0
+        and int(result.get("restored_deleted", 0) or 0) == 0
         and int(result.get("errors") and len(result.get("errors") or []) or 0) == 0
         and int(result.get("skipped", 0) or 0) > 0
     )
