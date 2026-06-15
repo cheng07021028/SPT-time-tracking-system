@@ -481,7 +481,11 @@ HISTORY_ALIAS_GROUPS = {
     "type_name": ["機型", "type", "type name", "type_name", "model", "型號"],
     "process_name": ["工段名稱", "工段", "process", "process name", "process_name", "作業工段"],
     "employee_id": ["工號", "employee id", "employee_id", "emp id", "人員工號"],
-    "employee_name": ["姓名", "name", "employee name", "employee_name", "人員姓名"],
+    # V30077: Excel template uses bilingual header "姓名 / Name".  The safer
+    # header matcher intentionally avoids short fuzzy aliases such as "name", so
+    # include normalized bilingual aliases explicitly to prevent employee_name
+    # from being parsed as blank.
+    "employee_name": ["姓名", "姓名 / Name", "姓名 Name", "姓名name", "name姓名", "name", "employee name", "employee_name", "人員姓名"],
     "start_action": ["開始動作", "start action", "start_action"],
     "start_timestamp": ["開始時間戳", "開始時間", "start timestamp", "start_timestamp", "start datetime", "開始日期時間"],
     "end_action": ["結束動作", "end action", "end_action"],
@@ -2271,7 +2275,7 @@ with tab2:
                 st.session_state[HISTORY_IMPORT_PREVIEW_KEY] = parsed.copy()
                 st.session_state[HISTORY_IMPORT_PREVIEW_KEY + "_warnings"] = warnings
                 st.caption("原始 Excel 預覽 / Source Preview")
-                st.dataframe(source_df.head(30), use_container_width=True, height=220, key="history_excel_source_preview_v30075")
+                st.dataframe(source_df.head(30), use_container_width=True, height=220)
                 for msg in warnings:
                     st.warning(msg)
                 if parsed.empty:
@@ -2291,7 +2295,7 @@ with tab2:
                         else:
                             _add_history_result("warning", "這次沒有寫入任何資料。請確認解析預覽中的工號、製令、工段名稱、開始時間戳是否正確。")
                             rerun()
-                    st.dataframe(parsed, use_container_width=True, height=360, key="history_excel_parsed_preview_v30075")
+                    st.dataframe(parsed, use_container_width=True, height=360)
             except Exception as exc:
                 _add_history_result("error", f"Excel 匯入失敗：{exc}", append=False)
                 st.error(f"Excel 匯入失敗：{exc}")
@@ -2332,7 +2336,7 @@ with tab3:
                         _focus_filter_to_import_rows(import_df, "貼上匯入資料")
                     rerun()
                 st.caption("匯入前預覽 / Parsed Preview")
-                st.dataframe(parsed, use_container_width=True, height=360, key="history_paste_parsed_preview_v30075")
+                st.dataframe(parsed, use_container_width=True, height=360)
         else:
             st.info("請先貼上 Excel 資料。")
 
