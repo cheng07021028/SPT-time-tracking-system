@@ -14,6 +14,7 @@ import json
 import os
 import math
 import uuid
+import hashlib
 from datetime import datetime, timedelta, time as dt_time
 from typing import Any, Iterable
 
@@ -1397,31 +1398,221 @@ def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) 
     return int(count)
 
 
+def _v30076_import_stable_operation_id(row: dict[str, Any]) -> str:
+    """Return a deterministic operation id for 02 history imports.
+
+    Older imports without record_id / operation_id generated a fresh UUID for
+    every row.  Re-importing the same Excel therefore produced a different
+    record_key, so the service could not detect existing rows and performed
+    many duplicate inserts.  For imported history rows, the business identity is
+    the worker + order + process + start/end time.
+    """
+    existing = _text(row.get("operation_id")) or _text(row.get("record_id"))
+    if existing:
+        return existing
+    parts = [
+        _text(row.get("employee_id")),
+        _text(row.get("work_order") or row.get("work_order_no")),
+        _text(row.get("process_name")),
+        _text(row.get("start_timestamp") or row.get("start_date")),
+        _text(row.get("end_timestamp") or row.get("end_date")),
+    ]
+    raw = "|".join(parts)
+    digest = hashlib.sha1(raw.encode("utf-8", "ignore")).hexdigest()[:24]
+    return f"hist-{digest}"
+
+
+def _v30076_load_records_by_record_key(record_keys: list[str], *, include_deleted: bool = False) -> dict[str, dict[str, Any]]:
+    keys = []
+    seen: set[str] = set()
+    for key in record_keys or []:
+        t = _text(key)
+        if t and t not in seen:
+            keys.append(t)
+            seen.add(t)
+    if not keys:
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for i in range(0, len(keys), 200):
+        chunk = keys[i:i + 200]
+        ph = ",".join(["?"] * len(chunk))
+        deleted_clause = "" if include_deleted else " AND (deleted_at IS NULL OR deleted_at='')"
+        df = _safe_df(f"SELECT {_base_cols()} FROM time_records WHERE record_key IN ({ph}){deleted_clause}", tuple(chunk))
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            for _, row in df.iterrows():
+                key = _text(row.get("record_key"))
+                if key and key not in out:
+                    out[key] = row.to_dict()
+    return out
+
+
+def _v30076_bulk_insert_payloads(payloads: list[dict[str, Any]]) -> int:
+    if not payloads:
+        return 0
+    cols = [c for c in TIME_RECORD_COLUMNS if c != "id"]
+    sql = f"INSERT INTO time_records ({', '.join(cols)}) VALUES ({', '.join(['?'] * len(cols))})"
+    rows = [tuple(p.get(c, "") for c in cols) for p in payloads]
+    executemany(sql, rows)
+    return len(payloads)
+
+
+def _v30076_bulk_update_payloads(update_items: list[tuple[int, dict[str, Any], set[str]]]) -> int:
+    if not update_items:
+        return 0
+    allowed = set(TIME_RECORD_COLUMNS) - {"id", "created_at", "version"}
+    grouped: dict[tuple[str, ...], list[tuple[Any, ...]]] = {}
+    for rid, payload, changed_fields in update_items:
+        update_cols: list[str] = []
+        seen: set[str] = set()
+        for c in sorted(str(x) for x in (changed_fields or set())):
+            if c in allowed and c not in seen:
+                update_cols.append(c)
+                seen.add(c)
+        for c in ["updated_at", "updated_by"]:
+            if c in allowed and c not in seen:
+                update_cols.append(c)
+                seen.add(c)
+        if not update_cols:
+            continue
+        key = tuple(update_cols)
+        grouped.setdefault(key, []).append(tuple(payload.get(c, "") for c in update_cols) + (int(rid),))
+
+    total = 0
+    for update_cols, rows in grouped.items():
+        assignments = ", ".join([f"{c}=?" for c in update_cols] + ["version=COALESCE(version,1)+1"])
+        sql = f"UPDATE time_records SET {assignments} WHERE id=? AND (deleted_at IS NULL OR deleted_at='')"
+        executemany(sql, rows)
+        total += len(rows)
+    return total
+
+
 def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "history_import") -> dict:
+    """Import 02 history rows using a single diff/batch path.
+
+    V300.76 speed fix:
+    - Do not run SELECT id by record_key for every row.
+    - Do not UPDATE unchanged rows.
+    - Do not open one Neon transaction per imported row.
+    - Use deterministic record keys for Excel/Paste history rows that do not
+      contain record_id/operation_id, so repeated imports become no-op/update
+      instead of duplicate inserts.
+    """
     _ensure_time_runtime_columns()
     work = _normalize_df(df)
     result = {"inserted": 0, "updated": 0, "skipped": 0, "errors": []}
+    if work.empty:
+        return result
+
     source_columns = set(work.attrs.get("_spt_source_columns", set(work.columns)))
+    prepared: list[tuple[int, int | None, dict[str, Any]]] = []
+    payload_by_key: dict[str, tuple[int, int | None, dict[str, Any]]] = {}
+
     for idx, row in work.iterrows():
         rd = dict(row)
-        if not _text(rd.get("employee_id")) or not _text(rd.get("work_order") or rd.get("work_order_no")) or not _text(rd.get("process_name")) or not _text(rd.get("start_timestamp") or rd.get("start_date")):
+        if (
+            not _text(rd.get("employee_id"))
+            or not _text(rd.get("work_order") or rd.get("work_order_no"))
+            or not _text(rd.get("process_name"))
+            or not _text(rd.get("start_timestamp") or rd.get("start_date"))
+        ):
             result["skipped"] += 1
             continue
         try:
             rd["source"] = source
+            if not _text(rd.get("operation_id")) and not _text(rd.get("record_id")) and not _text(rd.get("record_key")):
+                rd["operation_id"] = _v30076_import_stable_operation_id(rd)
+                rd["record_id"] = rd["operation_id"]
             payload = _row_to_payload(rd, recalc=bool(recalc), before=None, source_columns=source_columns)
             rid = _int_or_none(rd.get("id"))
-            if not rid and payload.get("record_key"):
-                old = _safe_one("SELECT id FROM time_records WHERE record_key=? AND (deleted_at IS NULL OR deleted_at='') LIMIT 1", (payload["record_key"],))
-                rid = _int_or_none((old or {}).get("id"))
-            kind, n = _insert_or_update_payload(payload, rid)
-            if kind == "inserted":
-                result["inserted"] += 1 if n else 0
-            else:
-                result["updated"] += 1 if n else 0
+            key = _text(payload.get("record_key"))
+            if not key:
+                result["skipped"] += 1
+                continue
+            # Same import file may contain duplicate business rows.  Keep the
+            # last copy and avoid writing the same record twice in one click.
+            if key in payload_by_key:
+                result["skipped"] += 1
+            payload_by_key[key] = (int(idx), rid, payload)
         except Exception as exc:
             result["skipped"] += 1
-            result["errors"].append(f"第 {idx+1} 筆失敗：{exc}")
+            result["errors"].append(f"第 {idx+1} 筆解析失敗：{exc}")
+
+    prepared = list(payload_by_key.values())
+    if not prepared:
+        _cache_clear()
+        return result
+
+    ids = sorted({int(rid) for _, rid, _ in prepared if rid is not None and int(rid) > 0})
+    keys = [_text(payload.get("record_key")) for _, _, payload in prepared if _text(payload.get("record_key"))]
+    existing_by_id = _load_existing_records_map(ids)
+    existing_active_by_key = _v30076_load_records_by_record_key(keys, include_deleted=False)
+    existing_all_by_key = _v30076_load_records_by_record_key(keys, include_deleted=True)
+
+    inserts: list[dict[str, Any]] = []
+    updates: list[tuple[int, dict[str, Any], set[str]]] = []
+
+    for idx, rid, payload in prepared:
+        try:
+            key = _text(payload.get("record_key"))
+            before = existing_by_id.get(int(rid)) if rid is not None and int(rid) > 0 else None
+            if before is None:
+                before = existing_active_by_key.get(key)
+            if before:
+                effective_id = _int_or_none(before.get("id"))
+                diff = _diff_payload(before, payload)
+                if not diff:
+                    result["skipped"] += 1
+                    continue
+                if effective_id is None:
+                    result["skipped"] += 1
+                    result["errors"].append(f"第 {idx+1} 筆無法取得既有紀錄 ID，已略過。")
+                    continue
+                updates.append((int(effective_id), payload, set(diff.keys())))
+                continue
+
+            deleted_existing = existing_all_by_key.get(key)
+            if deleted_existing and _text(deleted_existing.get("deleted_at")):
+                result["skipped"] += 1
+                continue
+
+            inserts.append(payload)
+        except Exception as exc:
+            result["skipped"] += 1
+            result["errors"].append(f"第 {idx+1} 筆比對失敗：{exc}")
+
+    try:
+        if inserts:
+            result["inserted"] = _v30076_bulk_insert_payloads(inserts)
+        if updates:
+            result["updated"] = _v30076_bulk_update_payloads(updates)
+    except Exception as exc:
+        # Keep the import page usable if a batch hits a legacy constraint.
+        # Fall back to the old single-row path only for rows that actually need
+        # writing; unchanged rows have already been skipped.
+        result["errors"].append(f"批次寫入失敗，已改用逐筆保護寫入：{exc}")
+        result["inserted"] = 0
+        result["updated"] = 0
+        for payload in inserts:
+            try:
+                kind, n = _insert_or_update_payload(payload, None)
+                if kind == "inserted" and n:
+                    result["inserted"] += 1
+                else:
+                    result["skipped"] += 1
+            except Exception as row_exc:
+                result["skipped"] += 1
+                result["errors"].append(f"逐筆新增失敗：{row_exc}")
+        for rid, payload, changed in updates:
+            try:
+                kind, n = _insert_or_update_payload(payload, rid, changed_fields=changed)
+                if kind == "updated" and n:
+                    result["updated"] += 1
+                else:
+                    result["skipped"] += 1
+            except Exception as row_exc:
+                result["skipped"] += 1
+                result["errors"].append(f"逐筆更新失敗：{row_exc}")
+
     _cache_clear()
     return result
 
