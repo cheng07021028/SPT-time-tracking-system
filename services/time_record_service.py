@@ -220,6 +220,7 @@ def _add_col(table: str, ddl: str) -> None:
 
 
 _TIME_RUNTIME_READY = False
+_IMPORT_LOOKUP_INDEX_READY = False
 _REST_PERIODS_CACHE: list[tuple[dt_time, dt_time]] | None = None
 _REST_PERIODS_CACHE_AT = 0.0
 _REST_PERIODS_TTL_SECONDS = 300.0
@@ -1461,6 +1462,55 @@ def _v30080_chunks(items: list[Any], size: int) -> Iterable[list[Any]]:
     for i in range(0, len(items), step):
         yield items[i:i + step]
 
+
+
+def _v30081_import_lookup_columns() -> str:
+    """Columns needed for import duplicate/diff lookup.
+
+    V300.81: importing 16k+ history rows used SELECT *-style _base_cols()
+    for every record_key lookup chunk.  The diff step only needs id,
+    record_key, deleted_at and audit fields, so keep the lookup payload small.
+    """
+    cols: list[str] = []
+    for c in ["id", "record_key", "deleted_at"] + list(_V73_AUDIT_FIELDS):
+        if c in TIME_RECORD_COLUMNS and c not in cols:
+            cols.append(c)
+    return ", ".join(cols)
+
+
+def _v30081_ensure_import_lookup_index(progress_callback: Callable[[dict[str, Any]], None] | None = None) -> None:
+    """Create the import lookup index only on the 02 import path.
+
+    This avoids putting DDL into the normal 01/02 hot render path, but still
+    protects large Excel imports from doing many full-table scans by record_key.
+    If Neon refuses or times out on index creation, the import still proceeds
+    with the optimized ANY/chunk lookup below.
+    """
+    global _IMPORT_LOOKUP_INDEX_READY
+    if _IMPORT_LOOKUP_INDEX_READY:
+        return
+    _v30080_import_progress(
+        progress_callback,
+        stage="lookup_index",
+        current=0,
+        total=1,
+        message="確認匯入防重索引",
+        fraction=0.33,
+    )
+    try:
+        execute("CREATE INDEX IF NOT EXISTS idx_v30081_time_records_record_key_lookup ON time_records(record_key)", ())
+    except Exception:
+        pass
+    _IMPORT_LOOKUP_INDEX_READY = True
+    _v30080_import_progress(
+        progress_callback,
+        stage="lookup_index",
+        current=1,
+        total=1,
+        message="匯入防重索引確認完成",
+        fraction=0.35,
+    )
+
 def _v30076_load_records_by_record_key(
     record_keys: list[str],
     *,
@@ -1470,7 +1520,20 @@ def _v30076_load_records_by_record_key(
     progress_end: float = 1.0,
     progress_message: str = "比對既有工時紀錄",
 ) -> dict[str, dict[str, Any]]:
-    keys = []
+    """Load existing time_records for imported record keys without per-row reads.
+
+    V300.81 fix for imports freezing around 16000/16491:
+    - V300.80 still queried record_key IN (...) in 500-key chunks.  Without a
+      record_key index this can become dozens of full-table scans on Neon, and
+      the last chunks make the UI look stuck.
+    - PostgreSQL now uses record_key = ANY(%s::text[]) in 4000-key chunks, so
+      16k keys become about 5 lookups instead of 33.
+    - Only the columns needed by diff/update are selected, not the whole wide
+      time_records row.
+    - A final progress event is always sent so the UI does not remain on
+      16000/16491 while the next phase starts.
+    """
+    keys: list[str] = []
     seen: set[str] = set()
     for key in record_keys or []:
         t = _text(key)
@@ -1479,13 +1542,56 @@ def _v30076_load_records_by_record_key(
             seen.add(t)
     if not keys:
         return {}
+
     out: dict[str, dict[str, Any]] = {}
-    chunks = list(_v30080_chunks(keys, 500))
-    total_chunks = max(len(chunks), 1)
+    cols = _v30081_import_lookup_columns()
     deleted_clause = "" if include_deleted else " AND (deleted_at IS NULL OR deleted_at='')"
+
+    # PostgreSQL can bind a Python list to ANY(%s::text[]).  This dramatically
+    # reduces round trips and avoids building thousands of SQL placeholders.
+    if is_postgres_enabled():
+        chunks = list(_v30080_chunks(keys, 4000))
+        total_chunks = max(len(chunks), 1)
+        try:
+            for chunk_index, chunk in enumerate(chunks, start=1):
+                df = query_df(
+                    f"SELECT {cols} FROM time_records WHERE record_key = ANY(?::text[]){deleted_clause}",
+                    (list(chunk),),
+                )
+                if isinstance(df, pd.DataFrame) and not df.empty:
+                    df = df.where(pd.notna(df), "")
+                    for _, row in df.iterrows():
+                        key = _text(row.get("record_key"))
+                        if key and key not in out:
+                            out[key] = row.to_dict()
+                frac = float(progress_start) + (float(progress_end) - float(progress_start)) * (chunk_index / total_chunks)
+                _v30080_import_progress(
+                    progress_callback,
+                    stage="lookup",
+                    current=min(chunk_index * 4000, len(keys)),
+                    total=len(keys),
+                    message=progress_message,
+                    fraction=frac,
+                )
+            _v30080_import_progress(
+                progress_callback,
+                stage="lookup",
+                current=len(keys),
+                total=len(keys),
+                message=f"{progress_message}完成",
+                fraction=progress_end,
+            )
+            return out
+        except Exception:
+            # Fallback to portable placeholder chunks below.  Never return an
+            # empty map merely because the optimized ANY form is unavailable.
+            out = {}
+
+    chunks = list(_v30080_chunks(keys, 1000))
+    total_chunks = max(len(chunks), 1)
     for chunk_index, chunk in enumerate(chunks, start=1):
         ph = ",".join(["?"] * len(chunk))
-        df = _safe_df(f"SELECT {_base_cols()} FROM time_records WHERE record_key IN ({ph}){deleted_clause}", tuple(chunk))
+        df = _safe_df(f"SELECT {cols} FROM time_records WHERE record_key IN ({ph}){deleted_clause}", tuple(chunk))
         if isinstance(df, pd.DataFrame) and not df.empty:
             for _, row in df.iterrows():
                 key = _text(row.get("record_key"))
@@ -1495,13 +1601,20 @@ def _v30076_load_records_by_record_key(
         _v30080_import_progress(
             progress_callback,
             stage="lookup",
-            current=min(chunk_index * 500, len(keys)),
+            current=min(chunk_index * 1000, len(keys)),
             total=len(keys),
             message=progress_message,
             fraction=frac,
         )
+    _v30080_import_progress(
+        progress_callback,
+        stage="lookup",
+        current=len(keys),
+        total=len(keys),
+        message=f"{progress_message}完成",
+        fraction=progress_end,
+    )
     return out
-
 
 def _v30079_apply_import_parallel_average(payloads: list[dict[str, Any]]) -> dict[str, int]:
     """Detect and average imported synchronous work rows in Python before DB write.
@@ -1747,6 +1860,7 @@ def import_time_records(
     ids = sorted({int(rid) for _, rid, _ in prepared if rid is not None and int(rid) > 0})
     keys = [_text(payload.get("record_key")) for _, _, payload in prepared if _text(payload.get("record_key"))]
     _v30080_import_progress(progress_callback, stage="lookup", current=0, total=len(keys), message="比對 Neon 既有紀錄", fraction=0.34)
+    _v30081_ensure_import_lookup_index(progress_callback)
     existing_by_id = _load_existing_records_map(ids)
     # V300.80: load all matching keys once, then split active/deleted locally.
     # Previous V300.76 path queried active and all keys separately, doubling
