@@ -1605,6 +1605,16 @@ def _v30081_ensure_import_lookup_index(progress_callback: Callable[[dict[str, An
         execute("CREATE INDEX IF NOT EXISTS idx_v30081_time_records_record_key_lookup ON time_records(record_key)", ())
     except Exception:
         pass
+    # V300.88: import duplicate planning also checks record_id/operation_id.
+    # Create these indexes only on the import path, not on normal page render.
+    for _idx_sql in [
+        "CREATE INDEX IF NOT EXISTS idx_v30088_time_records_record_id_lookup ON time_records(record_id)",
+        "CREATE INDEX IF NOT EXISTS idx_v30088_time_records_operation_id_lookup ON time_records(operation_id)",
+    ]:
+        try:
+            execute(_idx_sql, ())
+        except Exception:
+            pass
     _IMPORT_LOOKUP_INDEX_READY = True
     _v30080_import_progress(
         progress_callback,
@@ -1730,6 +1740,102 @@ def _v30076_load_records_by_record_key(
         message=f"{progress_message}完成",
         fraction=progress_end,
     )
+    return out
+
+
+def _v30088_load_records_by_identity_column(
+    values: list[str],
+    *,
+    column: str,
+    include_deleted: bool = False,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    progress_start: float = 0.0,
+    progress_end: float = 1.0,
+    progress_message: str = "比對既有工時紀錄身分鍵",
+) -> dict[str, dict[str, Any]]:
+    """Load existing rows by record_id or operation_id for 02 imports.
+
+    V300.88: the duplicate guard in the fast PostgreSQL insert protects
+    record_key, record_id and operation_id.  The diff planner, however, only
+    looked up record_key, so rows already present under the same record_id or
+    operation_id could be counted as "planned insert" and then skipped by the
+    database.  That produced confusing results such as "預計新增 100、實際新增 0".
+    Load those identity keys up front so duplicate imports are classified as
+    update/skip before the write stage instead of being discovered by the INSERT
+    guard.
+    """
+    if column not in {"record_id", "operation_id"}:
+        return {}
+    clean: list[str] = []
+    seen: set[str] = set()
+    for value in values or []:
+        t = _text(value)
+        if t and t not in seen:
+            clean.append(t)
+            seen.add(t)
+    if not clean:
+        return {}
+
+    out: dict[str, dict[str, Any]] = {}
+    cols = _v30081_import_lookup_columns()
+    deleted_clause = "" if include_deleted else " AND (deleted_at IS NULL OR deleted_at='')"
+    if is_postgres_enabled():
+        chunks = list(_v30080_chunks(clean, 4000))
+        total_chunks = max(len(chunks), 1)
+        try:
+            for chunk_index, chunk in enumerate(chunks, start=1):
+                order_sql = f"ORDER BY {column}, CASE WHEN deleted_at IS NULL OR deleted_at='' THEN 0 ELSE 1 END, id DESC"
+                df = _v30082_query_df_uncached(
+                    f"SELECT DISTINCT ON ({column}) {cols} FROM time_records WHERE {column} = ANY(?::text[]){deleted_clause} {order_sql}",
+                    (list(chunk),),
+                )
+                if isinstance(df, pd.DataFrame) and not df.empty:
+                    df = df.where(pd.notna(df), "")
+                    for _, row in df.iterrows():
+                        key = _text(row.get(column))
+                        if key and key not in out:
+                            out[key] = row.to_dict()
+                frac = float(progress_start) + (float(progress_end) - float(progress_start)) * (chunk_index / total_chunks)
+                _v30080_import_progress(
+                    progress_callback,
+                    stage=f"lookup_{column}",
+                    current=min(chunk_index * 4000, len(clean)),
+                    total=len(clean),
+                    message=progress_message,
+                    fraction=frac,
+                )
+            return out
+        except Exception as exc:
+            _v30080_import_progress(
+                progress_callback,
+                stage=f"lookup_{column}",
+                current=0,
+                total=len(clean),
+                message=f"{progress_message}未完成，改用相容批次：{str(exc)[:120]}",
+                fraction=progress_start,
+            )
+            out = {}
+
+    chunks = list(_v30080_chunks(clean, 1000))
+    total_chunks = max(len(chunks), 1)
+    for chunk_index, chunk in enumerate(chunks, start=1):
+        ph = ",".join(["?"] * len(chunk))
+        df = _safe_df(f"SELECT {cols} FROM time_records WHERE {column} IN ({ph}){deleted_clause}", tuple(chunk))
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            df = df.where(pd.notna(df), "")
+            for _, row in df.iterrows():
+                key = _text(row.get(column))
+                if key and key not in out:
+                    out[key] = row.to_dict()
+        frac = float(progress_start) + (float(progress_end) - float(progress_start)) * (chunk_index / total_chunks)
+        _v30080_import_progress(
+            progress_callback,
+            stage=f"lookup_{column}",
+            current=min(chunk_index * 1000, len(clean)),
+            total=len(clean),
+            message=progress_message,
+            fraction=frac,
+        )
     return out
 
 def _v30079_apply_import_parallel_average(payloads: list[dict[str, Any]]) -> dict[str, int]:
@@ -2097,6 +2203,9 @@ def import_time_records(
         "to_update": 0,
         "batch_size": batch_size,
         "duration_seconds": 0.0,
+        "db_duplicate_skipped": 0,
+        "identity_matches": 0,
+        "duplicate_only": False,
         "errors": [],
     }
     if work.empty:
@@ -2200,13 +2309,51 @@ def import_time_records(
         if not _text((v or {}).get("deleted_at"))
     }
 
+    # V300.88: also lookup record_id / operation_id.  Old imports and manual
+    # 01 records may share these identity fields while having a different
+    # generated record_key.  The INSERT guard already protects these fields;
+    # doing the same lookup before diffing prevents misleading results like
+    # "預計新增 100、實際新增 0".
+    import_record_ids = [_text(payload.get("record_id")) for _, _, payload in prepared if _text(payload.get("record_id"))]
+    import_operation_ids = [_text(payload.get("operation_id")) for _, _, payload in prepared if _text(payload.get("operation_id"))]
+    existing_all_by_record_id = _v30088_load_records_by_identity_column(
+        import_record_ids,
+        column="record_id",
+        include_deleted=True,
+        progress_callback=progress_callback,
+        progress_start=0.525,
+        progress_end=0.545,
+        progress_message="比對 Neon record_id",
+    )
+    existing_all_by_operation_id = _v30088_load_records_by_identity_column(
+        import_operation_ids,
+        column="operation_id",
+        include_deleted=True,
+        progress_callback=progress_callback,
+        progress_start=0.545,
+        progress_end=0.565,
+        progress_message="比對 Neon operation_id",
+    )
+    existing_active_by_record_id = {
+        k: v for k, v in existing_all_by_record_id.items()
+        if not _text((v or {}).get("deleted_at"))
+    }
+    existing_active_by_operation_id = {
+        k: v for k, v in existing_all_by_operation_id.items()
+        if not _text((v or {}).get("deleted_at"))
+    }
+    result["identity_matches"] = len(existing_active_by_record_id) + len(existing_active_by_operation_id)
+
     _v30080_import_progress(
         progress_callback,
         stage="lookup_done",
         current=len(keys),
         total=len(keys),
-        message=f"比對 Neon 完成，找到 {len(existing_all_by_key)} 筆既有 key",
-        fraction=0.53,
+        message=(
+            f"比對 Neon 完成，record_key {len(existing_all_by_key)} 筆、"
+            f"record_id {len(existing_all_by_record_id)} 筆、operation_id {len(existing_all_by_operation_id)} 筆"
+        ),
+        fraction=0.57,
     )
 
     inserts: list[dict[str, Any]] = []
@@ -2216,9 +2363,15 @@ def import_time_records(
     for diff_pos, (idx, rid, payload) in enumerate(prepared, start=1):
         try:
             key = _text(payload.get("record_key"))
+            rec_identity = _text(payload.get("record_id"))
+            op_identity = _text(payload.get("operation_id"))
             before = existing_by_id.get(int(rid)) if rid is not None and int(rid) > 0 else None
             if before is None:
                 before = existing_active_by_key.get(key)
+            if before is None and rec_identity:
+                before = existing_active_by_record_id.get(rec_identity)
+            if before is None and op_identity:
+                before = existing_active_by_operation_id.get(op_identity)
             if before:
                 effective_id = _int_or_none(before.get("id"))
                 diff = _v30083_import_relevant_diff(before, payload, source_columns)
@@ -2233,6 +2386,10 @@ def import_time_records(
                 continue
 
             deleted_existing = existing_all_by_key.get(key)
+            if deleted_existing is None and rec_identity:
+                deleted_existing = existing_all_by_record_id.get(rec_identity)
+            if deleted_existing is None and op_identity:
+                deleted_existing = existing_all_by_operation_id.get(op_identity)
             if deleted_existing and _text(deleted_existing.get("deleted_at")):
                 result["skipped"] += 1
                 continue
@@ -2293,6 +2450,7 @@ def import_time_records(
                 skipped_by_db = max(len(insert_chunk) - int(n_inserted or 0), 0)
                 if skipped_by_db:
                     result["skipped"] = int(result.get("skipped", 0) or 0) + skipped_by_db
+                    result["db_duplicate_skipped"] = int(result.get("db_duplicate_skipped", 0) or 0) + skipped_by_db
                 write_done_chunks += 1
                 _v30080_import_progress(
                     progress_callback,
@@ -2371,6 +2529,12 @@ def import_time_records(
                     fraction=0.86,
                 )
 
+    result["duplicate_only"] = (
+        int(result.get("inserted", 0) or 0) == 0
+        and int(result.get("updated", 0) or 0) == 0
+        and int(result.get("errors") and len(result.get("errors") or []) or 0) == 0
+        and int(result.get("skipped", 0) or 0) > 0
+    )
     _cache_clear()
     result["duration_seconds"] = round(_time.monotonic() - started_at, 2)
     _v30080_import_progress(progress_callback, stage="done", current=1, total=1, message="匯入完成", fraction=1.0)

@@ -2545,15 +2545,21 @@ with tab2:
                         import_df = st.session_state.get(HISTORY_IMPORT_PREVIEW_KEY, parsed).copy()
                         result = _v30080_import_with_progress(import_df, recalc=recalc_excel, source="history_excel_import", label="Excel 歷史紀錄匯入")
                         _parallel_note = f"，同時作業 {int(result.get('parallel_groups', 0) or 0)} 組 / {int(result.get('parallel_records', 0) or 0)} 筆" if int(result.get('parallel_records', 0) or 0) else ""
+                        _identity_note = f"，身分鍵既有比對 {int(result.get('identity_matches', 0) or 0)} 筆" if int(result.get('identity_matches', 0) or 0) else ""
+                        _db_dup_note = f"，資料庫防重略過 {int(result.get('db_duplicate_skipped', 0) or 0)} 筆" if int(result.get('db_duplicate_skipped', 0) or 0) else ""
                         _batch_note = f"，預計新增 {int(result.get('to_insert', 0) or 0)}，預計更新 {int(result.get('to_update', 0) or 0)}，分批 {int(result.get('batch_size', 0) or 0)} 筆/批，用時 {_v30080_format_seconds(float(result.get('duration_seconds', 0) or 0))}"
-                        _add_history_result("success", f"Excel 匯入完成：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}{_parallel_note}{_batch_note}。", append=False)
+                        _add_history_result("success", f"Excel 匯入完成：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}{_parallel_note}{_identity_note}{_db_dup_note}{_batch_note}。", append=False)
                         for msg in result.get("errors", [])[:20]:
                             _add_history_result("warning", msg)
                         if result.get("inserted", 0) or result.get("updated", 0):
                             _focus_filter_to_import_rows(import_df, "Excel 匯入資料")
                             rerun()
                         else:
-                            _add_history_result("warning", "這次沒有寫入任何資料。請確認解析預覽中的工號、製令、工段名稱、開始時間戳是否正確。")
+                            if result.get("duplicate_only") or int(result.get("skipped", 0) or 0) > 0:
+                                _add_history_result("info", "本次沒有新增或更新，因為匯入資料已被防重機制判定為既有/重複紀錄；這不是欄位解析錯誤。若要確認資料是否已存在，請使用匯入日期區間查詢。")
+                                _focus_filter_to_import_rows(import_df, "Excel 匯入資料")
+                            else:
+                                _add_history_result("warning", "這次沒有寫入任何資料。請確認解析預覽中的工號、製令、工段名稱、開始時間戳是否正確。")
                             rerun()
                     st.dataframe(parsed, use_container_width=True, height=360, key="history_excel_parsed_preview_v30078")
             except Exception as exc:
@@ -2584,12 +2590,18 @@ with tab3:
                     import_df = parsed.copy()
                     result = _v30080_import_with_progress(import_df, recalc=recalc_paste, source="history_paste_import", label="貼上歷史紀錄匯入")
                     _parallel_note = f"，同時作業 {int(result.get('parallel_groups', 0) or 0)} 組 / {int(result.get('parallel_records', 0) or 0)} 筆" if int(result.get('parallel_records', 0) or 0) else ""
+                    _identity_note = f"，身分鍵既有比對 {int(result.get('identity_matches', 0) or 0)} 筆" if int(result.get('identity_matches', 0) or 0) else ""
+                    _db_dup_note = f"，資料庫防重略過 {int(result.get('db_duplicate_skipped', 0) or 0)} 筆" if int(result.get('db_duplicate_skipped', 0) or 0) else ""
                     _batch_note = f"，預計新增 {int(result.get('to_insert', 0) or 0)}，預計更新 {int(result.get('to_update', 0) or 0)}，分批 {int(result.get('batch_size', 0) or 0)} 筆/批，用時 {_v30080_format_seconds(float(result.get('duration_seconds', 0) or 0))}"
-                    _add_history_result("success", f"貼上資料已匯入：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}{_parallel_note}{_batch_note}。", append=False)
+                    _add_history_result("success", f"貼上資料已匯入：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}{_parallel_note}{_identity_note}{_db_dup_note}{_batch_note}。", append=False)
                     for msg in result.get("errors", [])[:20]:
                         _add_history_result("warning", msg)
                     if result.get("inserted", 0) == 0 and result.get("updated", 0) == 0:
-                        _add_history_result("warning", "這次沒有寫入任何資料。請確認解析預覽中的工號、製令、工段名稱、開始時間戳是否正確。")
+                        if result.get("duplicate_only") or int(result.get("skipped", 0) or 0) > 0:
+                            _add_history_result("info", "本次沒有新增或更新，因為貼上資料已被防重機制判定為既有/重複紀錄；這不是欄位解析錯誤。")
+                            _focus_filter_to_import_rows(parsed, "貼上匯入資料")
+                        else:
+                            _add_history_result("warning", "這次沒有寫入任何資料。請確認解析預覽中的工號、製令、工段名稱、開始時間戳是否正確。")
                     else:
                         # 不可在 text_area 建立後直接改同一個 session_state key，
                         # 否則 Streamlit 會拋 StreamlitAPIException。
