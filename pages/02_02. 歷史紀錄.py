@@ -2286,7 +2286,8 @@ with tab2:
                     if st.button("⟟ 確認匯入 Excel 歷史紀錄 / Import Excel History", type="primary", use_container_width=True, key="history_excel_import_save_v242_top"):
                         import_df = st.session_state.get(HISTORY_IMPORT_PREVIEW_KEY, parsed).copy()
                         result = import_time_records(import_df, recalc=recalc_excel, source="history_excel_import")
-                        _add_history_result("success", f"Excel 匯入完成：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}。", append=False)
+                        _parallel_note = f"，同時作業 {int(result.get('parallel_groups', 0) or 0)} 組 / {int(result.get('parallel_records', 0) or 0)} 筆" if int(result.get('parallel_records', 0) or 0) else ""
+                        _add_history_result("success", f"Excel 匯入完成：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}{_parallel_note}。", append=False)
                         for msg in result.get("errors", [])[:20]:
                             _add_history_result("warning", msg)
                         if result.get("inserted", 0) or result.get("updated", 0):
@@ -2323,7 +2324,8 @@ with tab3:
                 if st.button("▣ 確認匯入貼上歷史紀錄 / Save Pasted History", type="primary", use_container_width=True, key="history_paste_save_v242"):
                     import_df = parsed.copy()
                     result = import_time_records(import_df, recalc=recalc_paste, source="history_paste_import")
-                    _add_history_result("success", f"貼上資料已匯入：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}。", append=False)
+                    _parallel_note = f"，同時作業 {int(result.get('parallel_groups', 0) or 0)} 組 / {int(result.get('parallel_records', 0) or 0)} 筆" if int(result.get('parallel_records', 0) or 0) else ""
+                    _add_history_result("success", f"貼上資料已匯入：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}{_parallel_note}。", append=False)
                     for msg in result.get("errors", [])[:20]:
                         _add_history_result("warning", msg)
                     if result.get("inserted", 0) == 0 and result.get("updated", 0) == 0:

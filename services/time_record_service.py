@@ -1446,6 +1446,94 @@ def _v30076_load_records_by_record_key(record_keys: list[str], *, include_delete
     return out
 
 
+def _v30079_apply_import_parallel_average(payloads: list[dict[str, Any]]) -> dict[str, int]:
+    """Detect and average imported synchronous work rows in Python before DB write.
+
+    Import rule aligned with 01 Finish Work:
+    - same employee + same date + same process
+    - two or more completed rows whose time intervals overlap
+    - average = net minutes from earliest group start to latest group end / row count
+
+    This stays in the foreground Python batch and does not scan 02 history.  It
+    only inspects the current import payloads, so repeated Excel/Paste imports
+    remain fast and deterministic.
+    """
+    summary = {"parallel_groups": 0, "parallel_records": 0}
+    if not payloads:
+        return summary
+
+    buckets: dict[tuple[str, str, str], list[tuple[int, datetime, datetime, dict[str, Any]]]] = {}
+    for pos, payload in enumerate(payloads):
+        emp = _text(payload.get("employee_id"))
+        proc = _text(payload.get("process_name"))
+        sdate = _text(payload.get("start_date")) or _normalize_date_part(payload.get("start_timestamp"))
+        start_dt = _parse_dt(payload.get("start_timestamp"))
+        end_dt = _parse_dt(payload.get("end_timestamp"))
+        # Start-only or invalid time rows cannot be averaged safely.
+        if not emp or not proc or not sdate or start_dt is None or end_dt is None or end_dt <= start_dt:
+            continue
+        buckets.setdefault((emp, sdate, proc), []).append((pos, start_dt, end_dt, payload))
+
+    for (emp, sdate, proc), rows in buckets.items():
+        if len(rows) <= 1:
+            continue
+        rows.sort(key=lambda item: (item[1], item[2], _text(item[3].get("record_key"))))
+        components: list[list[tuple[int, datetime, datetime, dict[str, Any]]]] = []
+        cur: list[tuple[int, datetime, datetime, dict[str, Any]]] = []
+        cur_end: datetime | None = None
+        for item in rows:
+            _, st, et, _ = item
+            if not cur:
+                cur = [item]
+                cur_end = et
+                continue
+            # Actual overlap only.  A row ending exactly when the next starts is
+            # sequential work and must not be treated as synchronous work.
+            if cur_end is not None and st < cur_end:
+                cur.append(item)
+                if et > cur_end:
+                    cur_end = et
+            else:
+                components.append(cur)
+                cur = [item]
+                cur_end = et
+        if cur:
+            components.append(cur)
+
+        for comp in components:
+            if len(comp) <= 1:
+                continue
+            group_start = min(item[1] for item in comp)
+            group_end = max(item[2] for item in comp)
+            raw_total, net_total = calculate_work_minutes(_fmt_dt(group_start), _fmt_dt(group_end))
+            n = max(len(comp), 1)
+            raw_each = round(raw_total / n, 2)
+            net_each = round(net_total / n, 2)
+            group_seed = "|".join([
+                emp,
+                sdate,
+                proc,
+                _fmt_dt(group_start),
+                _fmt_dt(group_end),
+                "|".join(sorted(_text(item[3].get("record_key")) for item in comp)),
+            ])
+            group_key = "import-parallel-" + hashlib.sha1(group_seed.encode("utf-8", "ignore")).hexdigest()[:16]
+            for _, _, _, payload in comp:
+                payload["group_key"] = group_key
+                payload["is_group_work"] = 1
+                payload["raw_minutes"] = raw_each
+                payload["work_minutes"] = net_each
+                payload["average_minutes"] = net_each
+                payload["work_hours"] = round(net_each / 60.0, 4)
+                # Keep imported rows visibly ended when they have an end time but
+                # the source did not provide an explicit final status.
+                if _text(payload.get("end_timestamp")) and _text(payload.get("status")) in ACTIVE_STATUSES:
+                    payload["status"] = END_ACTION_STATUS.get(_text(payload.get("end_action")), "已結束")
+            summary["parallel_groups"] += 1
+            summary["parallel_records"] += len(comp)
+    return summary
+
+
 def _v30076_bulk_insert_payloads(payloads: list[dict[str, Any]]) -> int:
     if not payloads:
         return 0
@@ -1499,7 +1587,7 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
     """
     _ensure_time_runtime_columns()
     work = _normalize_df(df)
-    result = {"inserted": 0, "updated": 0, "skipped": 0, "errors": []}
+    result = {"inserted": 0, "updated": 0, "skipped": 0, "parallel_groups": 0, "parallel_records": 0, "errors": []}
     if work.empty:
         return result
 
@@ -1523,6 +1611,15 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
                 rd["operation_id"] = _v30076_import_stable_operation_id(rd)
                 rd["record_id"] = rd["operation_id"]
             payload = _row_to_payload(rd, recalc=bool(recalc), before=None, source_columns=source_columns)
+            # V300.79: _row_to_payload historically defaulted every import row
+            # to employee|process|date as group_key.  That makes sequential
+            # same-process records look like synchronous work later.  For 02
+            # Excel/Paste imports, keep an explicit source group_key if present;
+            # otherwise leave it blank until overlap detection proves the rows
+            # are truly simultaneous.
+            if "group_key" not in source_columns or not _text(rd.get("group_key")):
+                payload["group_key"] = ""
+                payload["is_group_work"] = 0
             rid = _int_or_none(rd.get("id"))
             key = _text(payload.get("record_key"))
             if not key:
@@ -1541,6 +1638,13 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
     if not prepared:
         _cache_clear()
         return result
+
+    # V300.79: detect same-employee/same-date/same-process overlapping
+    # completed rows inside this import batch and apply the 01 Finish Work
+    # average rule before diffing/writing Neon.
+    parallel_summary = _v30079_apply_import_parallel_average([payload for _, _, payload in prepared])
+    result["parallel_groups"] = int(parallel_summary.get("parallel_groups", 0) or 0)
+    result["parallel_records"] = int(parallel_summary.get("parallel_records", 0) or 0)
 
     ids = sorted({int(rid) for _, rid, _ in prepared if rid is not None and int(rid) > 0})
     keys = [_text(payload.get("record_key")) for _, _, payload in prepared if _text(payload.get("record_key"))]
