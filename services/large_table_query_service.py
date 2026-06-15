@@ -257,6 +257,31 @@ def count_history_records_sql_filtered(filters: dict[str, Any] | None = None, *,
     _add_in_filter(where, params, "employee_id", f.get("employee_ids"))
     _add_in_filter(where, params, "employee_name", f.get("employee_names"))
     _add_in_filter(where, params, "status", f.get("statuses"))
+
+    # V300.86: count must match the SQL-first page query.  Earlier count logic
+    # ignored keyword and end-state filters, so the page total could be much
+    # larger than the actual rows available to browse.
+    keyword = _clean_text(f.get("keyword"))
+    if keyword:
+        kw = f"%{keyword}%"
+        where.append("(" + " OR ".join([
+            "COALESCE(work_order,'') LIKE ?",
+            "COALESCE(part_no,'') LIKE ?",
+            "COALESCE(type_name,'') LIKE ?",
+            "COALESCE(process_name,'') LIKE ?",
+            "COALESCE(employee_id,'') LIKE ?",
+            "COALESCE(employee_name,'') LIKE ?",
+            "COALESCE(remark,'') LIKE ?",
+            "COALESCE(assembly_location,'') LIKE ?",
+        ]) + ")")
+        params.extend([kw] * 8)
+
+    end_state = _clean_text(f.get("end_state"))
+    if end_state == "未結束":
+        where.append("COALESCE(end_timestamp,'') IN ('','None','none','nan','NaT','nat','null')")
+    elif end_state == "已結束":
+        where.append("COALESCE(end_timestamp,'') NOT IN ('','None','none','nan','NaT','nat','null')")
+
     sql = "SELECT COUNT(*) AS cnt FROM time_records"
     if where:
         sql += " WHERE " + " AND ".join(f"({w})" for w in where)

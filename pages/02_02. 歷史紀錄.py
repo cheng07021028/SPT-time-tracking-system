@@ -34,10 +34,11 @@ from services.time_record_delete_unifier_service import delete_selected_time_rec
 from services.duration_service import hours_to_hms
 from services.history_filter_service import load_history_filters, save_history_filters, reset_history_filters
 try:
-    from services.large_table_query_service import load_history_records_sql_filtered, load_history_filter_options_sql
+    from services.large_table_query_service import load_history_records_sql_filtered, load_history_filter_options_sql, count_history_records_sql_filtered
 except Exception:
     load_history_records_sql_filtered = None
     load_history_filter_options_sql = None
+    count_history_records_sql_filtered = None
 
 # === V180B_HISTORY_TOTAL_TIME_TYPE_FIX_BEGIN ===
 def _v180b_parse_work_hours_to_decimal_hours(value):
@@ -132,6 +133,11 @@ HISTORY_RESULT_MESSAGES_KEY = "v238_history_result_messages"
 V259_HISTORY_QUERY_REQUESTED_KEY = "v259_02_history_query_requested"
 V259_HISTORY_DF_KEY = "v259_02_history_df"
 V259_HISTORY_TS_KEY = "v259_02_history_loaded_at"
+V30086_HISTORY_PAGE_KEY = "v30086_02_history_page"
+V30086_HISTORY_TOTAL_KEY = "v30086_02_history_total_count"
+V30086_HISTORY_FILTER_SIG_KEY = "v30086_02_history_filter_signature"
+V30086_HISTORY_EXPORT_BYTES_KEY = "v30086_02_history_all_filtered_export_bytes"
+V30086_HISTORY_EXPORT_NAME_KEY = "v30086_02_history_all_filtered_export_name"
 
 # === V300.27 02 HISTORY LOW-RISK FASTPATH BEGIN ===
 # 02 歷史紀錄的查詢本身已改成手動觸發；這裡只處理不影響資料正確性的
@@ -304,6 +310,111 @@ def _v71_needs_python_post_filter(filters: dict | None) -> bool:
         or anomaly != "全部"
         or sort_by in {"工時由大到小", "工時由小到大"}
     )
+
+
+# V300.86: 02 history server-side pagination helpers.
+# Keep the existing Professional Filters and table UI; only change the data loading
+# strategy so large result sets are read page by page instead of loading tens of
+# thousands of rows into Streamlit at once.
+def _v30086_history_filter_signature(filters: dict | None) -> str:
+    try:
+        return json.dumps(filters or {}, sort_keys=True, ensure_ascii=False, default=str)
+    except Exception:
+        return repr(filters or {})
+
+
+def _v30086_clear_history_page_cache(*, reset_page: bool = True) -> None:
+    st.session_state.pop(V259_HISTORY_DF_KEY, None)
+    st.session_state.pop(V259_HISTORY_TS_KEY, None)
+    st.session_state.pop(V30086_HISTORY_TOTAL_KEY, None)
+    st.session_state.pop("v100_history_current_export_bytes", None)
+    st.session_state.pop("v100_history_current_export_name", None)
+    st.session_state.pop(V30086_HISTORY_EXPORT_BYTES_KEY, None)
+    st.session_state.pop(V30086_HISTORY_EXPORT_NAME_KEY, None)
+    if reset_page:
+        st.session_state[V30086_HISTORY_PAGE_KEY] = 1
+
+
+def _v30086_history_page_size(filters: dict | None) -> int:
+    return _v71_requested_detail_limit(filters, default=500)
+
+
+def _v30086_top_n_cap(filters: dict | None, total: int) -> int:
+    top_limit = _v71_top_n_limit(filters)
+    if top_limit:
+        try:
+            return min(int(total), int(top_limit))
+        except Exception:
+            return int(total or 0)
+    return int(total or 0)
+
+
+def _v30086_load_history_total_count(filters: dict | None) -> tuple[int, bool]:
+    """Return total count for SQL-side filters.
+
+    The count is exact for SQL-safe filters.  If the user chooses Python-only
+    filters such as anomaly or department/title, this value is the SQL candidate
+    count and the current page still applies the final Python filter after loading.
+    """
+    if not callable(count_history_records_sql_filtered):
+        return 0, False
+    try:
+        total = int(count_history_records_sql_filtered(filters or {}) or 0)
+    except Exception:
+        return 0, False
+    return _v30086_top_n_cap(filters, total), (not _v71_needs_python_post_filter(filters))
+
+
+def _v30086_load_history_page(filters: dict | None, *, page: int, page_size: int) -> pd.DataFrame:
+    offset = max(0, int(page_size) * max(0, int(page) - 1))
+    if callable(load_history_records_sql_filtered):
+        _needs_python_post_filter = _v71_needs_python_post_filter(filters)
+        # For Python-only filters, read a bounded candidate page and then apply
+        # the existing pandas filter, preserving current calculation semantics.
+        _sql_limit = min(V71_HISTORY_PYTHON_SCAN_MAX_ROWS, max(page_size, min(V71_HISTORY_PYTHON_SCAN_MAX_ROWS, page_size * 2))) if _needs_python_post_filter else page_size
+        _sql_df = load_history_records_sql_filtered(filters, limit=_sql_limit, offset=offset)
+        if isinstance(_sql_df, pd.DataFrame):
+            out = _apply_history_filters(_sql_df, filters) if _needs_python_post_filter else _sql_df
+            if len(out) > page_size:
+                out = out.head(page_size).copy()
+            return out
+        return pd.DataFrame()
+    # Fallback keeps the old bounded path.  It is not used on Streamlit Cloud with Neon.
+    fallback_df = load_records(str((filters or {}).get("start_date", _seed_start)), str((filters or {}).get("end_date", _seed_end)), None, None)
+    fallback_df = _apply_history_filters(fallback_df, filters)
+    start_idx = offset
+    end_idx = offset + page_size
+    return fallback_df.iloc[start_idx:end_idx].copy() if isinstance(fallback_df, pd.DataFrame) else pd.DataFrame()
+
+
+def _v30086_prepare_all_filtered_export(filters: dict | None, *, batch_size: int = 3000, max_rows: int = 100000) -> pd.DataFrame:
+    """Load all filtered rows for explicit export only, never for screen rendering."""
+    if not callable(load_history_records_sql_filtered):
+        fallback_df = load_records(str((filters or {}).get("start_date", _seed_start)), str((filters or {}).get("end_date", _seed_end)), None, None)
+        return _apply_history_filters(fallback_df, filters).head(max_rows)
+    frames: list[pd.DataFrame] = []
+    offset = 0
+    page_size = max(100, min(5000, int(batch_size)))
+    total_loaded = 0
+    while total_loaded < int(max_rows):
+        part = load_history_records_sql_filtered(filters, limit=page_size, offset=offset)
+        if not isinstance(part, pd.DataFrame) or part.empty:
+            break
+        if _v71_needs_python_post_filter(filters):
+            part = _apply_history_filters(part, filters)
+        if isinstance(part, pd.DataFrame) and not part.empty:
+            frames.append(part)
+            total_loaded += len(part)
+        # Offset follows SQL candidate rows, not post-filter rows.
+        offset += page_size
+        if len(part) < page_size and not _v71_needs_python_post_filter(filters):
+            break
+        if offset >= int(max_rows) and _v71_needs_python_post_filter(filters):
+            # Protection for Python-only export filters.
+            break
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True).head(max_rows)
 
 
 def _v259_now_label() -> str:
@@ -1853,7 +1964,7 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
             start_input = r1c2.date_input("開始日期", value=start_default)
             end_input = r1c3.date_input("結束日期", value=end_default)
             detail_default = min(V71_HISTORY_INTERACTIVE_MAX_ROWS, max(50, int(applied.get("detail_limit") or 300)))
-            detail_limit = r1c4.number_input("明細讀取上限", min_value=50, max_value=V71_HISTORY_INTERACTIVE_MAX_ROWS, value=detail_default, step=50)
+            detail_limit = r1c4.number_input("每頁筆數 / Page Size（原明細讀取上限）", min_value=50, max_value=V71_HISTORY_INTERACTIVE_MAX_ROWS, value=detail_default, step=50)
 
             # V253: build options from SQL DISTINCT values when available, not full history rows.
             _opt = option_values or {}
@@ -1900,8 +2011,7 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
             new_filters = _v30027_reset_history_filters_cached()
             st.session_state["history_filters_applied_v216"] = new_filters
             st.session_state[V259_HISTORY_QUERY_REQUESTED_KEY] = False
-            st.session_state.pop(V259_HISTORY_DF_KEY, None)
-            st.session_state.pop(V259_HISTORY_TS_KEY, None)
+            _v30086_clear_history_page_cache(reset_page=True)
             _add_history_result("success", "已恢復 02｜歷史紀錄預設篩選；歷史明細不會自動載入，請按查詢。", append=False)
             rerun()
 
@@ -1933,10 +2043,7 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
             saved = _v30027_save_history_filters_cached(new_filters)
             st.session_state["history_filters_applied_v216"] = saved
             st.session_state[V259_HISTORY_QUERY_REQUESTED_KEY] = True
-            st.session_state.pop(V259_HISTORY_DF_KEY, None)
-            st.session_state.pop(V259_HISTORY_TS_KEY, None)
-            st.session_state.pop("v100_history_current_export_bytes", None)
-            st.session_state.pop("v100_history_current_export_name", None)
+            _v30086_clear_history_page_cache(reset_page=True)
             _add_history_result("success", "已套用篩選條件，正在載入本次查詢結果。", append=False)
             rerun()
 
@@ -1974,41 +2081,68 @@ with hr3:
         st.caption("V259：歷史明細不再於開頁自動載入；請先設定條件，再按查詢。")
 if clear_history_cache_clicked:
     st.session_state[V259_HISTORY_QUERY_REQUESTED_KEY] = False
-    st.session_state.pop(V259_HISTORY_DF_KEY, None)
-    st.session_state.pop(V259_HISTORY_TS_KEY, None)
-    st.session_state.pop("v100_history_current_export_bytes", None)
-    st.session_state.pop("v100_history_current_export_name", None)
+    _v30086_clear_history_page_cache(reset_page=True)
     _add_history_result("success", "已清除歷史查詢快取。", append=False)
     rerun()
 if manual_query_clicked:
     st.session_state[V259_HISTORY_QUERY_REQUESTED_KEY] = True
-    st.session_state.pop(V259_HISTORY_DF_KEY, None)
-    st.session_state.pop(V259_HISTORY_TS_KEY, None)
-    st.session_state.pop("v100_history_current_export_bytes", None)
-    st.session_state.pop("v100_history_current_export_name", None)
+    _v30086_clear_history_page_cache(reset_page=True)
+
+_query_requested = bool(st.session_state.get(V259_HISTORY_QUERY_REQUESTED_KEY))
+_filter_sig = _v30086_history_filter_signature(history_filters)
+if st.session_state.get(V30086_HISTORY_FILTER_SIG_KEY) != _filter_sig:
+    st.session_state[V30086_HISTORY_FILTER_SIG_KEY] = _filter_sig
+    _v30086_clear_history_page_cache(reset_page=True)
+
+_page_size = _v30086_history_page_size(history_filters)
+_current_page = max(1, int(st.session_state.get(V30086_HISTORY_PAGE_KEY, 1) or 1))
+_total_count = int(st.session_state.get(V30086_HISTORY_TOTAL_KEY, 0) or 0)
+_total_is_exact = True
+
+if _query_requested and callable(count_history_records_sql_filtered) and V30086_HISTORY_TOTAL_KEY not in st.session_state:
+    with st.spinner("正在計算符合條件的歷史紀錄總筆數..."):
+        _total_count, _total_is_exact = _v30086_load_history_total_count(history_filters)
+        st.session_state[V30086_HISTORY_TOTAL_KEY] = int(_total_count)
+        st.session_state["v30086_02_history_total_exact"] = bool(_total_is_exact)
+else:
+    _total_is_exact = bool(st.session_state.get("v30086_02_history_total_exact", True))
+
+_total_count = int(st.session_state.get(V30086_HISTORY_TOTAL_KEY, _total_count) or 0)
+_max_page = max(1, int((_total_count + _page_size - 1) // _page_size)) if _total_count else 1
+if _current_page > _max_page:
+    _current_page = _max_page
+    st.session_state[V30086_HISTORY_PAGE_KEY] = _current_page
+
+if _query_requested:
+    pg1, pg2, pg3, pg4, pg5 = st.columns([1, 1, 1.2, 1, 2.2])
+    prev_clicked = pg1.button("上一頁 / Prev", use_container_width=True, key="v30086_history_prev_page", disabled=_current_page <= 1)
+    next_clicked = pg2.button("下一頁 / Next", use_container_width=True, key="v30086_history_next_page", disabled=_current_page >= _max_page)
+    jump_page = pg3.number_input("頁碼 / Page", min_value=1, max_value=max(1, _max_page), value=_current_page, step=1, key="v30086_history_jump_page_input")
+    go_clicked = pg4.button("跳頁 / Go", use_container_width=True, key="v30086_history_go_page")
+    with pg5:
+        count_label = "總筆數" if _total_is_exact else "候選筆數"
+        st.caption(f"{count_label}：{_total_count:,}；每頁：{_page_size:,}；目前第 {_current_page:,} / {_max_page:,} 頁。")
+    if prev_clicked:
+        st.session_state[V30086_HISTORY_PAGE_KEY] = max(1, _current_page - 1)
+        st.session_state.pop(V259_HISTORY_DF_KEY, None)
+        st.session_state.pop(V259_HISTORY_TS_KEY, None)
+        rerun()
+    if next_clicked:
+        st.session_state[V30086_HISTORY_PAGE_KEY] = min(_max_page, _current_page + 1)
+        st.session_state.pop(V259_HISTORY_DF_KEY, None)
+        st.session_state.pop(V259_HISTORY_TS_KEY, None)
+        rerun()
+    if go_clicked:
+        st.session_state[V30086_HISTORY_PAGE_KEY] = max(1, min(_max_page, int(jump_page)))
+        st.session_state.pop(V259_HISTORY_DF_KEY, None)
+        st.session_state.pop(V259_HISTORY_TS_KEY, None)
+        rerun()
 
 df = st.session_state.get(V259_HISTORY_DF_KEY, pd.DataFrame())
-_query_requested = bool(st.session_state.get(V259_HISTORY_QUERY_REQUESTED_KEY))
 _query_not_loaded = (not isinstance(df, pd.DataFrame)) or (isinstance(df, pd.DataFrame) and df.empty and not st.session_state.get(V259_HISTORY_TS_KEY))
 if _query_requested and _query_not_loaded:
-    with st.spinner("正在查詢歷史明細，已套用 V71 快速路徑與互動上限..."):
-        if callable(load_history_records_sql_filtered):
-            _detail_limit = _v71_requested_detail_limit(history_filters, default=300)
-            _needs_python_post_filter = _v71_needs_python_post_filter(history_filters)
-            # Python-only filters need a little more candidate rows, but still cannot load tens
-            # of thousands into Streamlit. Keep the page interactive and let exports use a batch path.
-            _sql_limit = min(V71_HISTORY_PYTHON_SCAN_MAX_ROWS, max(_detail_limit, min(V71_HISTORY_PYTHON_SCAN_MAX_ROWS, _detail_limit * 2))) if _needs_python_post_filter else _detail_limit
-            _sql_df = load_history_records_sql_filtered(history_filters, limit=_sql_limit)
-            if isinstance(_sql_df, pd.DataFrame):
-                df = _apply_history_filters(_sql_df, history_filters) if _needs_python_post_filter else _sql_df
-                if len(df) > _detail_limit:
-                    df = df.head(_detail_limit).copy()
-            else:
-                df = pd.DataFrame()
-        else:
-            _fallback_limit = _v71_requested_detail_limit(history_filters, default=300)
-            df = load_records(str(history_filters.get("start_date", _seed_start)), str(history_filters.get("end_date", _seed_end)), None, None)
-            df = _apply_history_filters(df, history_filters).head(_fallback_limit)
+    with st.spinner(f"正在查詢歷史明細第 {_current_page} 頁，已套用伺服器端分頁..."):
+        df = _v30086_load_history_page(history_filters, page=_current_page, page_size=_page_size)
         st.session_state[V259_HISTORY_DF_KEY] = df
         st.session_state[V259_HISTORY_TS_KEY] = _v259_now_label()
 if not isinstance(df, pd.DataFrame):
@@ -2018,7 +2152,7 @@ start = history_filters.get("start_date", str(_seed_start))
 end = history_filters.get("end_date", str(_seed_end))
 
 m1, m2, m3, m4, m5, m6 = st.columns(6)
-m1.metric("篩選筆數 / Records", f"{len(df):,}")
+m1.metric("當頁 / 總筆數", f"{len(df):,} / {_total_count:,}" if _query_requested and _total_count else f"{len(df):,}")
 m2.metric("總工時 / Total Time", _safe_work_hours_total_hms(df))
 if not df.empty:
     _ended_metric = _has_end_info_df(df)
@@ -2330,6 +2464,24 @@ with tab2:
                 )
             else:
                 st.caption("需匯出時請先按『準備目前清單下載』，避免查詢歷史明細時同步產生 Excel。")
+            st.markdown("---")
+            if st.button("準備全部篩選資料下載 / Prepare All Filtered", use_container_width=True, key="v30086_prepare_all_filtered_history_export"):
+                with st.spinner("正在分批準備全部符合篩選的歷史紀錄下載檔，不會把全部資料顯示在畫面表格..."):
+                    export_all_df = _v30086_prepare_all_filtered_export(history_filters, batch_size=3000, max_rows=100000)
+                    export_all_bio = BytesIO()
+                    with pd.ExcelWriter(export_all_bio, engine="xlsxwriter") as writer:
+                        export_all_df.to_excel(writer, index=False, sheet_name="歷史紀錄")
+                    st.session_state[V30086_HISTORY_EXPORT_BYTES_KEY] = export_all_bio.getvalue()
+                    st.session_state[V30086_HISTORY_EXPORT_NAME_KEY] = f"SPT_歷史紀錄_全部篩選_{start}_{end}.xlsx"
+                    _add_history_result("success", f"已準備全部篩選資料下載檔，共 {len(export_all_df):,} 筆。", append=False)
+            if st.session_state.get(V30086_HISTORY_EXPORT_BYTES_KEY):
+                st.download_button(
+                    "下載全部篩選資料 / Download All Filtered",
+                    data=st.session_state.get(V30086_HISTORY_EXPORT_BYTES_KEY),
+                    file_name=st.session_state.get(V30086_HISTORY_EXPORT_NAME_KEY, f"SPT_歷史紀錄_全部篩選_{start}_{end}.xlsx"),
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
         with dl2:
             st.download_button(
                 "下載歷史紀錄匯入範本 / Download Template",
