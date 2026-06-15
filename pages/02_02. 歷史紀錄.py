@@ -138,6 +138,8 @@ V30086_HISTORY_TOTAL_KEY = "v30086_02_history_total_count"
 V30086_HISTORY_FILTER_SIG_KEY = "v30086_02_history_filter_signature"
 V30086_HISTORY_EXPORT_BYTES_KEY = "v30086_02_history_all_filtered_export_bytes"
 V30086_HISTORY_EXPORT_NAME_KEY = "v30086_02_history_all_filtered_export_name"
+V30087_HISTORY_PAGINATION_VERSION_KEY = "v30087_02_history_pagination_version"
+V30087_HISTORY_PAGINATION_VERSION = "V30087_20260615_PAGING_TOTAL_UNCAPPED"
 
 # === V300.27 02 HISTORY LOW-RISK FASTPATH BEGIN ===
 # 02 歷史紀錄的查詢本身已改成手動觸發；這裡只處理不影響資料正確性的
@@ -294,9 +296,10 @@ def _v71_requested_detail_limit(filters: dict | None, default: int = 300) -> int
         raw = int(float(str((filters or {}).get("detail_limit") or default).strip()))
     except Exception:
         raw = default
-    top_limit = _v71_top_n_limit(filters)
-    if top_limit:
-        raw = min(raw, top_limit)
+    # V300.87: detail_limit is now the server-side page size.  It must not be
+    # reduced by Top N, otherwise a saved Top 100 setting makes the page and
+    # total area look like only 100 records were imported.  Top N is a legacy
+    # display cap; page size and total count are handled separately.
     return max(50, min(V71_HISTORY_INTERACTIVE_MAX_ROWS, raw))
 
 
@@ -339,6 +342,20 @@ def _v30086_history_page_size(filters: dict | None) -> int:
     return _v71_requested_detail_limit(filters, default=500)
 
 
+def _v30087_filters_without_legacy_display_caps(filters: dict | None) -> dict:
+    """Return filters used for server-side paging/export post filters.
+
+    V300.86 could apply legacy Top N/detail_limit after the SQL page was already
+    loaded.  That made the screen show 100/100 even when Neon held thousands of
+    rows.  Pagination owns the display limit now, so pandas post-filters should
+    keep semantic filters only.
+    """
+    f = dict(filters or {})
+    f["top_n"] = "全部"
+    f["detail_limit"] = 0
+    return f
+
+
 def _v30086_top_n_cap(filters: dict | None, total: int) -> int:
     top_limit = _v71_top_n_limit(filters)
     if top_limit:
@@ -362,7 +379,10 @@ def _v30086_load_history_total_count(filters: dict | None) -> tuple[int, bool]:
         total = int(count_history_records_sql_filtered(filters or {}) or 0)
     except Exception:
         return 0, False
-    return _v30086_top_n_cap(filters, total), (not _v71_needs_python_post_filter(filters))
+    # V300.87: total count must represent all rows matching the filters.  Do not
+    # cap it by the legacy Top N option, otherwise users think only 100 rows were
+    # imported after a large Excel import.
+    return int(total or 0), (not _v71_needs_python_post_filter(filters))
 
 
 def _v30086_load_history_page(filters: dict | None, *, page: int, page_size: int) -> pd.DataFrame:
@@ -374,7 +394,7 @@ def _v30086_load_history_page(filters: dict | None, *, page: int, page_size: int
         _sql_limit = min(V71_HISTORY_PYTHON_SCAN_MAX_ROWS, max(page_size, min(V71_HISTORY_PYTHON_SCAN_MAX_ROWS, page_size * 2))) if _needs_python_post_filter else page_size
         _sql_df = load_history_records_sql_filtered(filters, limit=_sql_limit, offset=offset)
         if isinstance(_sql_df, pd.DataFrame):
-            out = _apply_history_filters(_sql_df, filters) if _needs_python_post_filter else _sql_df
+            out = _apply_history_filters(_sql_df, _v30087_filters_without_legacy_display_caps(filters)) if _needs_python_post_filter else _sql_df
             if len(out) > page_size:
                 out = out.head(page_size).copy()
             return out
@@ -401,7 +421,7 @@ def _v30086_prepare_all_filtered_export(filters: dict | None, *, batch_size: int
         if not isinstance(part, pd.DataFrame) or part.empty:
             break
         if _v71_needs_python_post_filter(filters):
-            part = _apply_history_filters(part, filters)
+            part = _apply_history_filters(part, _v30087_filters_without_legacy_display_caps(filters))
         if isinstance(part, pd.DataFrame) and not part.empty:
             frames.append(part)
             total_loaded += len(part)
@@ -2071,6 +2091,14 @@ base_df = pd.DataFrame()
 _panel_df, history_filters = _render_history_filter_panel(base_df, employees, work_orders, _history_option_values)
 history_filters = _v79_effective_history_filters(history_filters)
 
+# V300.87: deployment changes must invalidate old pagination totals.
+# Streamlit sessions can keep V300.86 values such as total_count=100 even after
+# the user changes Top N back to 全部.  Clear only query-page caches, not saved
+# filter settings.
+if st.session_state.get(V30087_HISTORY_PAGINATION_VERSION_KEY) != V30087_HISTORY_PAGINATION_VERSION:
+    st.session_state[V30087_HISTORY_PAGINATION_VERSION_KEY] = V30087_HISTORY_PAGINATION_VERSION
+    _v30086_clear_history_page_cache(reset_page=True)
+
 hr1, hr2, hr3 = st.columns([1.2, 1.2, 3])
 manual_query_clicked = hr1.button("查詢 / 重新整理歷史明細", type="primary", use_container_width=True, key="v259_history_manual_query")
 clear_history_cache_clicked = hr2.button("清除歷史查詢快取", use_container_width=True, key="v259_history_clear_cache")
@@ -2121,7 +2149,9 @@ if _query_requested:
     go_clicked = pg4.button("跳頁 / Go", use_container_width=True, key="v30086_history_go_page")
     with pg5:
         count_label = "總筆數" if _total_is_exact else "候選筆數"
-        st.caption(f"{count_label}：{_total_count:,}；每頁：{_page_size:,}；目前第 {_current_page:,} / {_max_page:,} 頁。")
+        _legacy_top = _v71_top_n_limit(history_filters)
+        _top_note = "；Top N 不再限制分頁總筆數" if _legacy_top else ""
+        st.caption(f"{count_label}：{_total_count:,}；每頁：{_page_size:,}；目前第 {_current_page:,} / {_max_page:,} 頁{_top_note}。")
     if prev_clicked:
         st.session_state[V30086_HISTORY_PAGE_KEY] = max(1, _current_page - 1)
         st.session_state.pop(V259_HISTORY_DF_KEY, None)
