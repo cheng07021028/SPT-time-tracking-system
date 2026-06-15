@@ -1888,21 +1888,32 @@ def _v30084_pg_insert_from_jsonb(payloads: list[dict[str, Any]]) -> int:
         return 0
 
     select_cols = ", ".join([f"i.{c}" for c in cols])
+    # V300.85: use a writable CTE that returns a single COUNT row instead of a
+    # plain INSERT.  db_service automatically appends RETURNING id to normal
+    # INSERT statements into time_records; for thousands of rows that can create
+    # a large returned rowset and, on error, pushes the import into the very slow
+    # row-by-row protected path.  A WITH ... INSERT ... RETURNING 1 SELECT COUNT(*)
+    # is still one PostgreSQL statement but returns only one scalar count.
+    duplicate_guard = (
+        "t.record_key = i.record_key"
+        " OR (i.record_id IS NOT NULL AND i.record_id <> '' AND t.record_id = i.record_id)"
+        " OR (i.operation_id IS NOT NULL AND i.operation_id <> '' AND t.operation_id = i.operation_id)"
+    )
     sql = (
         f"WITH incoming AS ("
         f"SELECT * FROM jsonb_to_recordset(?::jsonb) AS i({', '.join(type_defs)})"
-        f") "
+        f"), dedup AS ("
+        f"SELECT DISTINCT ON (record_key) * FROM incoming "
+        f"WHERE record_key IS NOT NULL AND record_key <> '' "
+        f"ORDER BY record_key"
+        f"), ins AS ("
         f"INSERT INTO time_records ({', '.join(cols)}) "
-        f"SELECT {select_cols} FROM incoming i "
-        f"WHERE i.record_key IS NOT NULL AND i.record_key <> '' "
-        f"AND NOT EXISTS (SELECT 1 FROM time_records t WHERE t.record_key = i.record_key)"
+        f"SELECT {select_cols} FROM dedup i "
+        f"WHERE NOT EXISTS (SELECT 1 FROM time_records t WHERE {duplicate_guard}) "
+        f"RETURNING 1"
+        f") SELECT COUNT(*) AS id FROM ins"
     )
-    try:
-        return int(execute(sql, (json.dumps(cleaned, ensure_ascii=False),)) or 0)
-    except Exception:
-        # Some legacy deployments may not support jsonb_to_recordset or may not
-        # have all runtime columns yet.  Let the caller use the portable path.
-        raise
+    return int(execute(sql, (json.dumps(cleaned, ensure_ascii=False),)) or 0)
 
 
 def _v30076_bulk_insert_payloads(
@@ -1916,22 +1927,61 @@ def _v30076_bulk_insert_payloads(
         return 0
     if is_postgres_enabled():
         try:
-            return _v30084_pg_insert_from_jsonb(payloads)
+            inserted = _v30084_pg_insert_from_jsonb(payloads)
+            _v30080_import_progress(
+                progress_callback,
+                stage="write_insert_pg_batch",
+                current=progress_base + len(payloads),
+                total=progress_total or len(payloads),
+                message=f"PostgreSQL 批次新增完成 {progress_base + len(payloads)}/{progress_total or len(payloads)}，實際新增 {inserted}",
+                fraction=0.70,
+            )
+            return int(inserted or 0)
         except Exception as exc:
             _v30080_import_progress(
                 progress_callback,
                 stage="write_insert_fallback",
                 current=progress_base,
                 total=progress_total or len(payloads),
-                message=f"批次新增未完成，改用小批次相容新增：{str(exc)[:120]}",
+                message=f"大批次新增未完成，改用 100 筆小批次：{str(exc)[:120]}",
                 fraction=0.70,
             )
+            inserted = 0
+            failed = 0
+            # V300.85: stay in PostgreSQL JSONB mode for smaller chunks.  Do not
+            # immediately fall through to executemany/row-by-row, because the
+            # screenshot showing 100 rows/minute means that protected path is the
+            # real bottleneck.  Bad micro-batches are skipped with a visible
+            # message instead of locking the whole Streamlit request for an hour.
+            for small in _v30080_chunks(payloads, 100):
+                try:
+                    n = _v30084_pg_insert_from_jsonb(small)
+                    inserted += int(n or 0)
+                except Exception as small_exc:
+                    failed += len(small)
+                    _v30080_import_progress(
+                        progress_callback,
+                        stage="write_insert_skip_bad_batch",
+                        current=progress_base + inserted + failed,
+                        total=progress_total or len(payloads),
+                        message=f"小批次新增失敗已略過 {failed} 筆：{str(small_exc)[:100]}",
+                        fraction=0.70,
+                    )
+                    continue
+                _v30080_import_progress(
+                    progress_callback,
+                    stage="write_insert_pg_small_batch",
+                    current=progress_base + inserted + failed,
+                    total=progress_total or len(payloads),
+                    message=f"小批次新增工時紀錄 已處理 {progress_base + inserted + failed}/{progress_total or len(payloads)}，實際新增 {inserted}",
+                    fraction=0.70,
+                )
+            return int(inserted or 0)
 
     cols = [c for c in TIME_RECORD_COLUMNS if c != "id"]
     sql = f"INSERT INTO time_records ({', '.join(cols)}) VALUES ({', '.join(['?'] * len(cols))})"
     inserted = 0
-    # Portable fallback: use small batches and report progress.  Do not let a
-    # single executemany over thousands of rows leave the UI at 0/n for minutes.
+    # SQLite/local fallback only.  PostgreSQL should have returned above.
     for small_index, small in enumerate(_v30080_chunks(payloads, 100), start=1):
         rows = [tuple(p.get(c, "") for c in cols) for p in small]
         executemany(sql, rows)
@@ -1941,7 +1991,7 @@ def _v30076_bulk_insert_payloads(
             stage="write_insert_fallback",
             current=progress_base + inserted,
             total=progress_total or len(payloads),
-            message=f"相容小批次新增工時紀錄 {progress_base + inserted}/{progress_total or len(payloads)}",
+            message=f"SQLite 相容小批次新增工時紀錄 {progress_base + inserted}/{progress_total or len(payloads)}",
             fraction=0.70,
         )
     return inserted
