@@ -588,7 +588,13 @@ def _row_to_payload(
         "raw_minutes": round(raw_minutes, 2),
         "average_minutes": round(_num(row.get("average_minutes")) or work_minutes, 2),
         "assembly_location": _text(row.get("assembly_location")),
-        "group_key": _text(row.get("group_key")) or f"{emp}|{proc}|{start_date}",
+        # V300.90: do not create a broad fallback group_key such as
+        # employee|process|date for every row.  That legacy fallback made 02
+        # history recalculation treat all same-day same-process rows as one
+        # simultaneous-work group.  Only keep an explicit group_key supplied by
+        # 01 Finish Work / import parallel detection, or preserve the existing
+        # value when editing an old row.
+        "group_key": _text(row.get("group_key")) or _text((before or {}).get("group_key")),
         "is_group_work": 1 if _truthy(row.get("is_group_work")) else 0,
         "source": _text(row.get("source")) or "streamlit",
         "created_at": _text(row.get("created_at")) or now,
@@ -1303,77 +1309,221 @@ def _audit_time_record_change(record_id: int | None, action_type: str, changed: 
         pass
 
 
+
+def _v30090_is_explicit_parallel_group_key(group_key: Any) -> bool:
+    """Return True only for group keys that identify one real parallel session.
+
+    Legacy rows may have a broad fallback key like employee|process|date.  That
+    key is not a real simultaneous-work identity; using it merges every same-day
+    same-process row during 02 recalculation.  Explicit keys are those produced
+    by 01 start/finish with a time suffix or by the V300.79 import overlap
+    detector.
+    """
+    key = _text(group_key)
+    if not key:
+        return False
+    if key.startswith("import-parallel-"):
+        return True
+    parts = key.split("|")
+    # 01 start_work writes employee|process|yyyy-mm-dd|HH:MM.  Treat 4+ parts as
+    # a concrete session key, but do not trust the old 3-part fallback.
+    return len(parts) >= 4
+
+
+def _v30090_intervals_overlap(a_start: datetime, a_end: datetime, b_start: datetime, b_end: datetime) -> bool:
+    """Actual interval overlap only; touching endpoints are sequential work."""
+    return a_start < b_end and b_start < a_end
+
+
+def _v30090_component_ids_from_candidates(seed_id: int, records: dict[int, dict[str, Any]]) -> list[int]:
+    """Find the connected overlap component that contains seed_id.
+
+    A simultaneous-work group for historical recalculation is not "every row with
+    the checkbox set" and not "every row sharing employee/process/date".  It is
+    the connected set of records for the same employee + process + start_date
+    whose time intervals overlap.  This supports large batch recalculation while
+    keeping independent jobs separate.
+    """
+    seed_id = int(seed_id)
+    if seed_id not in records:
+        return [seed_id]
+
+    intervals: dict[int, tuple[datetime, datetime]] = {}
+    for rid, rec in records.items():
+        st = _parse_dt(rec.get("start_timestamp"))
+        et = _parse_dt(rec.get("end_timestamp"))
+        if st is None or et is None or et <= st:
+            continue
+        intervals[int(rid)] = (st, et)
+    if seed_id not in intervals:
+        return [seed_id]
+
+    component: set[int] = {seed_id}
+    changed = True
+    while changed:
+        changed = False
+        for rid, (st, et) in intervals.items():
+            if rid in component:
+                continue
+            for cid in list(component):
+                cst, cet = intervals[cid]
+                if _v30090_intervals_overlap(st, et, cst, cet):
+                    component.add(rid)
+                    changed = True
+                    break
+    return sorted(component)
+
+
+def _v30090_candidate_records_for_parallel(seed: dict[str, Any]) -> dict[int, dict[str, Any]]:
+    """Load only candidate rows that can belong to seed's simultaneous group."""
+    rid = _int_or_none(seed.get("id"))
+    out: dict[int, dict[str, Any]] = {}
+
+    explicit_key = _text(seed.get("group_key")) if _v30090_is_explicit_parallel_group_key(seed.get("group_key")) else ""
+    if explicit_key:
+        df = _safe_df(f"SELECT {_base_cols()} FROM time_records WHERE group_key=? AND {_not_deleted_predicate()} LIMIT 500", (explicit_key,))
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            for _, row in df.iterrows():
+                i = _int_or_none(row.get("id"))
+                if i is not None:
+                    out[int(i)] = row.to_dict()
+        if rid is not None and rid not in out:
+            out[int(rid)] = seed
+        return out
+
+    emp = _text(seed.get("employee_id"))
+    proc = _text(seed.get("process_name"))
+    sdate = _text(seed.get("start_date")) or _normalize_date_part(seed.get("start_timestamp"))
+    st = _parse_dt(seed.get("start_timestamp"))
+    et = _parse_dt(seed.get("end_timestamp"))
+    if not emp or not proc or not sdate or st is None or et is None or et <= st:
+        if rid is not None:
+            out[int(rid)] = seed
+        return out
+
+    # Load same employee/process/start-date rows only.  02 historical recalcs can
+    # cover many pages, but each seed's candidate set stays small and indexed.
+    df = _safe_df(
+        f"""
+        SELECT {_base_cols()}
+        FROM time_records
+        WHERE employee_id=? AND process_name=? AND start_date=?
+          AND start_timestamp IS NOT NULL AND start_timestamp<>''
+          AND end_timestamp IS NOT NULL AND end_timestamp<>''
+          AND {_not_deleted_predicate()}
+        ORDER BY start_timestamp, end_timestamp, id
+        LIMIT 1000
+        """,
+        (emp, proc, sdate),
+    )
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        for _, row in df.iterrows():
+            i = _int_or_none(row.get("id"))
+            if i is not None:
+                out[int(i)] = row.to_dict()
+    if rid is not None and rid not in out:
+        out[int(rid)] = seed
+    return out
+
+
 def _related_group_ids_from_record(record: dict[str, Any]) -> list[int]:
+    """Return the real simultaneous-work group for one historical record.
+
+    V300.90 fixes the old behavior that used broad legacy group_key values and
+    merged every same-day same-process row into one recalculation group.  The new
+    rule is:
+      1. explicit group_key from 01/import-parallel => that exact group;
+      2. otherwise same employee + same start date + same process + overlapping
+         time intervals only.
+    """
     rid = _int_or_none(record.get("id"))
-    ids: list[int] = []
-    group_key = _text(record.get("group_key"))
-    if group_key:
-        df = _safe_df(f"SELECT id FROM time_records WHERE group_key=? AND {_not_deleted_predicate()}", (group_key,))
-        if isinstance(df, pd.DataFrame) and not df.empty and "id" in df.columns:
-            ids = [i for i in (_int_or_none(x) for x in df["id"].tolist()) if i is not None]
-    if len(ids) <= 1:
-        emp = _text(record.get("employee_id")); proc = _text(record.get("process_name")); sdate = _text(record.get("start_date"))
-        start_dt = _parse_dt(record.get("start_timestamp"))
-        if emp and proc and sdate and start_dt is not None:
-            cand = _safe_df(
-                f"SELECT id, start_timestamp FROM time_records WHERE employee_id=? AND process_name=? AND start_date=? AND {_not_deleted_predicate()} LIMIT 100",
-                (emp, proc, sdate),
-            )
-            ids = []
-            if isinstance(cand, pd.DataFrame) and not cand.empty:
-                for _, row in cand.iterrows():
-                    d = _parse_dt(row.get("start_timestamp"))
-                    i = _int_or_none(row.get("id"))
-                    if d is not None and i is not None and abs((d - start_dt).total_seconds()) <= 180:
-                        ids.append(i)
-    if rid is not None and rid not in ids:
-        ids.append(rid)
-    return sorted({int(x) for x in ids if _int_or_none(x) is not None})
+    if rid is None:
+        return []
+    candidates = _v30090_candidate_records_for_parallel(record)
+    return _v30090_component_ids_from_candidates(int(rid), candidates)
+
+
+def _v30090_parallel_components_for_seed_ids(seed_ids: list[int]) -> list[list[int]]:
+    """Build independent simultaneous-work components for a batch of seed rows."""
+    clean_seeds: list[int] = []
+    for x in seed_ids or []:
+        i = _int_or_none(x)
+        if i is not None and i > 0 and int(i) not in clean_seeds:
+            clean_seeds.append(int(i))
+    if not clean_seeds:
+        return []
+
+    seed_records = _load_existing_records_map(clean_seeds)
+    seen: set[tuple[int, ...]] = set()
+    components: list[list[int]] = []
+    for seed_id in clean_seeds:
+        rec = seed_records.get(int(seed_id))
+        if not rec:
+            continue
+        ids = [int(i) for i in _related_group_ids_from_record(rec) if _int_or_none(i) is not None]
+        if len(ids) <= 1:
+            continue
+        # Keep only ended rows for averaging.  Open rows are handled by 01 Finish
+        # Work, not by 02 historical recalculation.
+        records = _load_existing_records_map(ids)
+        ended = sorted({int(i) for i, r in records.items() if _text(r.get("start_timestamp")) and _text(r.get("end_timestamp"))})
+        if len(ended) <= 1:
+            continue
+        key = tuple(ended)
+        if key not in seen:
+            seen.add(key)
+            components.append(ended)
+    return components
 
 
 def _sync_parallel_group_after_edit(seed_ids: list[int]) -> int:
-    if not seed_ids:
-        return 0
-    existing = _load_existing_records_map(seed_ids)
-    group_ids: set[int] = set()
-    for rec in existing.values():
-        group_ids.update(_related_group_ids_from_record(rec))
-    if len(group_ids) <= 1:
-        return 0
-    records = _load_existing_records_map(sorted(group_ids))
-    ended_ids = [i for i, rec in records.items() if _text(rec.get("start_timestamp")) and _text(rec.get("end_timestamp"))]
-    if len(ended_ids) <= 1:
-        return 0
-    parallel_average = _v30045_parallel_average_from_records(records, ended_ids)
-    avg_raw = float(parallel_average.get("raw_each") or 0.0)
-    avg_net = float(parallel_average.get("net_each") or 0.0)
-    now = now_text()
-    ops: list[tuple[str, tuple[Any, ...]]] = []
-    for i in ended_ids:
-        ops.append((
-            """
-            UPDATE time_records
-            SET raw_minutes=?, work_minutes=?, average_minutes=?, work_hours=?, is_group_work=1,
-                updated_at=?, updated_by='system', version=COALESCE(version,1)+1
-            WHERE id=? AND (deleted_at IS NULL OR deleted_at='')
-            """,
-            (round(avg_raw, 2), round(avg_net, 2), round(avg_net, 2), round(avg_net / 60.0, 4), now, i),
-        ))
-    counts = execute_transaction(ops, mark_changed=True, reason="sync_parallel_group_after_edit", source_sql="sync_parallel_group_after_edit")
-    try:
-        detail = (
-            f"ids={ended_ids}; group_start={parallel_average.get('start_ts')}; "
-            f"group_end={parallel_average.get('end_ts')}; group_net={parallel_average.get('net_total')}; "
-            f"average_minutes={avg_net}"
-        )
-        execute(
-            "INSERT INTO system_logs(log_time, user_name, action_type, target_table, target_id, message, detail, level) VALUES (?, ?, 'SYNC_PARALLEL_GROUP', 'time_records', ?, ?, ?, 'INFO')",
-            (now, "SYSTEM", ",".join(map(str, ended_ids[:50])), f"同步作業平均重算 {len(ended_ids)} 筆", detail),
-        )
-    except Exception:
-        pass
-    return int(sum(int(x or 0) for x in counts) or len(ended_ids))
+    """Recalculate independent simultaneous-work components after edit/recalc.
 
+    Previous versions unioned every selected row's related ids and averaged that
+    union once.  When an admin selected many rows in 02, unrelated simultaneous
+    groups were incorrectly calculated together.  V300.90 processes each overlap
+    component independently.
+    """
+    components = _v30090_parallel_components_for_seed_ids(seed_ids)
+    if not components:
+        return 0
+
+    now = now_text()
+    total_count = 0
+    for ended_ids in components:
+        records = _load_existing_records_map(ended_ids)
+        if len(records) <= 1:
+            continue
+        parallel_average = _v30045_parallel_average_from_records(records, ended_ids)
+        avg_raw = float(parallel_average.get("raw_each") or 0.0)
+        avg_net = float(parallel_average.get("net_each") or 0.0)
+        ops: list[tuple[str, tuple[Any, ...]]] = []
+        for i in ended_ids:
+            ops.append((
+                """
+                UPDATE time_records
+                SET raw_minutes=?, work_minutes=?, average_minutes=?, work_hours=?, is_group_work=1,
+                    updated_at=?, updated_by='system', version=COALESCE(version,1)+1
+                WHERE id=? AND (deleted_at IS NULL OR deleted_at='')
+                """,
+                (round(avg_raw, 2), round(avg_net, 2), round(avg_net, 2), round(avg_net / 60.0, 4), now, i),
+            ))
+        counts = execute_transaction(ops, mark_changed=True, reason="sync_parallel_group_after_edit_v30090", source_sql="sync_parallel_group_after_edit_v30090")
+        group_count = int(sum(int(x or 0) for x in counts) or len(ended_ids))
+        total_count += group_count
+        try:
+            detail = (
+                f"ids={ended_ids}; group_start={parallel_average.get('start_ts')}; "
+                f"group_end={parallel_average.get('end_ts')}; group_net={parallel_average.get('net_total')}; "
+                f"average_minutes={avg_net}"
+            )
+            execute(
+                "INSERT INTO system_logs(log_time, user_name, action_type, target_table, target_id, message, detail, level) VALUES (?, ?, 'SYNC_PARALLEL_GROUP', 'time_records', ?, ?, ?, 'INFO')",
+                (now, "SYSTEM", ",".join(map(str, ended_ids[:50])), f"同步作業平均重算 {len(ended_ids)} 筆", detail),
+            )
+        except Exception:
+            pass
+    return int(total_count)
 
 def _v30025_normalize_changed_column_map(raw: Any) -> dict[int, set[str]]:
     out: dict[int, set[str]] = {}
