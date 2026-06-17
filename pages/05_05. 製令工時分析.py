@@ -43,11 +43,6 @@ V30030_EXCEL_CACHE_PREFIX = "_spt_v30030_05_excel_"
 V30071_FILTER_OPTIONS_CACHE_KEY = "_spt_v30071_05_filter_options_cache"
 V30091_ANALYSIS_DEFAULT_PRESET = "今日"
 
-if FILTER_KEY not in st.session_state:
-    st.session_state[FILTER_KEY] = _v30091_today_default_analysis_filters(load_analysis_filters())
-filters = _v30091_today_default_analysis_filters(st.session_state[FILTER_KEY])
-st.session_state[FILTER_KEY] = dict(filters)
-
 DATE_PRESETS = ["今日", "近7天", "近30天", "本月", "上月", "自訂區間"]
 STATUS_OPTIONS = ["全部", "作業中", "暫停", "完工", "下班", "未結束", "已結束"]
 ANOMALY_OPTIONS = ["全部", "工時 = 0", "工時小於5分鐘", "工時大於8小時", "工時大於12小時", "未按結束", "跨日紀錄", "有開始無結束", "有結束無開始"]
@@ -124,6 +119,14 @@ def _v30091_today_default_analysis_filters(filters: dict | None) -> dict:
         f["start_date"] = str(today)
         f["end_date"] = str(today)
     return f
+
+
+# V30092: initialize filters only after the helper above is defined.
+# Calling it before definition caused NameError during Streamlit page import.
+if FILTER_KEY not in st.session_state:
+    st.session_state[FILTER_KEY] = _v30091_today_default_analysis_filters(load_analysis_filters())
+filters = _v30091_today_default_analysis_filters(st.session_state[FILTER_KEY])
+st.session_state[FILTER_KEY] = dict(filters)
 
 
 def _date_range_from_preset(preset: str, start_value: date, end_value: date) -> tuple[date, date]:
