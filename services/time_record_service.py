@@ -2899,7 +2899,7 @@ def load_daily_record_summary_sql(work_date: str):
     """
     _ensure_time_runtime_columns()
     d = _text(work_date)[:10]
-    cols = ["employee_id", "employee_name", "work_hours", "end_timestamp", "status"]
+    cols = ["employee_id", "employee_name", "work_hours", "start_timestamp", "end_timestamp", "status"]
     if not d:
         return pd.DataFrame(columns=cols)
 
@@ -2917,7 +2917,7 @@ def load_daily_record_summary_sql(work_date: str):
         return pd.DataFrame(columns=cols)
 
     sql = f"""
-        SELECT employee_id, employee_name, work_hours, end_timestamp, status
+        SELECT employee_id, employee_name, work_hours, start_timestamp, end_timestamp, status
         FROM time_records
         WHERE {_not_deleted_predicate()}
           AND start_date = ?
@@ -2931,7 +2931,7 @@ def load_daily_record_summary_sql(work_date: str):
     # the primary path because it can bypass indexes on larger Neon tables.
     next_day = _today_end_text(d)
     fallback_sql = f"""
-        SELECT employee_id, employee_name, work_hours, end_timestamp, status
+        SELECT employee_id, employee_name, work_hours, start_timestamp, end_timestamp, status
         FROM time_records
         WHERE {_not_deleted_predicate()}
           AND COALESCE(start_date,'')=''

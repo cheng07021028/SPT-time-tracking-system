@@ -208,6 +208,28 @@ def _v174_work_hours_to_float(value) -> float:
             return 0.0
     return 0.0
 
+
+
+def _v30094_display_timestamp(value) -> str:
+    """Return a compact timestamp string for chart hover labels."""
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text or text.lower() in {"none", "nan", "nat", "null", "<na>"}:
+        return ""
+    try:
+        ts = pd.to_datetime(text, errors="coerce")
+        if pd.notna(ts):
+            return ts.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        pass
+    return text
+
 # V29: 使用權威檔人員與工時資料即時計算，避免 SQLite 快取延遲造成資料錯誤。
 # V300.33：每日工時是查詢/分析頁，按「套用篩選」才讀取最新 Neon；
 # 同一日期、同一份人員主檔在短 TTL 內重用彙總結果，避免 Streamlit rerun
@@ -257,16 +279,28 @@ def _v30033_build_daily_base_df(work_date: str, employees_df: pd.DataFrame) -> p
             rec = rec[rec["work_date"].astype(str) == work_date]
 
         if {"total_hours", "record_count", "active_count"}.issubset(set(rec.columns)):
-            grp = rec[["employee_id", "total_hours", "record_count", "active_count"]].copy()
+            keep_cols = ["employee_id", "total_hours", "record_count", "active_count"]
+            for _c in ["first_start_time", "last_end_time"]:
+                if _c in rec.columns and _c not in keep_cols:
+                    keep_cols.append(_c)
+            grp = rec[keep_cols].copy()
         else:
             if "work_hours" not in rec.columns:
                 rec["work_hours"] = 0
             rec["work_hours"] = rec["work_hours"].map(_v174_work_hours_to_float).fillna(0)
+            if "start_timestamp" not in rec.columns:
+                rec["start_timestamp"] = ""
+            if "end_timestamp" not in rec.columns:
+                rec["end_timestamp"] = ""
             rec["is_active_record"] = rec.get("end_timestamp", pd.Series([""] * len(rec))).fillna("").astype(str).str.strip().eq("") if "end_timestamp" in rec.columns else False
+            rec["__first_start_ts"] = rec["start_timestamp"].map(_v30094_display_timestamp).replace("", pd.NA)
+            rec["__last_end_ts"] = rec["end_timestamp"].map(_v30094_display_timestamp).replace("", pd.NA)
             grp = rec.groupby("employee_id", dropna=False).agg(
                 total_hours=("work_hours", "sum"),
                 record_count=("employee_id", "size"),
                 active_count=("is_active_record", "sum"),
+                first_start_time=("__first_start_ts", "min"),
+                last_end_time=("__last_end_ts", "max"),
             ).reset_index()
         base_df = emp.merge(grp, on="employee_id", how="left")
     else:
@@ -279,6 +313,10 @@ def _v30033_build_daily_base_df(work_date: str, employees_df: pd.DataFrame) -> p
         if _c not in base_df.columns:
             base_df[_c] = 0
         base_df[_c] = pd.to_numeric(base_df[_c], errors="coerce").fillna(0)
+    for _c in ["first_start_time", "last_end_time"]:
+        if _c not in base_df.columns:
+            base_df[_c] = ""
+        base_df[_c] = base_df[_c].map(_v30094_display_timestamp).fillna("")
     if "employee_id" not in base_df.columns:
         base_df["employee_id"] = ""
     base_df = base_df.sort_values(["total_hours", "employee_id"], kind="stable").reset_index(drop=True)
@@ -324,6 +362,8 @@ if not base_df.empty:
     else:
         st.subheader("工時分布 / Time Distribution")
         chart_df = df.copy()
+        chart_df["第一筆開始時間 / First Start"] = chart_df.get("first_start_time", "").replace("", "—") if isinstance(chart_df, pd.DataFrame) else "—"
+        chart_df["最後一筆結束時間 / Last End"] = chart_df.get("last_end_time", "").replace("", "—") if isinstance(chart_df, pd.DataFrame) else "—"
         fig = px.bar(
             chart_df.sort_values("total_hours", ascending=False),
             x="employee_name",
@@ -335,6 +375,8 @@ if not base_df.empty:
                 "title": True,
                 "record_count": True,
                 "active_count": True,
+                "第一筆開始時間 / First Start": True,
+                "最後一筆結束時間 / Last End": True,
                 "total_hours": ":.2f",
                 "累積工時 / Total Time": True,
             },
@@ -355,7 +397,8 @@ else:
     df = base_df
     st.info("目前沒有符合條件的人員資料 / No employee data")
 
-render_table(df, "daily_employee_hours", editable=False, height=620)
+_display_df = df.drop(columns=[c for c in ["first_start_time", "last_end_time"] if c in df.columns], errors="ignore") if isinstance(df, pd.DataFrame) else df
+render_table(_display_df, "daily_employee_hours", editable=False, height=620)
 
 try:
     _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
