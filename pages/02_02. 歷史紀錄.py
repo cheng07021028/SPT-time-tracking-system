@@ -140,6 +140,8 @@ V30086_HISTORY_EXPORT_BYTES_KEY = "v30086_02_history_all_filtered_export_bytes"
 V30086_HISTORY_EXPORT_NAME_KEY = "v30086_02_history_all_filtered_export_name"
 V30087_HISTORY_PAGINATION_VERSION_KEY = "v30087_02_history_pagination_version"
 V30087_HISTORY_PAGINATION_VERSION = "V30087_20260615_PAGING_TOTAL_UNCAPPED"
+V30091_HISTORY_DEFAULT_PRESET = "今日"
+
 
 # === V300.27 02 HISTORY LOW-RISK FASTPATH BEGIN ===
 # 02 歷史紀錄的查詢本身已改成手動觸發；這裡只處理不影響資料正確性的
@@ -153,7 +155,7 @@ def _v30027_load_history_filters_cached() -> dict:
     cached = st.session_state.get(V30027_HISTORY_FILTERS_CACHE_KEY)
     if isinstance(cached, dict) and cached:
         return dict(cached)
-    loaded = load_history_filters()
+    loaded = _v30091_today_default_history_filters(load_history_filters())
     st.session_state[V30027_HISTORY_FILTERS_CACHE_KEY] = dict(loaded or {})
     return dict(loaded or {})
 
@@ -165,7 +167,7 @@ def _v30027_save_history_filters_cached(filters: dict) -> dict:
 
 
 def _v30027_reset_history_filters_cached() -> dict:
-    saved = reset_history_filters()
+    saved = _v30091_today_default_history_filters(reset_history_filters())
     st.session_state[V30027_HISTORY_FILTERS_CACHE_KEY] = dict(saved or {})
     return saved
 
@@ -1156,7 +1158,33 @@ def _date_range_from_preset(preset: str, fallback_start: str, fallback_end: str)
     try:
         return date.fromisoformat(str(fallback_start)), date.fromisoformat(str(fallback_end))
     except Exception:
-        return today - timedelta(days=30), today
+        return today, today
+
+
+def _v30091_today_default_history_filters(filters: dict | None) -> dict:
+    """Return UI default filters with Quick Date defaulting to 今日.
+
+    This is intentionally session/UI-level only: it does not write to Neon during
+    page render.  If an existing saved filter is a real custom range, keep it;
+    if it is blank or matches the old system default 近30天, show 今日 as the
+    new default.
+    """
+    f = dict(filters or {})
+    today = today_date()
+    old_start = str(today - timedelta(days=30))
+    old_end = str(today)
+    preset = str(f.get("date_preset") or "").strip()
+    start_raw = str(f.get("start_date") or "").strip()
+    end_raw = str(f.get("end_date") or "").strip()
+    should_use_today = (
+        not preset
+        or preset == "近30天" and (not start_raw or start_raw == old_start) and (not end_raw or end_raw == old_end)
+    )
+    if should_use_today:
+        f["date_preset"] = V30091_HISTORY_DEFAULT_PRESET
+        f["start_date"] = str(today)
+        f["end_date"] = str(today)
+    return f
 
 
 def _v79_effective_history_filters(filters: dict | None) -> dict:
@@ -1170,7 +1198,7 @@ def _v79_effective_history_filters(filters: dict | None) -> dict:
     明確日期，讓 SQL 能走 start_date 索引。
     """
     f = dict(filters or {})
-    preset = str(f.get("date_preset") or "近30天")
+    preset = str(f.get("date_preset") or V30091_HISTORY_DEFAULT_PRESET)
     start_raw = f.get("start_date")
     end_raw = f.get("end_date")
     start_dt, end_dt = _date_range_from_preset(preset, str(start_raw or ""), str(end_raw or ""))
@@ -1969,7 +1997,7 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
     applied = st.session_state["history_filters_applied_v216"]
 
     start_default, end_default = _date_range_from_preset(
-        applied.get("date_preset", "近30天"),
+        applied.get("date_preset", V30091_HISTORY_DEFAULT_PRESET),
         applied.get("start_date"),
         applied.get("end_date"),
     )
@@ -1980,7 +2008,7 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
             date_preset = r1c1.selectbox(
                 "快速日期",
                 ["今日", "近7天", "近30天", "近90天", "本月", "上月", "自訂區間"],
-                index=["今日", "近7天", "近30天", "近90天", "本月", "上月", "自訂區間"].index(applied.get("date_preset", "近30天")) if applied.get("date_preset", "近30天") in ["今日", "近7天", "近30天", "近90天", "本月", "上月", "自訂區間"] else 2,
+                index=["今日", "近7天", "近30天", "近90天", "本月", "上月", "自訂區間"].index(applied.get("date_preset", V30091_HISTORY_DEFAULT_PRESET)) if applied.get("date_preset", V30091_HISTORY_DEFAULT_PRESET) in ["今日", "近7天", "近30天", "近90天", "本月", "上月", "自訂區間"] else 0,
             )
             start_input = r1c2.date_input("開始日期", value=start_default)
             end_input = r1c3.date_input("結束日期", value=end_default)
@@ -2080,7 +2108,7 @@ work_orders = load_work_orders(active_only=False)
 # 篩選條件只有按「套用篩選並永久記錄」才寫入永久檔。
 _history_filter_seed = _v30027_load_history_filters_cached()
 _seed_start, _seed_end = _date_range_from_preset(
-    _history_filter_seed.get("date_preset", "近30天"),
+    _history_filter_seed.get("date_preset", V30091_HISTORY_DEFAULT_PRESET),
     _history_filter_seed.get("start_date"),
     _history_filter_seed.get("end_date"),
 )

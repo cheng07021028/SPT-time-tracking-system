@@ -41,9 +41,12 @@ V69_FILTER_SIG_KEY = "_spt_v69_05_filter_signature"
 V30030_SUMMARY_CACHE_KEY = "_spt_v30030_05_summary_bundle"
 V30030_EXCEL_CACHE_PREFIX = "_spt_v30030_05_excel_"
 V30071_FILTER_OPTIONS_CACHE_KEY = "_spt_v30071_05_filter_options_cache"
+V30091_ANALYSIS_DEFAULT_PRESET = "今日"
+
 if FILTER_KEY not in st.session_state:
-    st.session_state[FILTER_KEY] = load_analysis_filters()
-filters = dict(st.session_state[FILTER_KEY])
+    st.session_state[FILTER_KEY] = _v30091_today_default_analysis_filters(load_analysis_filters())
+filters = _v30091_today_default_analysis_filters(st.session_state[FILTER_KEY])
+st.session_state[FILTER_KEY] = dict(filters)
 
 DATE_PRESETS = ["今日", "近7天", "近30天", "本月", "上月", "自訂區間"]
 STATUS_OPTIONS = ["全部", "作業中", "暫停", "完工", "下班", "未結束", "已結束"]
@@ -96,6 +99,31 @@ def _parse_date(value, fallback: date) -> date:
         return pd.to_datetime(value).date()
     except Exception:
         return fallback
+
+
+def _v30091_today_default_analysis_filters(filters: dict | None) -> dict:
+    """Return UI default filters with Quick Date defaulting to 今日.
+
+    This does not write to Neon on render.  Existing custom saved filters remain
+    unchanged; blank filters or the previous exact 近30天 default are shown as
+    今日.
+    """
+    f = dict(filters or {})
+    today = today_date()
+    old_start = str(today - timedelta(days=30))
+    old_end = str(today)
+    preset = str(f.get("date_preset") or "").strip()
+    start_raw = str(f.get("start_date") or "").strip()
+    end_raw = str(f.get("end_date") or "").strip()
+    should_use_today = (
+        not preset
+        or preset == "近30天" and (not start_raw or start_raw == old_start) and (not end_raw or end_raw == old_end)
+    )
+    if should_use_today:
+        f["date_preset"] = V30091_ANALYSIS_DEFAULT_PRESET
+        f["start_date"] = str(today)
+        f["end_date"] = str(today)
+    return f
 
 
 def _date_range_from_preset(preset: str, start_value: date, end_value: date) -> tuple[date, date]:
@@ -616,7 +644,7 @@ def _v30030_build_analysis_bundle(source_df: pd.DataFrame, filters: dict) -> dic
     }
 
 
-start_saved = _parse_date(filters.get("start_date"), today_date() - timedelta(days=30))
+start_saved = _parse_date(filters.get("start_date"), today_date())
 end_saved = _parse_date(filters.get("end_date"), today_date())
 # V69: do not query time_records detail rows just to open the analysis page.
 # V300.71: still preload lightweight filter option lists from master data and
@@ -630,7 +658,7 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
     st.caption("所有條件按「套用篩選」後才重新運算，避免每點一下就卡頓；條件會永久記錄。")
     with st.form("analysis_filter_form", clear_on_submit=False):
         r1c1, r1c2, r1c3, r1c4 = st.columns([1.2, 1, 1, 1])
-        preset = r1c1.selectbox("快速日期 / Quick Date", DATE_PRESETS, index=DATE_PRESETS.index(filters.get("date_preset", "近30天")) if filters.get("date_preset", "近30天") in DATE_PRESETS else 2)
+        preset = r1c1.selectbox("快速日期 / Quick Date", DATE_PRESETS, index=DATE_PRESETS.index(filters.get("date_preset", V30091_ANALYSIS_DEFAULT_PRESET)) if filters.get("date_preset", V30091_ANALYSIS_DEFAULT_PRESET) in DATE_PRESETS else 0)
         start_input = r1c2.date_input("開始日期 / Start Date", value=start_saved)
         end_input = r1c3.date_input("結束日期 / End Date", value=end_saved)
         top_n = r1c4.selectbox("Top N", TOP_OPTIONS, index=TOP_OPTIONS.index(filters.get("top_n", "Top 20")) if filters.get("top_n", "Top 20") in TOP_OPTIONS else 1)
@@ -664,8 +692,8 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
         if clear_filter:
             new_filters = load_analysis_filters()
             new_filters.update({
-                "date_preset": "近30天",
-                "start_date": str(today_date() - timedelta(days=30)),
+                "date_preset": V30091_ANALYSIS_DEFAULT_PRESET,
+                "start_date": str(today_date()),
                 "end_date": str(today_date()),
                 "work_orders": [], "part_nos": [], "type_names": [], "customers": [], "assembly_locations": [],
                 "process_names": [], "employee_ids": [], "employee_names": [], "departments": [], "titles": [],

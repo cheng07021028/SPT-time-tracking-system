@@ -29,10 +29,10 @@ def _default_filters() -> dict[str, Any]:
     import datetime
     today = today_date()
     return {
-        "version": "V300.71",
+        "version": "V300.91",
         "updated_at": now_text(),
-        "date_preset": "近30天",
-        "start_date": str(today - datetime.timedelta(days=30)),
+        "date_preset": "今日",
+        "start_date": str(today),
         "end_date": str(today),
         "work_orders": [], "part_nos": [], "type_names": [], "customers": [], "assembly_locations": [],
         "process_names": [], "employee_ids": [], "employee_names": [], "departments": [], "titles": [],
@@ -222,7 +222,7 @@ def load_analysis_filters() -> dict[str, Any]:
 
 def save_analysis_filters(filters: dict[str, Any]) -> dict[str, Any]:
     payload = _normalize(filters or {})
-    payload["version"] = "V300.71"
+    payload["version"] = "V300.91"
     payload["updated_at"] = now_text()
     _save_to_db(payload)
     _save_legacy_neon_payload(payload)
