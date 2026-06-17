@@ -116,6 +116,9 @@ DAILY_LOADED_KEY = "v69_07_daily_attendance_loaded"
 MISSING_TODAY_DF_KEY = "v69_07_missing_today_df"
 MISSING_TODAY_LOADED_KEY = "v69_07_missing_today_loaded"
 MISSING_TODAY_TS_KEY = "v69_07_missing_today_ts"
+# V300.93：今日未出勤統計與明細。只使用 04 人員主檔/07 今日出勤暫存，
+# 不查 02 歷史整表，也不打 time_records，避免拖慢 01/02。
+TODAY_ABSENT_DF_KEY = "v30093_07_today_absent_df"
 
 # V300.32：07 省 Neon Compute 快速路徑。
 # - 每日出勤紀錄改優先以「單日 payload」讀寫，避免每次儲存整份歷史 JSON。
@@ -1175,6 +1178,50 @@ def _build_missing_today_df(employee_df: pd.DataFrame, target_date: str) -> pd.D
     return out[out_cols].sort_values("employee_id").reset_index(drop=True)
 
 
+def _v30093_today_absent_output_cols() -> list[str]:
+    return [
+        "employee_id",
+        "employee_name",
+        "department",
+        "title",
+        "attendance_status",
+        "is_active",
+        "is_in_factory",
+        "is_today_attendance",
+        "include_in_missing_records",
+        "note",
+    ]
+
+
+def _build_today_absent_df(employee_df: pd.DataFrame) -> pd.DataFrame:
+    """Build today's not-attendance employee details from the current 04/07 employee master.
+
+    Rule: count active + in-factory employees whose Today Attendance is false.
+    This is intentionally separate from Missing Records. Executives excluded from
+    Missing Records by include_in_missing_records=False may still appear here if
+    they are active/in-factory and not marked attendance today.
+    """
+    out_cols = _v30093_today_absent_output_cols()
+    emp = ensure_cols(employee_df)
+    if emp.empty:
+        return pd.DataFrame(columns=out_cols)
+    for c in BOOL_INTERNAL_COLS:
+        _default = True if c == "include_in_missing_records" else False
+        emp[c] = emp[c].map(lambda v, d=_default: _to_bool_value_with_default(v, d)).fillna(_default).astype(bool)
+    emp["employee_id"] = emp["employee_id"].fillna("").astype(str).str.strip()
+    emp = emp[emp["employee_id"] != ""].copy()
+    if emp.empty:
+        return pd.DataFrame(columns=out_cols)
+    emp = emp[(emp["is_active"]) & (emp["is_in_factory"]) & (~emp["is_today_attendance"])].copy()
+    if emp.empty:
+        return pd.DataFrame(columns=out_cols)
+    emp["attendance_status"] = "未出勤 / Not Attendance"
+    for c in out_cols:
+        if c not in emp.columns:
+            emp[c] = False if c in BOOL_INTERNAL_COLS else ""
+    return emp[out_cols].sort_values("employee_id").reset_index(drop=True)
+
+
 
 if STATE_KEY not in st.session_state:
     reload_employees()
@@ -1399,16 +1446,22 @@ mt1, mt2 = st.columns([1, 3])
 if mt1.button("重新計算今日未紀錄 / Refresh Missing Today", use_container_width=True, key="v69_refresh_missing_today"):
     current_attendance_df = _current_internal_df() if STATE_KEY in st.session_state else ensure_cols(load_employees())
     st.session_state[MISSING_TODAY_DF_KEY] = _build_missing_today_df(current_attendance_df, today)
+    st.session_state[TODAY_ABSENT_DF_KEY] = _build_today_absent_df(current_attendance_df)
     st.session_state[MISSING_TODAY_LOADED_KEY] = True
     st.session_state[MISSING_TODAY_TS_KEY] = today
 
 df = st.session_state.get(MISSING_TODAY_DF_KEY, pd.DataFrame()) if st.session_state.get(MISSING_TODAY_LOADED_KEY, False) else pd.DataFrame()
-st.metric("今日未紀錄人數 / Missing Records", f"{len(df):,}")
-st.caption("V300.63：今日未紀錄名單先排除 04 人員名單中『納入未紀錄統計 / Include Missing』為否的人，再比對 01/time_records 當日工時索引；按『重新計算今日未紀錄』才查詢。")
+absent_df = st.session_state.get(TODAY_ABSENT_DF_KEY, pd.DataFrame()) if st.session_state.get(MISSING_TODAY_LOADED_KEY, False) else pd.DataFrame()
+metric_a, metric_b = st.columns(2)
+metric_a.metric("今日未紀錄人數 / Missing Records", f"{len(df):,}")
+metric_b.metric("今日未出勤人數 / Not Attendance", f"{len(absent_df):,}")
+st.caption("V300.93：今日未紀錄會比對 01/time_records；今日未出勤只依 04 人員主檔/07 今日出勤設定計算：啟用 + 在廠 + 今日出勤未勾選。按『重新計算今日未紀錄』才刷新兩項統計。")
 if st.session_state.get(MISSING_TODAY_LOADED_KEY, False):
     render_table(df, "missing_today_v202", editable=False, height=460)
+    with st.expander("今日未出勤人員明細 / Today Not Attendance Details", expanded=False):
+        render_table(absent_df, "v30093_today_absent_details", editable=False, height=360)
 else:
-    st.info("尚未載入今日未紀錄名單。")
+    st.info("尚未載入今日未紀錄與今日未出勤統計。")
 
 try:
     _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
