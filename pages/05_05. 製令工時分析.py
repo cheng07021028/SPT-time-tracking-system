@@ -24,6 +24,7 @@ from services.model_detection_service import (
     model_rules_to_dataframe,
     save_model_rules,
 )
+from services.operation_content_service import apply_operation_content_column
 from services.master_data_service import load_work_orders, load_employees
 try:
     from services.large_table_query_service import load_history_filter_options_sql
@@ -421,6 +422,14 @@ def _enrich_records(df: pd.DataFrame) -> pd.DataFrame:
     except Exception:
         if "judged_model" not in out.columns:
             out["judged_model"] = ""
+
+    # 05 分析用衍生欄位：依 P/N / Part No. 解析可判讀的機台組裝 Unit。
+    # 只用於報表顯示與匯出，不回寫 01/02 工時權威資料。
+    try:
+        out = apply_operation_content_column(out, source_column="part_no", column_name="operation_content")
+    except Exception:
+        if "operation_content" not in out.columns:
+            out["operation_content"] = ""
     return out
 
 
@@ -559,7 +568,7 @@ def _build_work_order_process_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, p
     """
     if df is None or df.empty:
         empty_detail = pd.DataFrame(columns=[
-            "work_order", "judged_model", "process_name", "process_hours", "process_time",
+            "work_order", "judged_model", "operation_content", "process_name", "process_hours", "process_time",
             "work_order_total_hours", "work_order_total_time", "share_percent",
             "count", "employee_count", "avg_hours", "avg_time",
         ])
@@ -576,16 +585,19 @@ def _build_work_order_process_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, p
         work["employee_id"] = ""
     if "judged_model" not in work.columns:
         work["judged_model"] = ""
+    if "operation_content" not in work.columns:
+        work["operation_content"] = ""
     if "id" not in work.columns:
         work["id"] = range(1, len(work) + 1)
 
     work["work_order"] = _blank_to_unknown(work["work_order"], "未填製令")
     work["judged_model"] = work["judged_model"].fillna("").astype(str).str.strip()
+    work["operation_content"] = work["operation_content"].fillna("").astype(str).str.strip()
     work["process_name"] = _blank_to_unknown(work["process_name"], "未填工段")
     work["work_hours"] = _coerce_work_hours(work["work_hours"])
 
     detail = (
-        work.groupby(["work_order", "judged_model", "process_name"], dropna=False)
+        work.groupby(["work_order", "judged_model", "operation_content", "process_name"], dropna=False)
         .agg(
             process_hours=("work_hours", "sum"),
             count=("id", "count"),
@@ -617,7 +629,7 @@ def _build_work_order_process_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, p
 
     pivot_hours = (
         work.pivot_table(
-            index=["work_order", "judged_model"],
+            index=["work_order", "judged_model", "operation_content"],
             columns="process_name",
             values="work_hours",
             aggfunc="sum",
@@ -626,15 +638,15 @@ def _build_work_order_process_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, p
         .reset_index()
     )
     if not pivot_hours.empty:
-        process_cols = [c for c in pivot_hours.columns if c not in {"work_order", "judged_model"}]
+        process_cols = [c for c in pivot_hours.columns if c not in {"work_order", "judged_model", "operation_content"}]
         pivot_hours["總工時 / Total Hours"] = pivot_hours[process_cols].sum(axis=1) if process_cols else 0
         pivot_hours = pivot_hours.sort_values("總工時 / Total Hours", ascending=False).reset_index(drop=True)
         # Put model and total immediately after work_order for easier reading.
-        cols = ["work_order", "judged_model", "總工時 / Total Hours"] + [c for c in pivot_hours.columns if c not in {"work_order", "judged_model", "總工時 / Total Hours"}]
+        cols = ["work_order", "judged_model", "operation_content", "總工時 / Total Hours"] + [c for c in pivot_hours.columns if c not in {"work_order", "judged_model", "operation_content", "總工時 / Total Hours"}]
         pivot_hours = pivot_hours[cols]
 
     pivot_text = pivot_hours.copy()
-    for col in [c for c in pivot_text.columns if c not in {"work_order", "judged_model"}]:
+    for col in [c for c in pivot_text.columns if c not in {"work_order", "judged_model", "operation_content"}]:
         pivot_text[col] = pd.to_numeric(pivot_text[col], errors="coerce").fillna(0).map(hours_to_hms)
 
     return detail, pivot_hours, pivot_text
@@ -646,6 +658,7 @@ def _localize_work_order_process_table(df: pd.DataFrame) -> pd.DataFrame:
     cols = {
         "work_order": "製令 / Work Order",
         "judged_model": "判斷機型 / Model",
+        "operation_content": "作業內容 / Operation Content",
         "process_name": "工段名稱 / Process",
         "process_hours": "工段工時(小時) / Process Hours",
         "process_time": "工段工時 / Process Time",
@@ -691,7 +704,7 @@ def _v30030_build_analysis_bundle(source_df: pd.DataFrame, filters: dict) -> dic
     work_df["work_hours"] = _coerce_work_hours(work_df["work_hours"])
     work_df["work_time_text"] = work_df["work_hours"].map(hours_to_hms)
 
-    for col in ["work_order", "judged_model", "process_name", "employee_id", "employee_name", "department", "start_date", "id"]:
+    for col in ["work_order", "judged_model", "operation_content", "process_name", "employee_id", "employee_name", "department", "start_date", "id"]:
         if col not in work_df.columns:
             work_df[col] = "" if col != "id" else range(1, len(work_df) + 1)
 
@@ -720,6 +733,14 @@ def _v30030_build_analysis_bundle(source_df: pd.DataFrame, filters: dict) -> dic
         )
         by_wo = by_wo.merge(model_lookup, on="work_order", how="left")
         by_wo["judged_model"] = by_wo["judged_model"].fillna("")
+    if "operation_content" in work_df.columns and not by_wo.empty:
+        op_lookup = (
+            work_df.groupby("work_order", dropna=False)["operation_content"]
+            .apply(_join_unique_text)
+            .reset_index()
+        )
+        by_wo = by_wo.merge(op_lookup, on="work_order", how="left")
+        by_wo["operation_content"] = by_wo["operation_content"].fillna("")
     by_wo = _sort_summary(by_wo, sort_by, "work_order")
     by_wo["工時 / Time"] = by_wo["total_hours"].map(hours_to_hms)
     by_wo["平均 / Avg"] = by_wo["avg_hours"].map(hours_to_hms)
@@ -1139,7 +1160,7 @@ with tab6:
         detail_df,
         "analysis_detail_records",
         editable=True,
-        disabled=["id", "record_key", "created_at", "updated_at", "work_hours", "judged_model"],
+        disabled=["id", "record_key", "created_at", "updated_at", "work_hours", "judged_model", "operation_content"],
         key="analysis_detail_editor_v58",
         height=520,
     )
