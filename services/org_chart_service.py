@@ -1507,6 +1507,12 @@ body { margin:0; background:linear-gradient(135deg,#06111f,#02040a); color:var(-
 .xl-selection-box { position:fixed; display:none; border:2px dashed #00a8ff; background:rgba(0,168,255,.12); z-index:999999; pointer-events:none; }
 .xl-selected { outline:3px solid #00a8ff !important; outline-offset:2px; box-shadow:0 0 0 4px rgba(0,168,255,.18), 0 0 18px rgba(0,168,255,.45) !important; }
 .xl-resize-hint { display:none; }
+.xl-card-resize-handle { display:none; position:absolute; right:-7px; bottom:-7px; width:22px; height:22px; z-index:999; cursor:nwse-resize; border-right:4px solid rgba(56,189,248,.92); border-bottom:4px solid rgba(56,189,248,.92); border-radius:0 0 6px 0; background:linear-gradient(135deg, transparent 0 38%, rgba(56,189,248,.16) 38% 62%, transparent 62% 100%); box-shadow:0 0 10px rgba(56,189,248,.45); pointer-events:auto; touch-action:none; }
+body.org-editing .xl-machine-card > .xl-card-resize-handle,
+body.org-editing .xl-course > .xl-card-resize-handle,
+body.org-editing .xl-stage-card > .xl-card-resize-handle,
+body.org-editing .xl-role-block > .xl-card-resize-handle { display:block; }
+body.org-editing .xl-card-resizing { outline:2px solid rgba(56,189,248,.92) !important; outline-offset:3px; box-shadow:0 0 0 4px rgba(56,189,248,.16), 0 0 24px rgba(56,189,248,.42) !important; }
 .xl-org-canvas { position:relative; min-width:__CANVAS_WIDTH__px; min-height:__CANVAS_HEIGHT__px; padding:0 20px 40px; color:var(--text); }
 .xl-summary { position:absolute; left:0; top:0; width:1250px; }
 .xl-summary table { border-collapse:collapse; width:100%; table-layout:fixed; font-size:12px; background:rgba(10,22,40,.92); color:var(--text); box-shadow:0 0 16px rgba(34,211,238,.10); }
@@ -1739,7 +1745,7 @@ body.org-editing .xl-auto-connectors { opacity:.92; }
 .xl-auto-connector-path.org-connector-soft { stroke:rgba(125,249,255,.50); stroke-width:1.0; filter:none; }
 .xl-summary, .xl-exec-zone, .xl-root-card, .xl-course, .xl-course-title, .xl-course-count, .xl-leader-card, .xl-machine-card, .xl-machine-head, .xl-stage-card, .xl-role-block, .xl-person-row { z-index:5; }
 .xl-empty-wide { grid-column:1 / -1; min-height:54px; }
-body.org-editing .xl-machine-card { resize:both !important; overflow:visible !important; min-width:220px; min-height:120px; max-width:none !important; }
+body.org-editing .xl-machine-card { resize:none !important; overflow:visible !important; min-width:220px; min-height:120px; max-width:none !important; }
 body.org-editing .xl-machine-lane, body.org-editing .xl-machine-group-lane { overflow:visible !important; }
 body.org-editing .xl-machine-card:hover { outline:1px dashed rgba(0,112,192,.55); outline-offset:2px; }
 body.org-editing .xl-machine-card::after { content:''; position:absolute; right:2px; bottom:2px; width:16px; height:16px; z-index:8; pointer-events:none; border-right:3px solid rgba(0,112,192,.75); border-bottom:3px solid rgba(0,112,192,.75); background:linear-gradient(135deg, transparent 0 42%, rgba(0,112,192,.32) 42% 54%, transparent 54% 100%); }
@@ -1811,6 +1817,7 @@ body.xl-fullscreen-active #fullscreenOrg { border-color:rgba(250,204,21,.75); bo
   const saved = localStorage.getItem(KEY);
   if (!HAS_SERVER_LAYOUT && saved) mount.innerHTML = saved;
   ensureLineHandles();
+  ensureResizeHandles();
   requestAnimationFrame(drawAutoConnectors);
   setTimeout(drawAutoConnectors, 250);
   let dragged = null;
@@ -1819,6 +1826,7 @@ body.xl-fullscreen-active #fullscreenOrg { border-color:rgba(250,204,21,.75); bo
     document.body.classList.toggle('org-editing', !!enabled);
     const state = document.getElementById('editState');
     if (state) state.textContent = enabled ? '編輯模式' : '瀏覽模式';
+    if (enabled) ensureResizeHandles();
   }
   setEditing(false);
   requestAnimationFrame(function() { applyZoom(zoomValue); });
@@ -2025,6 +2033,18 @@ body.xl-fullscreen-active #fullscreenOrg { border-color:rgba(250,204,21,.75); bo
       if (!line.querySelector('.xl-line-handle')) line.insertAdjacentHTML('beforeend', lineHandles());
     });
   }
+  function ensureResizeHandles() {
+    const selector = '.xl-machine-card,.xl-course,.xl-stage-card,.xl-role-block';
+    mount.querySelectorAll(selector).forEach(card => {
+      if (!card.querySelector(':scope > .xl-card-resize-handle')) {
+        const handle = document.createElement('span');
+        handle.className = 'xl-card-resize-handle';
+        handle.title = '拖曳調整外框大小；調整後請按「保存目前版面於瀏覽器」或「複製永久記錄碼」。';
+        handle.setAttribute('data-resize-handle', 'card');
+        card.appendChild(handle);
+      }
+    });
+  }
   const selectionBox = document.createElement('div');
   selectionBox.className = 'xl-selection-box';
   document.body.appendChild(selectionBox);
@@ -2036,9 +2056,7 @@ body.xl-fullscreen-active #fullscreenOrg { border-color:rgba(250,204,21,.75); bo
   }
   function isResizeGesture(e, el) {
     if (!el || !isEditing()) return false;
-    const r = el.getBoundingClientRect();
-    const handle = 22;
-    return e.clientX >= r.right - handle && e.clientY >= r.bottom - handle;
+    return !!(e && e.target && e.target.closest && e.target.closest('.xl-card-resize-handle'));
   }
   function applyOffset(card, x, y) {
     card.dataset.offsetX = String(Math.round(x));
@@ -2216,7 +2234,7 @@ body.xl-fullscreen-active #fullscreenOrg { border-color:rgba(250,204,21,.75); bo
         if (!value) return;
         const parent = add.closest('.xl-course');
         const zone = parent ? parent.querySelector(':scope > .xl-machine-lane') : null;
-        if (zone) { zone.insertAdjacentHTML('beforeend', machineHtml(value, parent.dataset.cardId)); requestAnimationFrame(drawAutoConnectors); }
+        if (zone) { zone.insertAdjacentHTML('beforeend', machineHtml(value, parent.dataset.cardId)); ensureResizeHandles(); requestAnimationFrame(drawAutoConnectors); }
         return;
       }
       if (type === 'stage') {
@@ -2224,7 +2242,7 @@ body.xl-fullscreen-active #fullscreenOrg { border-color:rgba(250,204,21,.75); bo
         if (!value) return;
         const parent = add.closest('.xl-machine-card') || add.closest('.xl-course');
         const zone = parent ? (parent.querySelector(':scope > .xl-machine-group-lane') || parent.querySelector(':scope > .xl-stage-lane')) : null;
-        if (zone) { zone.insertAdjacentHTML('beforeend', stageHtml(value, parent.dataset.cardId)); requestAnimationFrame(drawAutoConnectors); }
+        if (zone) { zone.insertAdjacentHTML('beforeend', stageHtml(value, parent.dataset.cardId)); ensureResizeHandles(); requestAnimationFrame(drawAutoConnectors); }
         return;
       }
       if (type === 'role') {
@@ -2302,6 +2320,7 @@ body.xl-fullscreen-active #fullscreenOrg { border-color:rgba(250,204,21,.75); bo
         localStorage.removeItem(KEY);
         mount.innerHTML = source.innerHTML;
         ensureLineHandles();
+        ensureResizeHandles();
         resetHierarchyFlowLayout();
         drawAutoConnectors();
         clearSelected();
@@ -2316,6 +2335,7 @@ body.xl-fullscreen-active #fullscreenOrg { border-color:rgba(250,204,21,.75); bo
       localStorage.removeItem(KEY);
       mount.innerHTML = source.innerHTML;
       ensureLineHandles();
+      ensureResizeHandles();
       resetHierarchyFlowLayout();
       drawAutoConnectors();
       alert('已重新依專業階層排列並重繪連接線。若下方卡片看不到，可用縮放、適合視窗或全螢幕播放。');
@@ -2337,6 +2357,7 @@ body.xl-fullscreen-active #fullscreenOrg { border-color:rgba(250,204,21,.75); bo
     editCard(card);
   });
   let moveState = null;
+  let resizeState = null;
   let selectState = null;
   function movableCards() {
     return Array.from(mount.querySelectorAll('[data-drag-type]'));
@@ -2369,9 +2390,10 @@ body.xl-fullscreen-active #fullscreenOrg { border-color:rgba(250,204,21,.75); bo
   }
   function persistSizes() {
     mount.querySelectorAll('.xl-course,.xl-machine-card,.xl-stage-card,.xl-role-block,.xl-person-row,.xl-leader-card,.xl-top-box,.xl-root-card,.xl-line-node').forEach(el => {
-      const r = el.getBoundingClientRect();
-      if (r.width > 0) el.style.width = Math.round(r.width) + 'px';
-      if (r.height > 0) el.style.height = Math.round(r.height) + 'px';
+      const w = el.offsetWidth || 0;
+      const h = el.offsetHeight || 0;
+      if (w > 0) el.style.width = Math.round(w) + 'px';
+      if (h > 0) el.style.height = Math.round(h) + 'px';
     });
   }
   function nudgeOutOfOverlap(card) {
@@ -2510,6 +2532,33 @@ body.xl-fullscreen-active #fullscreenOrg { border-color:rgba(250,204,21,.75); bo
     }
     setLineGeom(line, g);
   }
+  function cardMinSize(card) {
+    if (!card) return { width: 120, height: 80 };
+    if (card.classList.contains('xl-course')) return { width: 520, height: 260 };
+    if (card.classList.contains('xl-machine-card')) return { width: 240, height: 130 };
+    if (card.classList.contains('xl-stage-card')) return { width: 180, height: 100 };
+    if (card.classList.contains('xl-role-block')) return { width: 150, height: 70 };
+    return { width: 120, height: 60 };
+  }
+  function startCardResize(e, handle) {
+    const card = handle ? handle.closest('.xl-machine-card,.xl-course,.xl-stage-card,.xl-role-block') : null;
+    if (!card) return false;
+    e.preventDefault();
+    e.stopPropagation();
+    addSelected(card, false);
+    const min = cardMinSize(card);
+    resizeState = {
+      card: card,
+      startX: e.clientX,
+      startY: e.clientY,
+      baseWidth: Math.max(min.width, card.offsetWidth || card.getBoundingClientRect().width),
+      baseHeight: Math.max(min.height, card.offsetHeight || card.getBoundingClientRect().height),
+      minWidth: min.width,
+      minHeight: min.height
+    };
+    card.classList.add('xl-card-resizing');
+    return true;
+  }
   document.addEventListener('pointerdown', function(e) {
     if (!isEditing()) return;
     if (e.button !== 0) return;
@@ -2523,6 +2572,8 @@ body.xl-fullscreen-active #fullscreenOrg { border-color:rgba(250,204,21,.75); bo
       lineHandleState = { line, handle: lineHandle.dataset.lineHandle || 'end', startX: e.clientX, startY: e.clientY, geom: getLineGeom(line), canvas: canvasRect() };
       return;
     }
+    const resizeHandle = e.target.closest('.xl-card-resize-handle');
+    if (resizeHandle && startCardResize(e, resizeHandle)) return;
     const card = e.target.closest('[data-drag-type]');
     if (!card) {
       if (e.target.closest('.xl-org-canvas,.xl-shell')) {
@@ -2554,6 +2605,21 @@ body.xl-fullscreen-active #fullscreenOrg { border-color:rgba(250,204,21,.75); bo
     targets.forEach(c => c.classList.add('dragging'));
   });
   document.addEventListener('pointermove', function(e) {
+    if (resizeState) {
+      e.preventDefault();
+      const zoom = zoomValue / 100 || 1;
+      const dx = (e.clientX - resizeState.startX) / zoom;
+      const dy = (e.clientY - resizeState.startY) / zoom;
+      const nextW = Math.max(resizeState.minWidth, Math.round(resizeState.baseWidth + dx));
+      const nextH = Math.max(resizeState.minHeight, Math.round(resizeState.baseHeight + dy));
+      resizeState.card.style.width = nextW + 'px';
+      resizeState.card.style.height = nextH + 'px';
+      resizeState.card.dataset.manualWidth = String(nextW);
+      resizeState.card.dataset.manualHeight = String(nextH);
+      ensureScrollableCanvas();
+      requestAnimationFrame(drawAutoConnectors);
+      return;
+    }
     if (lineHandleState) {
       e.preventDefault();
       const st = lineHandleState;
@@ -2603,6 +2669,12 @@ body.xl-fullscreen-active #fullscreenOrg { border-color:rgba(250,204,21,.75); bo
     });
   });
   document.addEventListener('pointerup', function() {
+    if (resizeState) {
+      resizeState.card.classList.remove('xl-card-resizing');
+      resizeState = null;
+      requestAnimationFrame(drawAutoConnectors);
+      return;
+    }
     if (lineHandleState) {
       snapLineHandle(lineHandleState.line, lineHandleState.handle, 22);
       lineHandleState = null;
