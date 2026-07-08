@@ -301,12 +301,28 @@ def _load_model_rules_for_page() -> dict:
 
 
 def _render_model_rules_manager() -> None:
-    """Render editable 05 model-detection rules. Writes only on submit."""
+    """Render editable 05 model-detection rules. Writes only on submit.
+
+    Streamlit still executes code inside a collapsed expander.  The first model
+    manager implementation therefore built an editable data_editor on every
+    rerun even when the user was only viewing charts.  The explicit checkbox
+    keeps the maintenance UI available, but avoids unnecessary table rendering
+    and DB/cache work during normal analysis.
+    """
     with st.expander("🧩 判斷機型清單 / Model Detection Rules", expanded=False):
         st.caption(
             "第一順位從『機型 / Type』比對；若找不到，再從『P/N / Part No.』比對。"
             "比對採不分大小寫，並會先比對較長名稱，避免 EB4L 被誤判成 EB4。"
         )
+        open_manager = st.checkbox(
+            "開啟判斷機型清單維護 / Open model rule editor",
+            value=False,
+            key="analysis_model_detection_rules_open_v2",
+        )
+        if not open_manager:
+            st.caption("一般查詢不會載入維護表格；需要新增、刪除或修改機型時再勾選開啟。")
+            return
+
         rules_payload = _load_model_rules_for_page()
         rules_df = model_rules_to_dataframe(rules_payload)
         draft_df = st.session_state.get(MODEL_RULES_DRAFT_KEY)
@@ -318,7 +334,7 @@ def _render_model_rules_manager() -> None:
                 rules_df,
                 "analysis_model_detection_rules",
                 editable=True,
-                key="analysis_model_detection_rules_editor_v1",
+                key="analysis_model_detection_rules_editor_v2",
                 height=320,
                 num_rows="dynamic",
             )

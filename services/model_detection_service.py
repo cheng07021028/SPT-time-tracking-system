@@ -343,34 +343,113 @@ def dataframe_to_model_rules(df: pd.DataFrame) -> dict[str, Any]:
 
 def _enabled_model_names(payload: Any) -> list[str]:
     rules = normalize_model_rules(payload).get("rules", [])
-    names = [str(r.get("model_name") or "").strip() for r in rules if _truthy(r.get("enabled"), default=True) and _blank(r.get("model_name"))]
+    names = [
+        str(r.get("model_name") or "").strip()
+        for r in rules
+        if _truthy(r.get("enabled"), default=True) and _blank(r.get("model_name"))
+    ]
     # Match longest first so EB4L/SB4L win before EB4/SB4.
     return sorted(names, key=lambda x: len(_clean_match_text(x)), reverse=True)
 
 
+def _prepared_match_rules(payload: Any) -> list[tuple[str, str]]:
+    """Return once-normalized (match_key, display_name) rules.
+
+    The first implementation normalized the complete rules payload and cleaned
+    every model name for every row.  With thousands of time records this became
+    a Python nested loop hot spot.  This helper prepares the active rule list
+    once per analysis run, then row matching can reuse the same compact list.
+    """
+    prepared: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for name in _enabled_model_names(payload):
+        key = _clean_match_text(name)
+        if not key or key in seen:
+            continue
+        prepared.append((key, name))
+        seen.add(key)
+    return prepared
+
+
+def _normalize_match_series(series: pd.Series, index: pd.Index) -> pd.Series:
+    """Vectorized version of _clean_match_text for a dataframe column."""
+    if not isinstance(series, pd.Series):
+        series = pd.Series([""] * len(index), index=index)
+    return (
+        series.reindex(index)
+        .fillna("")
+        .astype(str)
+        .str.upper()
+        .str.replace(r"[^A-Z0-9]+", "", regex=True)
+    )
+
+
 def detect_model_from_values(type_value: Any, part_no_value: Any, payload: Any) -> str:
-    names = _enabled_model_names(payload)
+    """Detect one row. Kept for compatibility with existing callers/tests."""
     type_text = _clean_match_text(type_value)
     pn_text = _clean_match_text(part_no_value)
-    for name in names:
-        key = _clean_match_text(name)
+    for key, name in _prepared_match_rules(payload):
         if key and key in type_text:
             return name
-    for name in names:
-        key = _clean_match_text(name)
+    for key, name in _prepared_match_rules(payload):
         if key and key in pn_text:
             return name
     return ""
 
 
 def apply_judged_model_column(df: pd.DataFrame, payload: Any | None = None, column_name: str = "judged_model") -> pd.DataFrame:
+    """Add 05 analysis-only judged model column with vectorized matching.
+
+    Priority is unchanged:
+    1. Match model rules from 機型 / Type (`type_name`).
+    2. Only when not found, match from P/N / Part No. (`part_no`).
+
+    This function does not write back to 01/02 records.  It only enriches the
+    dataframe used by 05 reports, so it is safe for UI reruns and cache reuse.
+    """
     if not isinstance(df, pd.DataFrame):
         return pd.DataFrame()
+
     out = df.copy()
+    if out.empty:
+        out[column_name] = pd.Series(dtype="object")
+        return out
+
     rules = payload if payload is not None else load_model_rules()
+    prepared = _prepared_match_rules(rules)
+    if not prepared:
+        out[column_name] = ""
+        return out
+
     type_series = out["type_name"] if "type_name" in out.columns else pd.Series([""] * len(out), index=out.index)
     pn_series = out["part_no"] if "part_no" in out.columns else pd.Series([""] * len(out), index=out.index)
-    out[column_name] = [detect_model_from_values(t, p, rules) for t, p in zip(type_series, pn_series)]
+
+    type_text = _normalize_match_series(type_series, out.index)
+    pn_text = _normalize_match_series(pn_series, out.index)
+
+    result = pd.Series("", index=out.index, dtype="object")
+
+    # First priority: 機型 / Type. Longest rules are already first.
+    unmatched = result.eq("")
+    for key, name in prepared:
+        if not unmatched.any():
+            break
+        mask = unmatched & type_text.str.contains(key, regex=False, na=False)
+        if mask.any():
+            result.loc[mask] = name
+            unmatched = result.eq("")
+
+    # Second priority: P/N / Part No. only for rows still unmatched.
+    unmatched = result.eq("")
+    for key, name in prepared:
+        if not unmatched.any():
+            break
+        mask = unmatched & pn_text.str.contains(key, regex=False, na=False)
+        if mask.any():
+            result.loc[mask] = name
+            unmatched = result.eq("")
+
+    out[column_name] = result
     return out
 
 
