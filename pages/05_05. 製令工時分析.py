@@ -19,6 +19,7 @@ from services.analysis_filter_service import load_analysis_filters, save_analysi
 from services.model_detection_service import (
     apply_judged_model_column,
     dataframe_to_model_rules,
+    default_model_rules_payload,
     load_model_rules,
     model_rules_to_dataframe,
     save_model_rules,
@@ -312,7 +313,9 @@ def _render_model_rules_manager() -> None:
     with st.expander("🧩 判斷機型清單 / Model Detection Rules", expanded=False):
         st.caption(
             "第一順位從『機型 / Type』比對；若找不到，再從『P/N / Part No.』比對。"
-            "比對採不分大小寫，並會先比對較長名稱，避免 EB4L 被誤判成 EB4。"
+            "『包含關鍵字』是要從文字裡抓到的字；『判斷機型』是最後顯示名稱，"
+            "例如包含 ROBOT+X-table 時可顯示為 Others(倍利)。"
+            "比對採不分大小寫、忽略符號，並會先比對較長關鍵字，避免 EB4L 被誤判成 EB4。"
         )
         open_manager = st.checkbox(
             "開啟判斷機型清單維護 / Open model rule editor",
@@ -359,14 +362,7 @@ def _render_model_rules_manager() -> None:
             st.rerun()
 
         if reset_rules:
-            from services.model_detection_service import DEFAULT_MODEL_NAMES
-
-            payload = {
-                "rules": [
-                    {"model_name": name, "enabled": True, "sort_order": idx + 1, "note": ""}
-                    for idx, name in enumerate(DEFAULT_MODEL_NAMES)
-                ]
-            }
+            payload = default_model_rules_payload()
             saved = save_model_rules(payload)
             st.session_state[MODEL_RULES_STATE_KEY] = saved
             st.session_state.pop(MODEL_RULES_DRAFT_KEY, None)

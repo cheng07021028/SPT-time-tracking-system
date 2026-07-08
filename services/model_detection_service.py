@@ -54,6 +54,24 @@ DEFAULT_MODEL_NAMES: list[str] = [
     "SA4L",
 ]
 
+# match_keyword：從「機型 / Type」或「P/N / Part No.」裡抓到的包含字。
+# model_name：實際顯示在「判斷機型」欄位的名稱。
+# 既有規則（Sorter、EFEM...）會以同名方式保存；特殊規則可把關鍵字映射到不同顯示名稱，
+# 例如 ROBOT+X-table -> Others(倍利)。
+DEFAULT_MODEL_RULES: list[dict[str, Any]] = [
+    {"match_keyword": name, "model_name": name, "enabled": True, "sort_order": idx + 1, "note": ""}
+    for idx, name in enumerate(DEFAULT_MODEL_NAMES)
+]
+DEFAULT_MODEL_RULES.append(
+    {
+        "match_keyword": "ROBOT+X-table",
+        "model_name": "Others(倍利)",
+        "enabled": True,
+        "sort_order": len(DEFAULT_MODEL_RULES) + 1,
+        "note": "包含 ROBOT+X-table 時歸類為 Others(倍利)",
+    }
+)
+
 
 def _db_services():
     try:
@@ -132,16 +150,19 @@ def _clean_match_text(value: Any) -> str:
 
 def _default_rules_payload() -> dict[str, Any]:
     return {
-        "version": "V1",
+        "version": "V2",
         "updated_at": now_text(),
-        "rules": [
-            {"model_name": name, "enabled": True, "sort_order": idx + 1, "note": ""}
-            for idx, name in enumerate(DEFAULT_MODEL_NAMES)
-        ],
+        "rules": [dict(rule) for rule in DEFAULT_MODEL_RULES],
     }
 
 
+def default_model_rules_payload() -> dict[str, Any]:
+    """Public default payload for page-level reset buttons."""
+    return _default_rules_payload()
+
+
 def normalize_model_rules(payload: Any) -> dict[str, Any]:
+    source_version = str(payload.get("version") or "") if isinstance(payload, dict) else ""
     if isinstance(payload, list):
         raw_rules = payload
     elif isinstance(payload, dict):
@@ -154,20 +175,45 @@ def normalize_model_rules(payload: Any) -> dict[str, Any]:
     for idx, row in enumerate(raw_rules if isinstance(raw_rules, list) else []):
         if not isinstance(row, dict):
             row = {"model_name": row}
-        name = _blank(row.get("model_name") or row.get("name") or row.get("機型") or row.get("判斷機型"))
-        if not name:
+
+        display_name = _blank(
+            row.get("model_name")
+            or row.get("display_model")
+            or row.get("display_name")
+            or row.get("name")
+            or row.get("機型")
+            or row.get("判斷機型")
+        )
+        match_keyword = _blank(
+            row.get("match_keyword")
+            or row.get("keyword")
+            or row.get("contains_text")
+            or row.get("contains")
+            or row.get("比對字")
+            or row.get("包含字")
+            or row.get("包含關鍵字")
+            or row.get("比對關鍵字")
+        )
+
+        # Backward compatibility: old V1 rows only had model_name, which meant
+        # both matching keyword and output display name.
+        if not match_keyword:
+            match_keyword = display_name
+        if not display_name:
+            display_name = match_keyword
+
+        match_key = _clean_match_text(match_keyword)
+        if not match_key or not display_name or match_key in seen:
             continue
-        key = _clean_match_text(name)
-        if not key or key in seen:
-            continue
-        seen.add(key)
+        seen.add(match_key)
         try:
             order = int(float(row.get("sort_order") or row.get("order") or row.get("排序") or idx + 1))
         except Exception:
             order = idx + 1
         rows.append(
             {
-                "model_name": name,
+                "match_keyword": match_keyword,
+                "model_name": display_name,
                 "enabled": _truthy(row.get("enabled", row.get("啟用", True)), default=True),
                 "sort_order": order,
                 "note": _blank(row.get("note") or row.get("備註")),
@@ -176,11 +222,29 @@ def normalize_model_rules(payload: Any) -> dict[str, Any]:
 
     if not rows:
         rows = _default_rules_payload()["rules"]
+    elif source_version != "V2":
+        # One-time migration for older saved V1 lists: keep user rules, but add
+        # the new requested keyword-mapping example if it is not already present.
+        existing_keys = {_clean_match_text(r.get("match_keyword") or r.get("model_name")) for r in rows}
+        for default_rule in DEFAULT_MODEL_RULES:
+            key = _clean_match_text(default_rule.get("match_keyword") or default_rule.get("model_name"))
+            if key == _clean_match_text("ROBOT+X-table") and key not in existing_keys:
+                migrated = dict(default_rule)
+                migrated["sort_order"] = len(rows) + 1
+                rows.append(migrated)
+                existing_keys.add(key)
 
-    rows = sorted(rows, key=lambda r: (int(r.get("sort_order") or 999999), str(r.get("model_name") or "")))
+    rows = sorted(
+        rows,
+        key=lambda r: (
+            int(r.get("sort_order") or 999999),
+            -len(_clean_match_text(r.get("match_keyword"))),
+            str(r.get("model_name") or ""),
+        ),
+    )
     for idx, row in enumerate(rows):
         row["sort_order"] = idx + 1
-    return {"version": "V1", "updated_at": now_text(), "rules": rows}
+    return {"version": "V2", "updated_at": now_text(), "rules": rows}
 
 
 def _load_json(path: Path) -> dict[str, Any] | None:
@@ -290,13 +354,18 @@ def model_rules_to_dataframe(payload: Any) -> pd.DataFrame:
     rules = normalize_model_rules(payload).get("rules", [])
     df = pd.DataFrame(rules)
     if df.empty:
-        df = pd.DataFrame(columns=["delete", "model_name", "enabled", "sort_order", "note"])
+        df = pd.DataFrame(columns=["delete", "match_keyword", "model_name", "enabled", "sort_order", "note"])
     if "delete" not in df.columns:
         df.insert(0, "delete", False)
-    cols = ["delete", "model_name", "enabled", "sort_order", "note"]
+    cols = ["delete", "match_keyword", "model_name", "enabled", "sort_order", "note"]
     for col in cols:
         if col not in df.columns:
             df[col] = False if col in {"delete", "enabled"} else ""
+    df["match_keyword"] = df["match_keyword"].map(_blank)
+    df["model_name"] = df["model_name"].map(_blank)
+    # Keep older saved rows usable if they only had model_name.
+    df.loc[df["match_keyword"].eq(""), "match_keyword"] = df.loc[df["match_keyword"].eq(""), "model_name"]
+    df.loc[df["model_name"].eq(""), "model_name"] = df.loc[df["model_name"].eq(""), "match_keyword"]
     df["delete"] = df["delete"].map(lambda _: False).astype(bool)
     df["enabled"] = df["enabled"].map(lambda x: _truthy(x, default=True)).astype(bool)
     order = pd.to_numeric(df["sort_order"], errors="coerce")
@@ -312,7 +381,10 @@ def dataframe_to_model_rules(df: pd.DataFrame) -> dict[str, Any]:
     # Support either internal or localized column labels if table wrappers ever return localized names.
     rename = {
         "刪除 / Delete": "delete",
+        "包含關鍵字 / Contains Text": "match_keyword",
+        "比對關鍵字 / Match Keyword": "match_keyword",
         "判斷機型 / Model": "model_name",
+        "顯示判斷機型 / Display Model": "model_name",
         "啟用 / Enabled": "enabled",
         "排序 / Sort Order": "sort_order",
         "備註 / Note": "note",
@@ -323,8 +395,14 @@ def dataframe_to_model_rules(df: pd.DataFrame) -> dict[str, Any]:
         rd = dict(row)
         if _truthy(rd.get("delete"), default=False):
             continue
-        name = _blank(rd.get("model_name"))
-        if not name:
+        match_keyword = _blank(rd.get("match_keyword"))
+        display_name = _blank(rd.get("model_name"))
+        # Backward compatibility for old table layout.
+        if not match_keyword:
+            match_keyword = display_name
+        if not display_name:
+            display_name = match_keyword
+        if not match_keyword or not display_name:
             continue
         try:
             order = int(float(rd.get("sort_order") or idx + 1))
@@ -332,7 +410,8 @@ def dataframe_to_model_rules(df: pd.DataFrame) -> dict[str, Any]:
             order = idx + 1
         rows.append(
             {
-                "model_name": name,
+                "match_keyword": match_keyword,
+                "model_name": display_name,
                 "enabled": _truthy(rd.get("enabled"), default=True),
                 "sort_order": order,
                 "note": _blank(rd.get("note")),
@@ -348,27 +427,32 @@ def _enabled_model_names(payload: Any) -> list[str]:
         for r in rules
         if _truthy(r.get("enabled"), default=True) and _blank(r.get("model_name"))
     ]
-    # Match longest first so EB4L/SB4L win before EB4/SB4.
-    return sorted(names, key=lambda x: len(_clean_match_text(x)), reverse=True)
+    # Return display names for compatibility with audit counters and legacy callers.
+    return names
 
 
 def _prepared_match_rules(payload: Any) -> list[tuple[str, str]]:
     """Return once-normalized (match_key, display_name) rules.
 
-    The first implementation normalized the complete rules payload and cleaned
-    every model name for every row.  With thousands of time records this became
-    a Python nested loop hot spot.  This helper prepares the active rule list
-    once per analysis run, then row matching can reuse the same compact list.
+    match_key comes from match_keyword（包含關鍵字）; display_name comes from
+    model_name（判斷機型）.  This supports rules such as:
+        ROBOT+X-table -> Others(倍利)
+
+    Longer keywords are matched first so EB4L/SB4L still win before EB4/SB4.
     """
     prepared: list[tuple[str, str]] = []
     seen: set[str] = set()
-    for name in _enabled_model_names(payload):
-        key = _clean_match_text(name)
-        if not key or key in seen:
+    for rule in normalize_model_rules(payload).get("rules", []):
+        if not _truthy(rule.get("enabled"), default=True):
             continue
-        prepared.append((key, name))
+        keyword = _blank(rule.get("match_keyword") or rule.get("model_name"))
+        display_name = _blank(rule.get("model_name") or keyword)
+        key = _clean_match_text(keyword)
+        if not key or not display_name or key in seen:
+            continue
+        prepared.append((key, display_name))
         seen.add(key)
-    return prepared
+    return sorted(prepared, key=lambda item: len(item[0]), reverse=True)
 
 
 def _normalize_match_series(series: pd.Series, index: pd.Index) -> pd.Series:
@@ -456,10 +540,10 @@ def apply_judged_model_column(df: pd.DataFrame, payload: Any | None = None, colu
 def audit_model_detection_service() -> dict[str, Any]:
     payload = load_model_rules()
     return {
-        "version": "V1",
+        "version": "V2",
         "authority": "system_settings",
         "setting_key": SYSTEM_SETTING_KEY,
-        "default_model_count": len(DEFAULT_MODEL_NAMES),
+        "default_model_count": len(DEFAULT_MODEL_RULES),
         "active_model_count": len(_enabled_model_names(payload)),
         "fallback_order": ["type_name", "part_no"],
     }
