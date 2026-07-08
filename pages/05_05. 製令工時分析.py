@@ -728,9 +728,20 @@ def _v30030_build_analysis_bundle(source_df: pd.DataFrame, filters: dict) -> dic
     by_wo["工時 / Time"] = by_wo["total_hours"].map(hours_to_hms)
     by_wo["平均 / Avg"] = by_wo["avg_hours"].map(hours_to_hms)
 
+    # 工段分析需依「判斷機型 + 工段名稱」區分工時。
+    # 這是 05 分析用衍生彙總，不回寫 01/02 原始工時權威資料。
+    by_proc_work = work_df.copy()
+    by_proc_work["judged_model"] = _blank_to_unknown(by_proc_work["judged_model"], "未判斷機型")
+    by_proc_work["process_name"] = _blank_to_unknown(by_proc_work["process_name"], "未填工段")
     by_proc = (
-        work_df.groupby("process_name", dropna=False)
-        .agg(total_hours=("work_hours", "sum"), count=("id", "count"), avg_hours=("work_hours", "mean"), employee_count=("employee_id", "nunique"), work_order_count=("work_order", "nunique"))
+        by_proc_work.groupby(["judged_model", "process_name"], dropna=False)
+        .agg(
+            total_hours=("work_hours", "sum"),
+            count=("id", "count"),
+            avg_hours=("work_hours", "mean"),
+            employee_count=("employee_id", "nunique"),
+            work_order_count=("work_order", "nunique"),
+        )
         .reset_index()
     )
     by_proc = _sort_summary(by_proc, sort_by, "process_name")
@@ -887,7 +898,7 @@ if df.empty:
     st.stop()
 
 _model_rules_sig = str((_load_model_rules_for_page() or {}).get("updated_at") or "")
-_summary_sig = f"{_filter_signature}|rows={len(df)}|model={_model_rules_sig}|v30030"
+_summary_sig = f"{_filter_signature}|rows={len(df)}|model={_model_rules_sig}|v30031_process_model"
 _cached_summary = st.session_state.get(V30030_SUMMARY_CACHE_KEY)
 if isinstance(_cached_summary, dict) and _cached_summary.get("sig") == _summary_sig and isinstance(_cached_summary.get("bundle"), dict):
     _bundle = _cached_summary["bundle"]
@@ -1049,20 +1060,34 @@ with tab2:
     )
 
 with tab3:
-    st.subheader("工段累積工時 / Process Time")
+    st.subheader("工段 x 判斷機型累積工時 / Process Time by Judged Model")
     plot_df = _apply_top(by_proc, top_n)
     fig = px.bar(
         plot_df,
         x="process_name",
         y="total_hours",
+        color="judged_model",
         text="工時 / Time",
-        hover_data={"total_hours": ":.2f", "工時 / Time": True, "count": True, "employee_count": True, "work_order_count": True},
-        labels={"process_name": "工段 / Process", "total_hours": "累積時數 / Total Hours", "count": "筆數"},
-        title=f"{top_n} 工段累積工時 / Process Time",
+        hover_data={
+            "total_hours": ":.2f",
+            "工時 / Time": True,
+            "judged_model": True,
+            "count": True,
+            "employee_count": True,
+            "work_order_count": True,
+        },
+        labels={
+            "process_name": "工段 / Process",
+            "judged_model": "判斷機型 / Model",
+            "total_hours": "累積時數 / Total Hours",
+            "count": "筆數",
+        },
+        title=f"{top_n} 工段 x 判斷機型累積工時 / Process Time by Model",
     )
-    fig.update_traces(textposition="outside")
-    st.plotly_chart(style_fig(fig, 460), use_container_width=True)
-    render_table(by_proc.drop(columns=["工時 / Time", "平均 / Avg"], errors="ignore"), "analysis_by_process", editable=False, height=380)
+    fig.update_traces(textposition="inside")
+    fig.update_layout(barmode="stack")
+    st.plotly_chart(style_fig(fig, 480), use_container_width=True)
+    render_table(by_proc.drop(columns=["工時 / Time", "平均 / Avg"], errors="ignore"), "analysis_by_process", editable=False, height=420)
 
 with tab4:
     st.subheader("人員累積工時 / Employee Time")
