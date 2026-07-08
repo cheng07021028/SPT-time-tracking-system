@@ -1,0 +1,386 @@
+# -*- coding: utf-8 -*-
+"""05｜製令工時分析：判斷機型清單與萃取服務。
+
+設計原則：
+- Neon / PostgreSQL 的 system_settings 是正式權威來源。
+- Local JSON 只做 fallback / mirror，避免正式環境 Reboot 後被舊檔覆蓋。
+- 此服務只產生 05 分析用衍生欄位，不寫回 01/02 工時權威資料。
+"""
+from __future__ import annotations
+
+import json
+import re
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+
+try:
+    from services.timezone_service import now_text
+except Exception:  # pragma: no cover
+    import time
+
+    def now_text() -> str:
+        return time.strftime("%Y-%m-%d %H:%M:%S")
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+LOCAL_MODEL_RULES_PATH = (
+    PROJECT_ROOT
+    / "data"
+    / "permanent_store"
+    / "persistent_modules"
+    / "05_analysis"
+    / "model_detection_rules.json"
+)
+
+SYSTEM_SETTING_KEY = "05_model_detection_rules_v1"
+SYSTEM_SETTING_NOTE = "05 製令工時分析｜判斷機型清單 JSON"
+_DB_SCHEMA_READY = False
+
+DEFAULT_MODEL_NAMES: list[str] = [
+    "Sorter",
+    "EFEM",
+    "NTB",
+    "FCLP",
+    "BWBS",
+    "Bench",
+    "EB2",
+    "EB4",
+    "EB4L",
+    "SB2",
+    "SB4",
+    "SB4L",
+    "SB3L",
+    "SA4L",
+]
+
+
+def _db_services():
+    try:
+        from services.db_service import ensure_database, query_one, execute
+
+        return ensure_database, query_one, execute
+    except Exception:
+        return None, None, None
+
+
+def _ensure_db_schema() -> bool:
+    global _DB_SCHEMA_READY
+    if _DB_SCHEMA_READY:
+        return True
+    ensure_database, _query_one, execute = _db_services()
+    if not callable(ensure_database) or not callable(execute):
+        return False
+    try:
+        ensure_database()
+        execute(
+            """
+            CREATE TABLE IF NOT EXISTS system_settings (
+                setting_key TEXT,
+                setting_value TEXT,
+                note TEXT,
+                updated_at TEXT
+            )
+            """,
+            (),
+        )
+        try:
+            execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ux_05_model_detection_system_settings_key ON system_settings(setting_key)",
+                (),
+            )
+        except Exception:
+            pass
+        _DB_SCHEMA_READY = True
+        return True
+    except Exception:
+        return False
+
+
+def _blank(value: Any) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    text = str(value if value is not None else "").strip()
+    return "" if text.lower() in {"none", "nan", "nat", "null"} else text
+
+
+def _truthy(value: Any, default: bool = True) -> bool:
+    if isinstance(value, bool):
+        return value
+    text = _blank(value).strip().lower()
+    if not text:
+        return bool(default)
+    if text in {"1", "true", "yes", "y", "on", "啟用", "是", "勾選"}:
+        return True
+    if text in {"0", "false", "no", "n", "off", "停用", "否", "刪除"}:
+        return False
+    return bool(default)
+
+
+def _clean_match_text(value: Any) -> str:
+    """Normalize a text cell for robust model matching.
+
+    Removing punctuation lets EB-4L / EB 4L still match EB4L. Longest enabled
+    model names are matched first, so EB4L wins before EB4 and SB4L wins before SB4.
+    """
+    text = _blank(value).upper()
+    return re.sub(r"[^A-Z0-9]+", "", text)
+
+
+def _default_rules_payload() -> dict[str, Any]:
+    return {
+        "version": "V1",
+        "updated_at": now_text(),
+        "rules": [
+            {"model_name": name, "enabled": True, "sort_order": idx + 1, "note": ""}
+            for idx, name in enumerate(DEFAULT_MODEL_NAMES)
+        ],
+    }
+
+
+def normalize_model_rules(payload: Any) -> dict[str, Any]:
+    if isinstance(payload, list):
+        raw_rules = payload
+    elif isinstance(payload, dict):
+        raw_rules = payload.get("rules", [])
+    else:
+        raw_rules = []
+
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for idx, row in enumerate(raw_rules if isinstance(raw_rules, list) else []):
+        if not isinstance(row, dict):
+            row = {"model_name": row}
+        name = _blank(row.get("model_name") or row.get("name") or row.get("機型") or row.get("判斷機型"))
+        if not name:
+            continue
+        key = _clean_match_text(name)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        try:
+            order = int(float(row.get("sort_order") or row.get("order") or row.get("排序") or idx + 1))
+        except Exception:
+            order = idx + 1
+        rows.append(
+            {
+                "model_name": name,
+                "enabled": _truthy(row.get("enabled", row.get("啟用", True)), default=True),
+                "sort_order": order,
+                "note": _blank(row.get("note") or row.get("備註")),
+            }
+        )
+
+    if not rows:
+        rows = _default_rules_payload()["rules"]
+
+    rows = sorted(rows, key=lambda r: (int(r.get("sort_order") or 999999), str(r.get("model_name") or "")))
+    for idx, row in enumerate(rows):
+        row["sort_order"] = idx + 1
+    return {"version": "V1", "updated_at": now_text(), "rules": rows}
+
+
+def _load_json(path: Path) -> dict[str, Any] | None:
+    try:
+        if path.exists() and path.stat().st_size > 0:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+    return None
+
+
+def _write_local_cache(payload: dict[str, Any]) -> None:
+    try:
+        LOCAL_MODEL_RULES_PATH.parent.mkdir(parents=True, exist_ok=True)
+        LOCAL_MODEL_RULES_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _load_from_db() -> dict[str, Any] | None:
+    if not _ensure_db_schema():
+        return None
+    _ensure_database, query_one, _execute = _db_services()
+    if not callable(query_one):
+        return None
+    try:
+        row = query_one(
+            "SELECT setting_value FROM system_settings WHERE setting_key=? ORDER BY updated_at DESC LIMIT 1",
+            (SYSTEM_SETTING_KEY,),
+        ) or {}
+        raw = row.get("setting_value") if isinstance(row, dict) else None
+        if not raw:
+            return None
+        parsed = json.loads(str(raw))
+        return normalize_model_rules(parsed)
+    except Exception:
+        return None
+
+
+def _save_to_db(payload: dict[str, Any]) -> bool:
+    if not _ensure_db_schema():
+        return False
+    _ensure_database, query_one, execute = _db_services()
+    if not callable(query_one) or not callable(execute):
+        return False
+    text = json.dumps(payload, ensure_ascii=False, default=str)
+    now = now_text()
+    try:
+        existing = query_one("SELECT setting_key FROM system_settings WHERE setting_key=? LIMIT 1", (SYSTEM_SETTING_KEY,))
+        if existing:
+            execute(
+                "UPDATE system_settings SET setting_value=?, note=?, updated_at=? WHERE setting_key=?",
+                (text, SYSTEM_SETTING_NOTE, now, SYSTEM_SETTING_KEY),
+            )
+        else:
+            execute(
+                "INSERT INTO system_settings(setting_key, setting_value, note, updated_at) VALUES (?, ?, ?, ?)",
+                (SYSTEM_SETTING_KEY, text, SYSTEM_SETTING_NOTE, now),
+            )
+        return True
+    except Exception:
+        try:
+            execute(
+                """
+                INSERT INTO system_settings(setting_key, setting_value, note, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(setting_key) DO UPDATE SET
+                    setting_value=excluded.setting_value,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+                """,
+                (SYSTEM_SETTING_KEY, text, SYSTEM_SETTING_NOTE, now),
+            )
+            return True
+        except Exception:
+            return False
+
+
+def load_model_rules() -> dict[str, Any]:
+    db_payload = _load_from_db()
+    if db_payload:
+        _write_local_cache(db_payload)
+        return db_payload
+
+    local = _load_json(LOCAL_MODEL_RULES_PATH)
+    if local:
+        payload = normalize_model_rules(local)
+        _save_to_db(payload)
+        return payload
+
+    payload = _default_rules_payload()
+    _save_to_db(payload)
+    _write_local_cache(payload)
+    return payload
+
+
+def save_model_rules(payload: Any) -> dict[str, Any]:
+    normalized = normalize_model_rules(payload)
+    normalized["updated_at"] = now_text()
+    _save_to_db(normalized)
+    _write_local_cache(normalized)
+    return normalized
+
+
+def model_rules_to_dataframe(payload: Any) -> pd.DataFrame:
+    rules = normalize_model_rules(payload).get("rules", [])
+    df = pd.DataFrame(rules)
+    if df.empty:
+        df = pd.DataFrame(columns=["delete", "model_name", "enabled", "sort_order", "note"])
+    if "delete" not in df.columns:
+        df.insert(0, "delete", False)
+    cols = ["delete", "model_name", "enabled", "sort_order", "note"]
+    for col in cols:
+        if col not in df.columns:
+            df[col] = False if col in {"delete", "enabled"} else ""
+    df["delete"] = df["delete"].map(lambda _: False).astype(bool)
+    df["enabled"] = df["enabled"].map(lambda x: _truthy(x, default=True)).astype(bool)
+    order = pd.to_numeric(df["sort_order"], errors="coerce")
+    fallback_order = pd.Series(range(1, len(df) + 1), index=df.index, dtype="int64")
+    df["sort_order"] = order.where(order.notna(), fallback_order).astype(int)
+    return df[cols].reset_index(drop=True)
+
+
+def dataframe_to_model_rules(df: pd.DataFrame) -> dict[str, Any]:
+    if not isinstance(df, pd.DataFrame):
+        return normalize_model_rules({"rules": []})
+    work = df.copy()
+    # Support either internal or localized column labels if table wrappers ever return localized names.
+    rename = {
+        "刪除 / Delete": "delete",
+        "判斷機型 / Model": "model_name",
+        "啟用 / Enabled": "enabled",
+        "排序 / Sort Order": "sort_order",
+        "備註 / Note": "note",
+    }
+    work = work.rename(columns={c: rename.get(str(c), str(c)) for c in work.columns})
+    rows: list[dict[str, Any]] = []
+    for idx, row in work.iterrows():
+        rd = dict(row)
+        if _truthy(rd.get("delete"), default=False):
+            continue
+        name = _blank(rd.get("model_name"))
+        if not name:
+            continue
+        try:
+            order = int(float(rd.get("sort_order") or idx + 1))
+        except Exception:
+            order = idx + 1
+        rows.append(
+            {
+                "model_name": name,
+                "enabled": _truthy(rd.get("enabled"), default=True),
+                "sort_order": order,
+                "note": _blank(rd.get("note")),
+            }
+        )
+    return normalize_model_rules({"rules": rows})
+
+
+def _enabled_model_names(payload: Any) -> list[str]:
+    rules = normalize_model_rules(payload).get("rules", [])
+    names = [str(r.get("model_name") or "").strip() for r in rules if _truthy(r.get("enabled"), default=True) and _blank(r.get("model_name"))]
+    # Match longest first so EB4L/SB4L win before EB4/SB4.
+    return sorted(names, key=lambda x: len(_clean_match_text(x)), reverse=True)
+
+
+def detect_model_from_values(type_value: Any, part_no_value: Any, payload: Any) -> str:
+    names = _enabled_model_names(payload)
+    type_text = _clean_match_text(type_value)
+    pn_text = _clean_match_text(part_no_value)
+    for name in names:
+        key = _clean_match_text(name)
+        if key and key in type_text:
+            return name
+    for name in names:
+        key = _clean_match_text(name)
+        if key and key in pn_text:
+            return name
+    return ""
+
+
+def apply_judged_model_column(df: pd.DataFrame, payload: Any | None = None, column_name: str = "judged_model") -> pd.DataFrame:
+    if not isinstance(df, pd.DataFrame):
+        return pd.DataFrame()
+    out = df.copy()
+    rules = payload if payload is not None else load_model_rules()
+    type_series = out["type_name"] if "type_name" in out.columns else pd.Series([""] * len(out), index=out.index)
+    pn_series = out["part_no"] if "part_no" in out.columns else pd.Series([""] * len(out), index=out.index)
+    out[column_name] = [detect_model_from_values(t, p, rules) for t, p in zip(type_series, pn_series)]
+    return out
+
+
+def audit_model_detection_service() -> dict[str, Any]:
+    payload = load_model_rules()
+    return {
+        "version": "V1",
+        "authority": "system_settings",
+        "setting_key": SYSTEM_SETTING_KEY,
+        "default_model_count": len(DEFAULT_MODEL_NAMES),
+        "active_model_count": len(_enabled_model_names(payload)),
+        "fallback_order": ["type_name", "part_no"],
+    }

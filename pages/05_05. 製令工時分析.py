@@ -16,6 +16,13 @@ from services.table_ui_service import render_table
 from services.duration_service import hours_to_hms
 from services.timezone_service import today_date
 from services.analysis_filter_service import load_analysis_filters, save_analysis_filters
+from services.model_detection_service import (
+    apply_judged_model_column,
+    dataframe_to_model_rules,
+    load_model_rules,
+    model_rules_to_dataframe,
+    save_model_rules,
+)
 from services.master_data_service import load_work_orders, load_employees
 try:
     from services.large_table_query_service import load_history_filter_options_sql
@@ -42,6 +49,8 @@ V30030_SUMMARY_CACHE_KEY = "_spt_v30030_05_summary_bundle"
 V30030_EXCEL_CACHE_PREFIX = "_spt_v30030_05_excel_"
 V30071_FILTER_OPTIONS_CACHE_KEY = "_spt_v30071_05_filter_options_cache"
 V30091_ANALYSIS_DEFAULT_PRESET = "今日"
+MODEL_RULES_STATE_KEY = "_spt_05_model_detection_rules"
+MODEL_RULES_DRAFT_KEY = "_spt_05_model_detection_rules_draft"
 
 DATE_PRESETS = ["今日", "近7天", "近30天", "本月", "上月", "自訂區間"]
 STATUS_OPTIONS = ["全部", "作業中", "暫停", "完工", "下班", "未結束", "已結束"]
@@ -269,6 +278,89 @@ def _clean_filter_list(values) -> list[str]:
     return [str(x).strip() for x in list(values) if str(x).strip()]
 
 
+def _join_unique_text(values) -> str:
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        text = str(value or "").strip()
+        if not text or text.lower() in {"none", "nan", "nat", "null"}:
+            continue
+        if text not in seen:
+            out.append(text)
+            seen.add(text)
+    return "、".join(out)
+
+
+def _load_model_rules_for_page() -> dict:
+    cached = st.session_state.get(MODEL_RULES_STATE_KEY)
+    if isinstance(cached, dict) and isinstance(cached.get("rules"), list):
+        return cached
+    payload = load_model_rules()
+    st.session_state[MODEL_RULES_STATE_KEY] = payload
+    return payload
+
+
+def _render_model_rules_manager() -> None:
+    """Render editable 05 model-detection rules. Writes only on submit."""
+    with st.expander("🧩 判斷機型清單 / Model Detection Rules", expanded=False):
+        st.caption(
+            "第一順位從『機型 / Type』比對；若找不到，再從『P/N / Part No.』比對。"
+            "比對採不分大小寫，並會先比對較長名稱，避免 EB4L 被誤判成 EB4。"
+        )
+        rules_payload = _load_model_rules_for_page()
+        rules_df = model_rules_to_dataframe(rules_payload)
+        draft_df = st.session_state.get(MODEL_RULES_DRAFT_KEY)
+        if isinstance(draft_df, pd.DataFrame):
+            rules_df = draft_df.copy()
+
+        with st.form("analysis_model_detection_rules_form", clear_on_submit=False):
+            edited_rules = render_table(
+                rules_df,
+                "analysis_model_detection_rules",
+                editable=True,
+                key="analysis_model_detection_rules_editor_v1",
+                height=320,
+                num_rows="dynamic",
+            )
+            c1, c2 = st.columns(2)
+            with c1:
+                save_rules = st.form_submit_button("▣ 儲存判斷機型清單 / Save Model Rules", type="primary", use_container_width=True)
+            with c2:
+                reset_rules = st.form_submit_button("↺ 還原預設機型 / Reset Defaults", use_container_width=True)
+
+        if isinstance(edited_rules, pd.DataFrame):
+            st.session_state[MODEL_RULES_DRAFT_KEY] = edited_rules.copy()
+
+        if save_rules:
+            payload = dataframe_to_model_rules(edited_rules if isinstance(edited_rules, pd.DataFrame) else rules_df)
+            saved = save_model_rules(payload)
+            st.session_state[MODEL_RULES_STATE_KEY] = saved
+            st.session_state.pop(MODEL_RULES_DRAFT_KEY, None)
+            st.session_state.pop(V69_DF_KEY, None)
+            st.session_state.pop(V69_FILTER_SIG_KEY, None)
+            _v30030_clear_analysis_output_cache()
+            st.success("已儲存判斷機型清單；下一次套用篩選後會依新清單重新萃取。")
+            st.rerun()
+
+        if reset_rules:
+            from services.model_detection_service import DEFAULT_MODEL_NAMES
+
+            payload = {
+                "rules": [
+                    {"model_name": name, "enabled": True, "sort_order": idx + 1, "note": ""}
+                    for idx, name in enumerate(DEFAULT_MODEL_NAMES)
+                ]
+            }
+            saved = save_model_rules(payload)
+            st.session_state[MODEL_RULES_STATE_KEY] = saved
+            st.session_state.pop(MODEL_RULES_DRAFT_KEY, None)
+            st.session_state.pop(V69_DF_KEY, None)
+            st.session_state.pop(V69_FILTER_SIG_KEY, None)
+            _v30030_clear_analysis_output_cache()
+            st.success("已還原預設判斷機型清單。")
+            st.rerun()
+
+
 def _enrich_records(df: pd.DataFrame) -> pd.DataFrame:
     if df is None or df.empty:
         return df
@@ -307,9 +399,16 @@ def _enrich_records(df: pd.DataFrame) -> pd.DataFrame:
     except Exception:
         pass
 
-    for col in ["customer", "assembly_location", "department", "title"]:
+    for col in ["customer", "assembly_location", "part_no", "type_name", "department", "title"]:
         if col not in out.columns:
             out[col] = ""
+
+    # 05 分析用衍生欄位：先從機型/Type 判斷；若找不到，再從 P/N / Part No. 判斷。
+    try:
+        out = apply_judged_model_column(out, _load_model_rules_for_page(), column_name="judged_model")
+    except Exception:
+        if "judged_model" not in out.columns:
+            out["judged_model"] = ""
     return out
 
 
@@ -448,7 +547,7 @@ def _build_work_order_process_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, p
     """
     if df is None or df.empty:
         empty_detail = pd.DataFrame(columns=[
-            "work_order", "process_name", "process_hours", "process_time",
+            "work_order", "judged_model", "process_name", "process_hours", "process_time",
             "work_order_total_hours", "work_order_total_time", "share_percent",
             "count", "employee_count", "avg_hours", "avg_time",
         ])
@@ -463,15 +562,18 @@ def _build_work_order_process_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, p
         work["work_hours"] = 0.0
     if "employee_id" not in work.columns:
         work["employee_id"] = ""
+    if "judged_model" not in work.columns:
+        work["judged_model"] = ""
     if "id" not in work.columns:
         work["id"] = range(1, len(work) + 1)
 
     work["work_order"] = _blank_to_unknown(work["work_order"], "未填製令")
+    work["judged_model"] = work["judged_model"].fillna("").astype(str).str.strip()
     work["process_name"] = _blank_to_unknown(work["process_name"], "未填工段")
     work["work_hours"] = _coerce_work_hours(work["work_hours"])
 
     detail = (
-        work.groupby(["work_order", "process_name"], dropna=False)
+        work.groupby(["work_order", "judged_model", "process_name"], dropna=False)
         .agg(
             process_hours=("work_hours", "sum"),
             count=("id", "count"),
@@ -503,7 +605,7 @@ def _build_work_order_process_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, p
 
     pivot_hours = (
         work.pivot_table(
-            index="work_order",
+            index=["work_order", "judged_model"],
             columns="process_name",
             values="work_hours",
             aggfunc="sum",
@@ -512,15 +614,15 @@ def _build_work_order_process_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, p
         .reset_index()
     )
     if not pivot_hours.empty:
-        process_cols = [c for c in pivot_hours.columns if c != "work_order"]
+        process_cols = [c for c in pivot_hours.columns if c not in {"work_order", "judged_model"}]
         pivot_hours["總工時 / Total Hours"] = pivot_hours[process_cols].sum(axis=1) if process_cols else 0
         pivot_hours = pivot_hours.sort_values("總工時 / Total Hours", ascending=False).reset_index(drop=True)
-        # Put total immediately after work_order for easier reading.
-        cols = ["work_order", "總工時 / Total Hours"] + [c for c in pivot_hours.columns if c not in {"work_order", "總工時 / Total Hours"}]
+        # Put model and total immediately after work_order for easier reading.
+        cols = ["work_order", "judged_model", "總工時 / Total Hours"] + [c for c in pivot_hours.columns if c not in {"work_order", "judged_model", "總工時 / Total Hours"}]
         pivot_hours = pivot_hours[cols]
 
     pivot_text = pivot_hours.copy()
-    for col in [c for c in pivot_text.columns if c != "work_order"]:
+    for col in [c for c in pivot_text.columns if c not in {"work_order", "judged_model"}]:
         pivot_text[col] = pd.to_numeric(pivot_text[col], errors="coerce").fillna(0).map(hours_to_hms)
 
     return detail, pivot_hours, pivot_text
@@ -531,6 +633,7 @@ def _localize_work_order_process_table(df: pd.DataFrame) -> pd.DataFrame:
         return df
     cols = {
         "work_order": "製令 / Work Order",
+        "judged_model": "判斷機型 / Model",
         "process_name": "工段名稱 / Process",
         "process_hours": "工段工時(小時) / Process Hours",
         "process_time": "工段工時 / Process Time",
@@ -576,7 +679,7 @@ def _v30030_build_analysis_bundle(source_df: pd.DataFrame, filters: dict) -> dic
     work_df["work_hours"] = _coerce_work_hours(work_df["work_hours"])
     work_df["work_time_text"] = work_df["work_hours"].map(hours_to_hms)
 
-    for col in ["work_order", "process_name", "employee_id", "employee_name", "department", "start_date", "id"]:
+    for col in ["work_order", "judged_model", "process_name", "employee_id", "employee_name", "department", "start_date", "id"]:
         if col not in work_df.columns:
             work_df[col] = "" if col != "id" else range(1, len(work_df) + 1)
 
@@ -597,6 +700,14 @@ def _v30030_build_analysis_bundle(source_df: pd.DataFrame, filters: dict) -> dic
         .agg(total_hours=("work_hours", "sum"), count=("id", "count"), avg_hours=("work_hours", "mean"), employee_count=("employee_id", "nunique"), process_count=("process_name", "nunique"))
         .reset_index()
     )
+    if "judged_model" in work_df.columns and not by_wo.empty:
+        model_lookup = (
+            work_df.groupby("work_order", dropna=False)["judged_model"]
+            .apply(_join_unique_text)
+            .reset_index()
+        )
+        by_wo = by_wo.merge(model_lookup, on="work_order", how="left")
+        by_wo["judged_model"] = by_wo["judged_model"].fillna("")
     by_wo = _sort_summary(by_wo, sort_by, "work_order")
     by_wo["工時 / Time"] = by_wo["total_hours"].map(hours_to_hms)
     by_wo["平均 / Avg"] = by_wo["avg_hours"].map(hours_to_hms)
@@ -656,6 +767,8 @@ base_df = st.session_state.get(V69_DF_KEY, pd.DataFrame())
 if not isinstance(base_df, pd.DataFrame):
     base_df = pd.DataFrame()
 analysis_option_values = _v30071_load_analysis_filter_options_cached(start_saved, end_saved, filters, base_df)
+
+_render_model_rules_manager()
 
 with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=True):
     st.caption("所有條件按「套用篩選」後才重新運算，避免每點一下就卡頓；條件會永久記錄。")
@@ -757,7 +870,8 @@ if df.empty:
     st.info("查無工時資料 / No records")
     st.stop()
 
-_summary_sig = f"{_filter_signature}|rows={len(df)}|v30030"
+_model_rules_sig = str((_load_model_rules_for_page() or {}).get("updated_at") or "")
+_summary_sig = f"{_filter_signature}|rows={len(df)}|model={_model_rules_sig}|v30030"
 _cached_summary = st.session_state.get(V30030_SUMMARY_CACHE_KEY)
 if isinstance(_cached_summary, dict) and _cached_summary.get("sig") == _summary_sig and isinstance(_cached_summary.get("bundle"), dict):
     _bundle = _cached_summary["bundle"]
@@ -844,8 +958,8 @@ with tab1:
         x="work_order",
         y="total_hours",
         text="工時 / Time",
-        hover_data={"total_hours": ":.2f", "工時 / Time": True, "count": True, "employee_count": True, "process_count": True},
-        labels={"work_order": "製令 / Work Order", "total_hours": "累積時數 / Total Hours", "count": "筆數"},
+        hover_data={"total_hours": ":.2f", "工時 / Time": True, "judged_model": True, "count": True, "employee_count": True, "process_count": True},
+        labels={"work_order": "製令 / Work Order", "judged_model": "判斷機型 / Model", "total_hours": "累積時數 / Total Hours", "count": "筆數"},
         title=f"{top_n} 製令累積工時 / Work Order Time",
     )
     fig.update_traces(textposition="outside")
@@ -874,6 +988,7 @@ with tab2:
             hover_data={
                 "process_hours": ":.2f",
                 "process_time": True,
+                "judged_model": True,
                 "work_order_total_time": True,
                 "share_percent": ":.2f",
                 "count": True,
@@ -881,6 +996,7 @@ with tab2:
             },
             labels={
                 "work_order": "製令 / Work Order",
+                "judged_model": "判斷機型 / Model",
                 "process_hours": "工段工時 / Process Hours",
                 "process_name": "工段名稱 / Process",
                 "share_percent": "佔比%",
@@ -975,7 +1091,7 @@ with tab6:
         detail_df,
         "analysis_detail_records",
         editable=True,
-        disabled=["id", "record_key", "created_at", "updated_at", "work_hours"],
+        disabled=["id", "record_key", "created_at", "updated_at", "work_hours", "judged_model"],
         key="analysis_detail_editor_v58",
         height=520,
     )

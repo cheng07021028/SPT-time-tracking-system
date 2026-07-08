@@ -23,6 +23,11 @@ COLUMN_LABELS: dict[str, str] = {
     "work_order": "製令 / Work Order",
     "part_no": "P/N / Part No.",
     "type_name": "機型 / Type",
+    "judged_model": "判斷機型 / Model",
+    "model_name": "判斷機型 / Model",
+    "enabled": "啟用 / Enabled",
+    "sort_order": "排序 / Sort Order",
+    "delete": "刪除 / Delete",
     "process_name": "工段名稱 / Process",
     "employee_id": "工號 / Employee ID",
     "employee_name": "姓名 / Name",
@@ -72,6 +77,11 @@ DEFAULT_WIDTHS: dict[str, int] = {
     "work_order": 150,
     "part_no": 170,
     "type_name": 230,
+    "judged_model": 140,
+    "model_name": 160,
+    "enabled": 90,
+    "sort_order": 90,
+    "delete": 90,
     "process_name": 140,
     "employee_id": 120,
     "employee_name": 130,
@@ -86,7 +96,7 @@ DEFAULT_WIDTHS: dict[str, int] = {
 }
 
 
-BOOLEAN_COLUMNS = {"is_active", "is_in_factory", "is_today_attendance", "is_group_work", "刪除", "delete", "selected"}
+BOOLEAN_COLUMNS = {"is_active", "is_in_factory", "is_today_attendance", "is_group_work", "enabled", "刪除", "delete", "selected"}
 NUMBER_COLUMNS = {"id", "record_count", "active_count", "today_record_count", "count", "sort_order", "order", "display_order"}
 
 
