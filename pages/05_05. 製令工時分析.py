@@ -12,7 +12,7 @@ import streamlit as st
 from services.theme_service import apply_theme, render_header
 from services.security_service import require_module_access
 from services.time_record_service import load_records, save_time_records
-from services.table_ui_service import render_table
+from services.table_ui_service import render_table, render_width_settings
 from services.duration_service import hours_to_hms
 from services.timezone_service import today_date
 from services.analysis_filter_service import load_analysis_filters, save_analysis_filters
@@ -1126,6 +1126,17 @@ with tab6:
     st.caption("此處編輯的是分析來源明細，儲存後會影響歷史紀錄與後續統計。工時欄位以 00:00:00 顯示，需調整時請改開始/結束時間後重新計算。")
     detail_limit = int(filters.get("detail_limit", 1000) or 1000)
     detail_df = df.head(detail_limit).drop(columns=["work_time_text"], errors="ignore")
+    # V300.93: editable render_table intentionally does not auto-render the
+    # shared Column Settings panel, to avoid duplicate data_editor keys on
+    # edit screens. 05 Detail Edit still needs permanent display preferences,
+    # so render the same shared settings panel explicitly before the editor.
+    # This saves only UI widths/order for analysis_detail_records and never
+    # writes business time-record data.
+    render_width_settings(
+        "analysis_detail_records",
+        detail_df,
+        title="欄位設定 / Column Settings（永久保存）",
+    )
     st.info("V63：明細編輯與 10｜權限管理同模式；儲存後會清除全域 data_editor 草稿，避免畫面殘留舊資料。")
     analysis_detail_draft_key = "analysis_detail_records_draft_v58"
     edited = render_table(
