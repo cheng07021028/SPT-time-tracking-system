@@ -414,6 +414,49 @@ def _v53_process_text(value: object) -> str:
     return text
 
 
+def _v62_make_editor_merge_frame(df: object) -> pd.DataFrame:
+    """Return a mutable object-dtype dataframe for st.data_editor state merging.
+
+    Pandas 2.x raises TypeError when Streamlit widget-state values such as
+    empty strings, None, or display-label text are assigned into int/bool
+    columns.  The process editor only normalizes types at save time, so the
+    temporary merge dataframe must accept mixed widget values safely.
+    """
+    out = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    try:
+        out = out.reset_index(drop=True)
+    except Exception:
+        out = pd.DataFrame(out).reset_index(drop=True)
+    for col in list(out.columns):
+        try:
+            out[col] = out[col].astype("object")
+        except Exception:
+            try:
+                out[col] = out[col].map(lambda v: v)
+            except Exception:
+                pass
+    return out
+
+
+def _v62_set_editor_cell(df: pd.DataFrame, row_idx: int, col: object, value: object) -> pd.DataFrame:
+    """Safely set a data_editor state value without dtype upcast failures."""
+    column = str(col)
+    if column not in df.columns:
+        df[column] = pd.Series([""] * len(df), dtype="object")
+    else:
+        try:
+            df[column] = df[column].astype("object")
+        except Exception:
+            pass
+    try:
+        df.at[row_idx, column] = value
+    except TypeError:
+        # Last-resort fallback for pandas strict dtype paths.
+        df.loc[:, column] = df[column].astype("object")
+        df.at[row_idx, column] = value
+    return df
+
+
 def _v53_row_has_process_value(row: object) -> bool:
     for c in ["process_name", "工段名稱", "工段名稱 / Process", "process", "Process", "工段"]:
         try:
@@ -463,9 +506,11 @@ def _v53_apply_editor_state_to_process_table(
     state = st.session_state.get(editor_widget_key)
     state_df = None
     if isinstance(state, dict) and any(k in state for k in ("edited_rows", "added_rows", "deleted_rows")):
-        work = base.copy()
-        # Ensure all rows/cols are mutable by position.
-        work = work.reset_index(drop=True)
+        # Ensure all rows/cols are mutable by position and object dtype.
+        # Streamlit can send empty strings / None into numeric or boolean
+        # columns; merging those directly into pandas int/bool columns fails on
+        # pandas 2.x / Python 3.14 before the Save button normalization runs.
+        work = _v62_make_editor_merge_frame(base)
         edited_rows = state.get("edited_rows") or {}
         if isinstance(edited_rows, dict):
             for idx_raw, changes in edited_rows.items():
@@ -476,9 +521,7 @@ def _v53_apply_editor_state_to_process_table(
                 if idx < 0 or idx >= len(work) or not isinstance(changes, dict):
                     continue
                 for col, val in changes.items():
-                    if col not in work.columns:
-                        work[col] = ""
-                    work.at[idx, col] = val
+                    work = _v62_set_editor_cell(work, idx, col, val)
 
         deleted_rows = state.get("deleted_rows") or []
         delete_idx = set()
@@ -528,6 +571,7 @@ def _v53_apply_editor_state_to_process_table(
     best = max(candidates, key=_v53_business_row_count) if candidates else pd.DataFrame()
     if not isinstance(best, pd.DataFrame):
         best = pd.DataFrame()
+    best = _v62_make_editor_merge_frame(best)
     best = _v54_force_editor_save_category_preserve_blank_rows(best, selected)
     # Do not keep purely blank dynamic rows in the confirmed draft.
     if isinstance(best, pd.DataFrame) and not best.empty:
@@ -573,7 +617,7 @@ def _v54_force_editor_save_category_preserve_blank_rows(df: pd.DataFrame, select
     old widget-state rows from another category.
     """
     selected = _v144_normalize_category_text(selected_category)
-    out = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    out = _v62_make_editor_merge_frame(df)
     if out.empty:
         return out
 
