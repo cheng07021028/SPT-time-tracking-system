@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import inspect
 import re
+import unicodedata
 
 import json
 import os
@@ -631,7 +632,7 @@ def render_width_settings(table_key: str, df: pd.DataFrame, title: str = "欄寬
                 new_widths[col] = st.number_input(
                     "欄寬",
                     min_value=60,
-                    max_value=700,
+                    max_value=3000,
                     value=default_width,
                     step=10,
                     key=f"width_{instance_key}_{idx}_{col_key}",
@@ -1722,7 +1723,7 @@ def render_width_settings(table_key: str, df: pd.DataFrame, title: str = "欄寬
                 new_widths[col_str] = st.number_input(
                     "欄寬",
                     min_value=60,
-                    max_value=700,
+                    max_value=3000,
                     value=safe_width,
                     step=10,
                     key=width_key,
@@ -1782,9 +1783,11 @@ def render_table(
             source_df = _v370_fill_readonly_id_for_display(source_df, editable=False)
         display_df = _format_duration_columns_for_display(source_df)
         display_df = _prepare_display_dataframe(display_df)
+        display_df = _v30096_prepare_long_text_display(display_df)
     else:
         display_df = source_df
 
+    effective_row_height = _v30096_auto_row_height(display_df, row_height) if isinstance(display_df, pd.DataFrame) else row_height
     cfg = build_column_config(table_key, display_df) if isinstance(display_df, pd.DataFrame) else {}
     disabled_cols = list(disabled or [])
     for c in ("work_hours", "total_hours", "avg_hours"):
@@ -2950,6 +2953,112 @@ def label_for(col: str) -> str:  # type: ignore[override]
     return _v30058_label_for(col)
 
 
+
+
+# V300.96: Operation Content auto width and multi-line display.
+# 目的：05｜製令工時分析的「作業內容 / Operation Content」字串較長，固定 1000 寬仍會被截斷。
+# 做法：只針對 operation_content 欄位依實際內容估算欄寬，並在顯示用 DataFrame 加入安全換行；
+#       不改原始工時資料、不寫回 01/02，也不影響其他欄位的永久欄寬設定。
+def _v30096_text_units(value: object) -> int:
+    text = "" if value is None else str(value)
+    if not text:
+        return 0
+    max_units = 0
+    for line in text.splitlines() or [text]:
+        units = 0
+        for ch in line:
+            try:
+                units += 2 if unicodedata.east_asian_width(ch) in {"W", "F"} else 1
+            except Exception:
+                units += 1
+        max_units = max(max_units, units)
+    return max_units
+
+
+def _v30096_hard_wrap_by_units(text: str, max_units: int = 96) -> str:
+    lines: list[str] = []
+    current: list[str] = []
+    units = 0
+    for ch in str(text):
+        if ch == "\n":
+            lines.append("".join(current).strip())
+            current = []
+            units = 0
+            continue
+        try:
+            ch_units = 2 if unicodedata.east_asian_width(ch) in {"W", "F"} else 1
+        except Exception:
+            ch_units = 1
+        if current and units + ch_units > max_units:
+            lines.append("".join(current).strip())
+            current = [ch]
+            units = ch_units
+        else:
+            current.append(ch)
+            units += ch_units
+    if current:
+        lines.append("".join(current).strip())
+    return "\n".join([line for line in lines if line != ""])
+
+
+def _v30096_wrap_operation_content(value: object) -> str:
+    text = "" if value is None else str(value).strip()
+    if not text:
+        return ""
+    # 作業內容由多個 Unit 組成，通常以「、」串接；先依 Unit 自然換行，再避免單行過長。
+    text = text.replace("；", "；\n").replace("; ", ";\n")
+    text = text.replace("、", "、\n")
+    raw_lines = [line.strip() for line in text.splitlines() if line.strip()]
+    wrapped: list[str] = []
+    for line in raw_lines:
+        wrapped.append(_v30096_hard_wrap_by_units(line, max_units=110))
+    return "\n".join([line for line in wrapped if line])
+
+
+def _v30096_prepare_long_text_display(df: pd.DataFrame) -> pd.DataFrame:
+    if not isinstance(df, pd.DataFrame) or "operation_content" not in df.columns:
+        return df
+    out = df.copy()
+    try:
+        out["operation_content"] = out["operation_content"].map(_v30096_wrap_operation_content)
+    except Exception:
+        pass
+    return out
+
+
+def _v30096_auto_operation_width(series: pd.Series | None, configured_width: int | None = None) -> int:
+    base = int(configured_width or DEFAULT_WIDTHS.get("operation_content", 1000) or 1000)
+    if series is None:
+        return max(base, 1000)
+    try:
+        sample = series.dropna().astype(str).head(500)
+    except Exception:
+        sample = series.head(500) if series is not None else []
+    max_units = _v30096_text_units("作業內容 / Operation Content")
+    try:
+        for value in sample:
+            max_units = max(max_units, _v30096_text_units(value))
+    except Exception:
+        pass
+    # 粗估 pixel：英數約 8px、中文字約 14~16px；加 padding。
+    estimated = int(max_units * 9.5 + 120)
+    # 上限避免單欄過寬拖慢瀏覽器；超長內容已經透過換行完整呈現。
+    return max(1000, min(3000, max(base, estimated)))
+
+
+def _v30096_auto_row_height(df: pd.DataFrame, requested: int | None = None) -> int | None:
+    if not isinstance(df, pd.DataFrame) or "operation_content" not in df.columns:
+        return requested
+    try:
+        max_lines = 1
+        for value in df["operation_content"].dropna().astype(str).head(120):
+            max_lines = max(max_lines, str(value).count("\n") + 1)
+        # 依內容行數放大列高，讓每筆作業內容可直接看完整；最高限制避免畫面過慢。
+        dynamic = min(420, max(72, 34 + max_lines * 28))
+        return max(int(requested or 0), dynamic) if requested else dynamic
+    except Exception:
+        return requested
+
 def build_column_config(table_key: str, df: pd.DataFrame) -> dict:  # type: ignore[override]
     """Final shared table column_config builder.
 
@@ -2965,9 +3074,12 @@ def build_column_config(table_key: str, df: pd.DataFrame) -> dict:  # type: igno
     for col in list(df.columns):
         col_key = str(col)
         label = _v30058_label_for(col_key)
-        width = int(widths.get(col_key, DEFAULT_WIDTHS.get(col_key, 140)))
+        configured_width = widths.get(col_key)
+        width = int(configured_width or DEFAULT_WIDTHS.get(col_key, 140))
         try:
             series = df[col] if col in df.columns else None
+            if col_key == "operation_content":
+                width = _v30096_auto_operation_width(series, int(configured_width) if configured_width else None)
             if col_key in BOOLEAN_COLUMNS or col_key.lower() in {"_delete", "delete", "selected"} or _v87_bool_like_series(series):
                 config[col] = _v87_checkbox_column(label, width)
             else:
@@ -3028,9 +3140,11 @@ def render_table(
             source_df = _v370_fill_readonly_id_for_display(source_df, editable=False)
         display_df = _format_duration_columns_for_display(source_df)
         display_df = _prepare_display_dataframe(display_df)
+        display_df = _v30096_prepare_long_text_display(display_df)
     else:
         display_df = source_df
 
+    effective_row_height = _v30096_auto_row_height(display_df, row_height) if isinstance(display_df, pd.DataFrame) else row_height
     cfg = build_column_config(table_key, display_df) if isinstance(display_df, pd.DataFrame) else {}
     disabled_cols = list(disabled or [])
     for c in ("work_hours", "total_hours", "avg_hours"):
@@ -3042,7 +3156,7 @@ def render_table(
                 disabled_cols.append(c)
 
     if editable:
-        return _v30095_call_table(
+        edited_df = _v30095_call_table(
             st.data_editor,
             {
                 "data": display_df,
@@ -3054,8 +3168,23 @@ def render_table(
                 "key": key or f"editor_{table_key}",
                 "height": height,
             },
-            row_height=row_height,
+            row_height=effective_row_height,
         )
+        # The Operation Content line breaks are display-only.  Return the original
+        # value to business save flows so analysis UI formatting never changes
+        # time-record data or generated content.
+        try:
+            if (
+                isinstance(edited_df, pd.DataFrame)
+                and isinstance(source_df, pd.DataFrame)
+                and "operation_content" in edited_df.columns
+                and "operation_content" in source_df.columns
+                and len(edited_df) == len(source_df)
+            ):
+                edited_df["operation_content"] = list(source_df["operation_content"].values)
+        except Exception:
+            pass
+        return edited_df
 
     visual_order = [str(c) for c in display_df.columns] if isinstance(display_df, pd.DataFrame) else None
     _v30095_call_table(
@@ -3069,7 +3198,7 @@ def render_table(
             "height": height,
             "key": key or f"frame_{table_key}",
         },
-        row_height=row_height,
+        row_height=effective_row_height,
     )
     return None
 
@@ -3174,7 +3303,7 @@ def render_width_settings(table_key: str, df: pd.DataFrame, title: str = '欄位
                 width_values[col] = st.number_input(
                     '欄寬 / Width',
                     min_value=60,
-                    max_value=700,
+                    max_value=3000,
                     value=default_width,
                     step=10,
                     key=f'v30059_width_{instance_key}_{safe_col}',
