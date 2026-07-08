@@ -80,7 +80,7 @@ DEFAULT_WIDTHS: dict[str, int] = {
     "part_no": 170,
     "type_name": 230,
     "judged_model": 140,
-    "operation_content": 520,
+    "operation_content": 1000,
     "match_keyword": 220,
     "model_name": 160,
     "enabled": 90,
@@ -1758,6 +1758,7 @@ def render_table(
     height: int | None = None,
     num_rows: str = "fixed",
     show_width_settings: bool = True,
+    row_height: int | None = None,
 ) -> pd.DataFrame | None:  # type: ignore[override]
     """V145 final table renderer with optional width settings.
 
@@ -2976,6 +2977,24 @@ def build_column_config(table_key: str, df: pd.DataFrame) -> dict:  # type: igno
     return config
 
 
+# V300.95: long text display compatibility for Operation Content.
+# Some Streamlit builds support row_height on st.dataframe/st.data_editor while
+# older builds do not.  Add the argument only when the runtime accepts it so
+# widening long-text rows does not break older deployments.
+def _v30095_supports_arg(fn, arg_name: str) -> bool:
+    try:
+        return arg_name in inspect.signature(fn).parameters
+    except Exception:
+        return False
+
+
+def _v30095_call_table(fn, kwargs: dict, *, row_height: int | None = None):
+    call_kwargs = dict(kwargs)
+    if row_height is not None and _v30095_supports_arg(fn, "row_height"):
+        call_kwargs["row_height"] = int(row_height)
+    return fn(**call_kwargs)
+
+
 # Final render_table override.  Keep the existing UI and data flow, but ensure the
 # editable data_editor does not pass column_order directly.  The dataframe has
 # already been ordered by apply_column_order(), and passing column_order through
@@ -2990,6 +3009,7 @@ def render_table(
     height: int | None = None,
     num_rows: str = "fixed",
     show_width_settings: bool = True,
+    row_height: int | None = None,
 ) -> pd.DataFrame | None:  # type: ignore[override]
     if df is None:
         st.info("目前沒有資料 / No data")
@@ -3022,26 +3042,34 @@ def render_table(
                 disabled_cols.append(c)
 
     if editable:
-        return st.data_editor(
-            display_df,
-            use_container_width=True,
-            hide_index=True,
-            column_config=cfg,
-            disabled=disabled_cols,
-            num_rows=num_rows,
-            key=key or f"editor_{table_key}",
-            height=height,
+        return _v30095_call_table(
+            st.data_editor,
+            {
+                "data": display_df,
+                "use_container_width": True,
+                "hide_index": True,
+                "column_config": cfg,
+                "disabled": disabled_cols,
+                "num_rows": num_rows,
+                "key": key or f"editor_{table_key}",
+                "height": height,
+            },
+            row_height=row_height,
         )
 
     visual_order = [str(c) for c in display_df.columns] if isinstance(display_df, pd.DataFrame) else None
-    st.dataframe(
-        display_df,
-        use_container_width=True,
-        hide_index=True,
-        column_config=cfg,
-        column_order=visual_order,
-        height=height,
-        key=key or f"frame_{table_key}",
+    _v30095_call_table(
+        st.dataframe,
+        {
+            "data": display_df,
+            "use_container_width": True,
+            "hide_index": True,
+            "column_config": cfg,
+            "column_order": visual_order,
+            "height": height,
+            "key": key or f"frame_{table_key}",
+        },
+        row_height=row_height,
     )
     return None
 

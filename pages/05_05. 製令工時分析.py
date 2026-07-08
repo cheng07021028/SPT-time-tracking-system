@@ -1008,7 +1008,13 @@ with tab1:
     )
     fig.update_traces(textposition="outside")
     st.plotly_chart(style_fig(fig, 460), use_container_width=True)
-    render_table(by_wo.drop(columns=["工時 / Time", "平均 / Avg"], errors="ignore"), "analysis_by_work_order", editable=False, height=380)
+    render_table(
+        by_wo.drop(columns=["工時 / Time", "平均 / Avg"], errors="ignore"),
+        "analysis_by_work_order",
+        editable=False,
+        height=500,
+        row_height=104,
+    )
 
 with tab2:
     st.subheader("每個製令總工時與各工段工時 / Work Order by Process")
@@ -1051,7 +1057,13 @@ with tab2:
         st.plotly_chart(style_fig(fig, 520), use_container_width=True)
 
     st.markdown("#### 製令 x 工段明細 / Work Order x Process Detail")
-    render_table(wo_process_display, "analysis_work_order_process_detail_v233", editable=False, height=420)
+    render_table(
+        wo_process_display,
+        "analysis_work_order_process_detail_v233",
+        editable=False,
+        height=560,
+        row_height=104,
+    )
 
     st.markdown("#### 製令工段矩陣 / Work Order Process Matrix")
     matrix_mode = st.radio(
@@ -1061,7 +1073,13 @@ with tab2:
         key="analysis_wo_process_matrix_mode_v233",
     )
     matrix_df = wo_process_pivot_text if matrix_mode == "時:分:秒" else wo_process_pivot_hours
-    render_table(matrix_df, "analysis_work_order_process_matrix_v233", editable=False, height=420)
+    render_table(
+        matrix_df,
+        "analysis_work_order_process_matrix_v233",
+        editable=False,
+        height=560,
+        row_height=104,
+    )
 
     st.download_button(
         "⟰ 下載製令 x 工段分析 Excel / Export Work Order Process Analysis",
@@ -1162,7 +1180,8 @@ with tab6:
         editable=True,
         disabled=["id", "record_key", "created_at", "updated_at", "work_hours", "judged_model", "operation_content"],
         key="analysis_detail_editor_v58",
-        height=520,
+        height=680,
+        row_height=112,
     )
     if isinstance(edited, pd.DataFrame):
         st.session_state[analysis_detail_draft_key] = edited.copy()
