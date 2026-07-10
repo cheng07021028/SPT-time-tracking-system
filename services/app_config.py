@@ -29,6 +29,10 @@ MODULES: list[ModuleInfo] = [
     ModuleInfo("11_login_logs", "11", "登入紀錄", "Login Logs", "登入、登出、權限不足與安全事件查詢", "11_11. 登入紀錄.py"),
     ModuleInfo("12_module_persistence", "12", "模組永久紀錄中心", "Module Persistence Center", "每個模組的 records/settings/backups 檢查", "12_12. 模組永久紀錄中心.py"),
     ModuleInfo("13_system_settings", "13", "系統設定", "System Settings", "工段、作業項目、休息時間、共用參數", "13_13. 系統設定.py"),
+    ModuleInfo("14_data_health", "14", "資料健康檢查中心", "Data Health", "資料完整性、備份佇列、回歸檢查與修復工具", "14_14. 資料健康檢查中心.py"),
+    ModuleInfo("15_legacy_migration", "15", "舊資料匯入到Neon", "Legacy Migration", "舊 ZIP / 舊權威檔匯入 Neon PostgreSQL", "15_15. 舊資料匯入到Neon.py"),
+    ModuleInfo("16_finished_machines", "16", "完工機台", "Finished Machines", "已完工製令查詢、匯入與 01 製令下拉隱藏設定", "16_16. 完工機台.py"),
+    ModuleInfo("98_authority_diagnostic", "98", "權威檔診斷", "Authority Diagnostic", "模組權威來源與資料流檢查", "98_98. 權威檔診斷.py"),
     ModuleInfo("99_speed_diagnostic", "99", "效能診斷", "Performance Diagnostic", "效能測速、慢查詢與錯誤事件診斷；限系統管理員", "99_99. 效能診斷.py"),
 ]
 MODULE_BY_KEY = {m.key: m for m in MODULES}
@@ -41,6 +45,7 @@ TABLE_COLUMNS: dict[str, list[str]] = {
     "06_logs": ["時間", "模組", "動作", "使用者", "結果", "訊息"],
     "10_permissions": ["帳號", "密碼", "姓名", "角色", "啟用", "備註"],
     "13_system_settings_process": ["工段分類", "工段", "啟用", "排序", "備註"],
+    "16_finished_machines": ["製令", "P/N", "機型", "Category", "組立地點", "客戶", "完工日期", "啟用", "備註"],
     "13_system_settings_rest": ["名稱", "開始", "結束", "啟用", "備註"],
 }
 

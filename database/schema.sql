@@ -59,6 +59,26 @@ CREATE TABLE IF NOT EXISTS work_orders (
         version INTEGER NOT NULL DEFAULT 1
     );
 
+
+CREATE TABLE IF NOT EXISTS finished_machines (
+        id SERIAL PRIMARY KEY,
+        work_order TEXT UNIQUE,
+        part_no TEXT,
+        type_name TEXT,
+        category TEXT,
+        assembly_location TEXT,
+        customer TEXT,
+        finished_date TEXT,
+        note TEXT,
+        is_active INTEGER DEFAULT 1,
+        active INTEGER DEFAULT 1,
+        created_at TEXT,
+        updated_at TEXT,
+        deleted_at TEXT,
+        deleted_by TEXT,
+        delete_reason TEXT
+    );
+
 CREATE TABLE IF NOT EXISTS processes (
         process_code TEXT PRIMARY KEY,
         process_name TEXT NOT NULL,
@@ -207,6 +227,10 @@ CREATE TABLE IF NOT EXISTS sync_jobs (
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_employees_active ON employees(active);
 CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders(status);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_finished_machines_work_order ON finished_machines(work_order);
+CREATE INDEX IF NOT EXISTS idx_finished_machines_active ON finished_machines(is_active);
+CREATE INDEX IF NOT EXISTS idx_finished_machines_deleted_at ON finished_machines(deleted_at);
+
 CREATE INDEX IF NOT EXISTS idx_processes_category ON processes(process_category);
 CREATE INDEX IF NOT EXISTS idx_time_records_work_date ON time_records(work_date);
 CREATE INDEX IF NOT EXISTS idx_time_records_employee_status ON time_records(employee_id, status);

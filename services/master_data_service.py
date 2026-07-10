@@ -110,12 +110,23 @@ def load_employees(
 
 
 def load_work_orders_for_time_record_fast(active_only: bool | None = True, **_: Any) -> pd.DataFrame:
-    key = ("work_orders_for_time_record", bool(active_only))
+    """Load 01 work-order dropdown data and hide Module 16 completed orders.
+
+    The finished-machine lookup is one cached set per TTL, not a per-row or
+    per-widget Neon query, so the 01 hot path remains fast even when many old
+    work orders have been completed.
+    """
+    key = ("work_orders_for_time_record", bool(active_only), "hide_finished_v16")
     now = _now_ts()
     cached = _WO_CACHE.get(key)
     if cached is not None and now - cached[0] <= _CACHE_TTL:
         return _copy(cached[1])
     df = load_work_orders(active_only=active_only)
+    try:
+        from services.finished_machine_service import filter_open_work_orders_for_time_record
+        df = filter_open_work_orders_for_time_record(df)
+    except Exception:
+        pass
     _WO_CACHE[key] = (now, _copy(df))
     return df.reset_index(drop=True)
 

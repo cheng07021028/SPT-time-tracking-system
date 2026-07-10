@@ -68,6 +68,7 @@ MODULES = [
     {"module_code": "13_system_settings", "module_no": "13", "module_name": "系統設定", "module_name_en": "System Settings"},
     {"module_code": "14_data_health", "module_no": "14", "module_name": "資料健康檢查中心", "module_name_en": "Data Health"},
     {"module_code": "15_legacy_migration", "module_no": "15", "module_name": "舊資料匯入到Neon", "module_name_en": "Legacy Migration"},
+    {"module_code": "16_finished_machines", "module_no": "16", "module_name": "完工機台", "module_name_en": "Finished Machines"},
     {"module_code": "98_authority_diagnostic", "module_no": "98", "module_name": "權威檔診斷", "module_name_en": "Authority Diagnostic"},
     {"module_code": "99_speed_diagnostic", "module_no": "99", "module_name": "效能診斷", "module_name_en": "Performance Diagnostic"},
 ]
@@ -430,7 +431,7 @@ def _role_perm_template(role_code: str, module_code: str) -> dict[str, int]:
     if role_code == "manager":
         p = view_only.copy()
         p.update({"can_edit": 1, "can_export": 1})
-        if module_code in ["03_work_orders", "04_employees"]:
+        if module_code in ["03_work_orders", "04_employees", "16_finished_machines"]:
             p.update({"can_create": 1, "can_import": 1})
         if module_code == "09_persistence":
             p.update({"can_backup": 1})
@@ -443,7 +444,7 @@ def _role_perm_template(role_code: str, module_code: str) -> dict[str, int]:
             return {**none, "can_view": 1, "can_create": 1, "can_edit": 1}
         if module_code in ["02_history", "04_employees", "07_missing", "08_daily_hours"]:
             return {**view_only, "can_edit": 1 if module_code == "04_employees" else 0, "can_export": 1}
-        if module_code in ["03_work_orders", "05_analysis"]:
+        if module_code in ["03_work_orders", "05_analysis", "16_finished_machines"]:
             return view_only
         return none
 
@@ -3485,6 +3486,11 @@ _V125_MODULE_ALIASES = {
     "11": "11", "11_login_logs": "11",
     "12": "12", "12_module_persistence": "12",
     "13": "13", "13_system_settings": "13",
+    "14": "14", "14_data_health": "14",
+    "15": "15", "15_legacy_migration": "15",
+    "16": "16", "16_finished_machines": "16",
+    "98": "98", "98_authority_diagnostic": "98",
+    "99": "99", "99_speed_diagnostic": "99",
 }
 _V125_ACTION_ALIASES = {
     "view": "can_view", "read": "can_view", "can_view": "can_view",
@@ -4489,7 +4495,7 @@ def _v33_module_no(module_code: str) -> str:
         "01_time_record":"01", "01_time_records":"01", "02_history":"02", "03_work_orders":"03", "04_employees":"04",
         "05_analysis":"05", "06_logs":"06", "07_missing":"07", "08_daily_hours":"08", "09_persistence":"09",
         "10_permissions":"10", "11_login_logs":"11", "12_module_persistence":"12", "13_system_settings":"13",
-        "14_data_health":"14", "15_legacy_migration":"15", "98_authority_diagnostic":"98", "99_speed_diagnostic":"99",
+        "14_data_health":"14", "15_legacy_migration":"15", "16_finished_machines":"16", "98_authority_diagnostic":"98", "99_speed_diagnostic":"99",
     }
     return mapping.get(s, s)
 

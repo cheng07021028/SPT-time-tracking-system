@@ -43,7 +43,7 @@ render_global_font_controls(username=str(_current_user))
 st.success("系統初始化成功。請從左側選單進入各功能頁。")
 
 render_kpi_cards([
-    ("核心模組 / Modules", "17"),
+    ("核心模組 / Modules", "18"),
     ("資料庫 / Database", "Neon / PostgreSQL"),
     ("雲端保存 / GitHub", "Ready"),
     ("權限系統 / Permission", "Enabled"),
@@ -67,6 +67,7 @@ all_modules = [
     ("13", "系統設定", "工段名稱、休息時間與跨模組共用設定", "13_system_settings"),
     ("14", "資料健康檢查中心", "資料完整性、備份佇列、回歸檢查與修復工具", "14_data_health"),
     ("15", "舊資料匯入到Neon", "舊 ZIP / 舊權威檔匯入 Neon PostgreSQL", "09_persistence"),
+    ("16", "完工機台", "已完工製令查詢、匯入與 01 製令下拉隱藏設定", "16_finished_machines"),
     ("98", "權威檔診斷", "模組權威來源與資料流檢查", "10_permissions"),
     ("99", "效能診斷", "頁面、SQL、Neon 與按鈕耗時診斷", "99_speed_diagnostic"),
 ]

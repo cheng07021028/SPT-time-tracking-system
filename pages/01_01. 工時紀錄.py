@@ -1556,7 +1556,17 @@ has_employees_master, has_work_orders_master = has_master_data_for_time_record_f
 _spt_perf_t = _spt_perf_tick("01_check_master_data_available", _spt_perf_t, threshold_ms=300.0)
 
 if employees.empty or work_orders.empty:
-    if st.session_state.get("_spt_employee_binding_required"):
+    _finished_hidden_count_v16 = 0
+    try:
+        _finished_hidden_count_v16 = int(getattr(work_orders, "attrs", {}).get("finished_hidden_count", 0) or 0)
+    except Exception:
+        _finished_hidden_count_v16 = 0
+    if work_orders.empty and _finished_hidden_count_v16 > 0 and not employees.empty:
+        st.warning(
+            f"目前沒有可開工製令；16｜完工機台已隱藏 {_finished_hidden_count_v16} 筆已完工製令。"
+            "如需重新顯示，請到 16｜完工機台停用或移除該製令。"
+        )
+    elif st.session_state.get("_spt_employee_binding_required"):
         st.warning("該人員未在人員名單，請洽管理員設定。")
     elif not has_employees_master or not has_work_orders_master:
         st.warning("請先到『03. 製令管理』與『04. 人員名單』匯入或新增資料。")
