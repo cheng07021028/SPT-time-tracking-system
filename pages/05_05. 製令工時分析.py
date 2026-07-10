@@ -53,6 +53,10 @@ V30071_FILTER_OPTIONS_CACHE_KEY = "_spt_v30071_05_filter_options_cache"
 V30091_ANALYSIS_DEFAULT_PRESET = "今日"
 MODEL_RULES_STATE_KEY = "_spt_05_model_detection_rules"
 MODEL_RULES_DRAFT_KEY = "_spt_05_model_detection_rules_draft"
+CATEGORY_SOURCE_COLUMNS = [
+    "category", "Category", "類別", "category_name", "show_category",
+    "work_category", "machine_category", "product_category", "wo_category",
+]
 
 DATE_PRESETS = ["今日", "近7天", "近30天", "本月", "上月", "自訂區間"]
 STATUS_OPTIONS = ["全部", "作業中", "暫停", "完工", "下班", "未結束", "已結束"]
@@ -208,6 +212,32 @@ def _v30071_df_options(df: pd.DataFrame, col: str) -> list[str]:
     return []
 
 
+def _find_first_existing_column(df: pd.DataFrame, candidates: list[str]) -> str | None:
+    """Return the first matching column name, accepting case-insensitive variants.
+
+    Category has appeared in different historical exports/settings as
+    category, Category, 類別, show_category, etc. 05 only needs a canonical
+    analysis column named category, so this helper keeps the page compatible
+    without forcing a schema change or touching Neon authority data.
+    """
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return None
+    columns = [str(c) for c in df.columns]
+    for cand in candidates:
+        if cand in df.columns:
+            return cand
+        cand_norm = str(cand).strip().lower()
+        for col in columns:
+            if col.strip().lower() == cand_norm:
+                return col
+    return None
+
+
+def _v30071_category_options_from_work_orders(wo: pd.DataFrame) -> list[str]:
+    col = _find_first_existing_column(wo, CATEGORY_SOURCE_COLUMNS)
+    return _v30071_df_options(wo, col) if col else []
+
+
 def _v30071_load_analysis_filter_options_cached(start_value, end_value, filters_map: dict, last_df: pd.DataFrame | None = None) -> dict[str, list[str]]:
     """Load 05 filter options without scanning full 02 history records.
 
@@ -223,7 +253,7 @@ def _v30071_load_analysis_filter_options_cached(start_value, end_value, filters_
         base_options = {str(k): list(v or []) for k, v in cache.get("options", {}).items()}
     else:
         base_options: dict[str, list[str]] = {
-            "work_order": [], "part_no": [], "type_name": [], "customer": [], "assembly_location": [],
+            "work_order": [], "part_no": [], "type_name": [], "category": [], "customer": [], "assembly_location": [],
             "process_name": [], "employee_id": [], "employee_name": [], "department": [], "title": [], "status": [],
         }
         try:
@@ -232,6 +262,7 @@ def _v30071_load_analysis_filter_options_cached(start_value, end_value, filters_
                 base_options["work_order"] = _v30071_merge_options(base_options["work_order"], _v30071_df_options(wo, "work_order"))
                 base_options["part_no"] = _v30071_merge_options(base_options["part_no"], _v30071_df_options(wo, "part_no"))
                 base_options["type_name"] = _v30071_merge_options(base_options["type_name"], _v30071_df_options(wo, "type_name"))
+                base_options["category"] = _v30071_merge_options(base_options["category"], _v30071_category_options_from_work_orders(wo))
                 base_options["customer"] = _v30071_merge_options(base_options["customer"], _v30071_df_options(wo, "customer"))
                 base_options["assembly_location"] = _v30071_merge_options(base_options["assembly_location"], _v30071_df_options(wo, "assembly_location"))
         except Exception:
@@ -249,7 +280,7 @@ def _v30071_load_analysis_filter_options_cached(start_value, end_value, filters_
             try:
                 time_opts = load_history_filter_options_sql(start_value, end_value, limit_per_column=5000)
                 if isinstance(time_opts, dict):
-                    for col in ["work_order", "part_no", "type_name", "assembly_location", "process_name", "employee_id", "employee_name", "status"]:
+                    for col in ["work_order", "part_no", "type_name", "category", "assembly_location", "process_name", "employee_id", "employee_name", "status"]:
                         base_options[col] = _v30071_merge_options(base_options.get(col, []), time_opts.get(col, []))
             except Exception:
                 pass
@@ -260,7 +291,7 @@ def _v30071_load_analysis_filter_options_cached(start_value, end_value, filters_
     # remain selectable even if the date range changed or master data is partial.
     option_map = dict(base_options)
     selected_key_map = {
-        "work_order": "work_orders", "part_no": "part_nos", "type_name": "type_names", "customer": "customers",
+        "work_order": "work_orders", "part_no": "part_nos", "type_name": "type_names", "category": "categories", "customer": "customers",
         "assembly_location": "assembly_locations", "process_name": "process_names", "employee_id": "employee_ids",
         "employee_name": "employee_names", "department": "departments", "title": "titles",
     }
@@ -379,16 +410,24 @@ def _enrich_records(df: pd.DataFrame) -> pd.DataFrame:
         return df
     out = df.copy()
 
-    # 補入製令主檔欄位：客戶、組立地點、P/N、機型。
+    # 補入製令主檔欄位：客戶、組立地點、P/N、機型、Category。
     try:
         wo = load_work_orders(active_only=False)
         if wo is not None and not wo.empty and "work_order" in wo.columns and "work_order" in out.columns:
             keep = [c for c in ["work_order", "customer", "assembly_location", "part_no", "type_name"] if c in wo.columns]
+            category_col = _find_first_existing_column(wo, CATEGORY_SOURCE_COLUMNS)
+            if category_col and category_col not in keep:
+                keep.append(category_col)
             wo2 = wo[keep].drop_duplicates("work_order").copy()
-            rename = {c: f"wo_{c}" for c in keep if c != "work_order"}
+            rename: dict[str, str] = {}
+            for c in keep:
+                if c == "work_order":
+                    continue
+                target = "category" if category_col and c == category_col else c
+                rename[c] = f"wo_{target}"
             wo2 = wo2.rename(columns=rename)
             out = out.merge(wo2, on="work_order", how="left")
-            for c in ["customer", "assembly_location", "part_no", "type_name"]:
+            for c in ["customer", "assembly_location", "part_no", "type_name", "category"]:
                 wc = f"wo_{c}"
                 if wc in out.columns:
                     if c not in out.columns:
@@ -412,7 +451,7 @@ def _enrich_records(df: pd.DataFrame) -> pd.DataFrame:
     except Exception:
         pass
 
-    for col in ["customer", "assembly_location", "part_no", "type_name", "department", "title"]:
+    for col in ["customer", "assembly_location", "part_no", "type_name", "category", "department", "title"]:
         if col not in out.columns:
             out[col] = ""
 
@@ -439,6 +478,7 @@ def _apply_filters(df: pd.DataFrame, f: dict) -> pd.DataFrame:
         "work_orders": "work_order",
         "part_nos": "part_no",
         "type_names": "type_name",
+        "categories": "category",
         "customers": "customer",
         "assembly_locations": "assembly_location",
         "process_names": "process_name",
@@ -568,7 +608,7 @@ def _build_work_order_process_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, p
     """
     if df is None or df.empty:
         empty_detail = pd.DataFrame(columns=[
-            "work_order", "judged_model", "operation_content", "process_name", "process_hours", "process_time",
+            "work_order", "category", "judged_model", "operation_content", "process_name", "process_hours", "process_time",
             "work_order_total_hours", "work_order_total_time", "share_percent",
             "count", "employee_count", "avg_hours", "avg_time",
         ])
@@ -583,6 +623,8 @@ def _build_work_order_process_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, p
         work["work_hours"] = 0.0
     if "employee_id" not in work.columns:
         work["employee_id"] = ""
+    if "category" not in work.columns:
+        work["category"] = ""
     if "judged_model" not in work.columns:
         work["judged_model"] = ""
     if "operation_content" not in work.columns:
@@ -591,13 +633,14 @@ def _build_work_order_process_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, p
         work["id"] = range(1, len(work) + 1)
 
     work["work_order"] = _blank_to_unknown(work["work_order"], "未填製令")
+    work["category"] = work["category"].fillna("").astype(str).str.strip()
     work["judged_model"] = work["judged_model"].fillna("").astype(str).str.strip()
     work["operation_content"] = work["operation_content"].fillna("").astype(str).str.strip()
     work["process_name"] = _blank_to_unknown(work["process_name"], "未填工段")
     work["work_hours"] = _coerce_work_hours(work["work_hours"])
 
     detail = (
-        work.groupby(["work_order", "judged_model", "operation_content", "process_name"], dropna=False)
+        work.groupby(["work_order", "category", "judged_model", "operation_content", "process_name"], dropna=False)
         .agg(
             process_hours=("work_hours", "sum"),
             count=("id", "count"),
@@ -629,7 +672,7 @@ def _build_work_order_process_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, p
 
     pivot_hours = (
         work.pivot_table(
-            index=["work_order", "judged_model", "operation_content"],
+            index=["work_order", "category", "judged_model", "operation_content"],
             columns="process_name",
             values="work_hours",
             aggfunc="sum",
@@ -638,15 +681,15 @@ def _build_work_order_process_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, p
         .reset_index()
     )
     if not pivot_hours.empty:
-        process_cols = [c for c in pivot_hours.columns if c not in {"work_order", "judged_model", "operation_content"}]
+        process_cols = [c for c in pivot_hours.columns if c not in {"work_order", "category", "judged_model", "operation_content"}]
         pivot_hours["總工時 / Total Hours"] = pivot_hours[process_cols].sum(axis=1) if process_cols else 0
         pivot_hours = pivot_hours.sort_values("總工時 / Total Hours", ascending=False).reset_index(drop=True)
         # Put model and total immediately after work_order for easier reading.
-        cols = ["work_order", "judged_model", "operation_content", "總工時 / Total Hours"] + [c for c in pivot_hours.columns if c not in {"work_order", "judged_model", "operation_content", "總工時 / Total Hours"}]
+        cols = ["work_order", "category", "judged_model", "operation_content", "總工時 / Total Hours"] + [c for c in pivot_hours.columns if c not in {"work_order", "category", "judged_model", "operation_content", "總工時 / Total Hours"}]
         pivot_hours = pivot_hours[cols]
 
     pivot_text = pivot_hours.copy()
-    for col in [c for c in pivot_text.columns if c not in {"work_order", "judged_model", "operation_content"}]:
+    for col in [c for c in pivot_text.columns if c not in {"work_order", "category", "judged_model", "operation_content"}]:
         pivot_text[col] = pd.to_numeric(pivot_text[col], errors="coerce").fillna(0).map(hours_to_hms)
 
     return detail, pivot_hours, pivot_text
@@ -657,6 +700,7 @@ def _localize_work_order_process_table(df: pd.DataFrame) -> pd.DataFrame:
         return df
     cols = {
         "work_order": "製令 / Work Order",
+        "category": "類別 / Category",
         "judged_model": "判斷機型 / Model",
         "operation_content": "作業內容 / Operation Content",
         "process_name": "工段名稱 / Process",
@@ -704,7 +748,7 @@ def _v30030_build_analysis_bundle(source_df: pd.DataFrame, filters: dict) -> dic
     work_df["work_hours"] = _coerce_work_hours(work_df["work_hours"])
     work_df["work_time_text"] = work_df["work_hours"].map(hours_to_hms)
 
-    for col in ["work_order", "judged_model", "operation_content", "process_name", "employee_id", "employee_name", "department", "start_date", "id"]:
+    for col in ["work_order", "category", "judged_model", "operation_content", "process_name", "employee_id", "employee_name", "department", "start_date", "id"]:
         if col not in work_df.columns:
             work_df[col] = "" if col != "id" else range(1, len(work_df) + 1)
 
@@ -725,6 +769,14 @@ def _v30030_build_analysis_bundle(source_df: pd.DataFrame, filters: dict) -> dic
         .agg(total_hours=("work_hours", "sum"), count=("id", "count"), avg_hours=("work_hours", "mean"), employee_count=("employee_id", "nunique"), process_count=("process_name", "nunique"))
         .reset_index()
     )
+    if "category" in work_df.columns and not by_wo.empty:
+        category_lookup = (
+            work_df.groupby("work_order", dropna=False)["category"]
+            .apply(_join_unique_text)
+            .reset_index()
+        )
+        by_wo = by_wo.merge(category_lookup, on="work_order", how="left")
+        by_wo["category"] = by_wo["category"].fillna("")
     if "judged_model" in work_df.columns and not by_wo.empty:
         model_lookup = (
             work_df.groupby("work_order", dropna=False)["judged_model"]
@@ -748,10 +800,11 @@ def _v30030_build_analysis_bundle(source_df: pd.DataFrame, filters: dict) -> dic
     # 工段分析需依「判斷機型 + 工段名稱」區分工時。
     # 這是 05 分析用衍生彙總，不回寫 01/02 原始工時權威資料。
     by_proc_work = work_df.copy()
+    by_proc_work["category"] = _blank_to_unknown(by_proc_work["category"], "未分類")
     by_proc_work["judged_model"] = _blank_to_unknown(by_proc_work["judged_model"], "未判斷機型")
     by_proc_work["process_name"] = _blank_to_unknown(by_proc_work["process_name"], "未填工段")
     by_proc = (
-        by_proc_work.groupby(["judged_model", "process_name"], dropna=False)
+        by_proc_work.groupby(["category", "judged_model", "process_name"], dropna=False)
         .agg(
             total_hours=("work_hours", "sum"),
             count=("id", "count"),
@@ -829,11 +882,12 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
         selected_type = r2c3.multiselect("機型 / Type", _v30071_options(analysis_option_values, "type_name", filters.get("type_names")), default=filters.get("type_names", []))
         selected_customer = r2c4.multiselect("客戶 / Customer", _v30071_options(analysis_option_values, "customer", filters.get("customers")), default=filters.get("customers", []))
 
-        r3c1, r3c2, r3c3, r3c4 = st.columns(4)
-        selected_loc = r3c1.multiselect("組立地點 / Assembly", _v30071_options(analysis_option_values, "assembly_location", filters.get("assembly_locations")), default=filters.get("assembly_locations", []))
-        selected_process = r3c2.multiselect("工段名稱 / Process", _v30071_options(analysis_option_values, "process_name", filters.get("process_names")), default=filters.get("process_names", []))
-        selected_emp_id = r3c3.multiselect("工號 / Employee ID", _v30071_options(analysis_option_values, "employee_id", filters.get("employee_ids")), default=filters.get("employee_ids", []))
-        selected_emp_name = r3c4.multiselect("姓名 / Name", _v30071_options(analysis_option_values, "employee_name", filters.get("employee_names")), default=filters.get("employee_names", []))
+        r3c1, r3c2, r3c3, r3c4, r3c5 = st.columns(5)
+        selected_category = r3c1.multiselect("類別 / Category", _v30071_options(analysis_option_values, "category", filters.get("categories")), default=filters.get("categories", []))
+        selected_loc = r3c2.multiselect("組立地點 / Assembly", _v30071_options(analysis_option_values, "assembly_location", filters.get("assembly_locations")), default=filters.get("assembly_locations", []))
+        selected_process = r3c3.multiselect("工段名稱 / Process", _v30071_options(analysis_option_values, "process_name", filters.get("process_names")), default=filters.get("process_names", []))
+        selected_emp_id = r3c4.multiselect("工號 / Employee ID", _v30071_options(analysis_option_values, "employee_id", filters.get("employee_ids")), default=filters.get("employee_ids", []))
+        selected_emp_name = r3c5.multiselect("姓名 / Name", _v30071_options(analysis_option_values, "employee_name", filters.get("employee_names")), default=filters.get("employee_names", []))
 
         r4c1, r4c2, r4c3, r4c4 = st.columns(4)
         selected_dept = r4c1.multiselect("單位 / Department", _v30071_options(analysis_option_values, "department", filters.get("departments")), default=filters.get("departments", []))
@@ -855,7 +909,7 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
                 "date_preset": V30091_ANALYSIS_DEFAULT_PRESET,
                 "start_date": str(today_date()),
                 "end_date": str(today_date()),
-                "work_orders": [], "part_nos": [], "type_names": [], "customers": [], "assembly_locations": [],
+                "work_orders": [], "part_nos": [], "type_names": [], "categories": [], "customers": [], "assembly_locations": [],
                 "process_names": [], "employee_ids": [], "employee_names": [], "departments": [], "titles": [],
                 "status_filter": "全部", "anomaly_filter": "全部", "top_n": "Top 20", "sort_by": "累積工時由大到小", "detail_limit": 1000,
             })
@@ -868,6 +922,7 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
                 "work_orders": _clean_filter_list(selected_wo),
                 "part_nos": _clean_filter_list(selected_pn),
                 "type_names": _clean_filter_list(selected_type),
+                "categories": _clean_filter_list(selected_category),
                 "customers": _clean_filter_list(selected_customer),
                 "assembly_locations": _clean_filter_list(selected_loc),
                 "process_names": _clean_filter_list(selected_process),
@@ -915,7 +970,7 @@ if df.empty:
     st.stop()
 
 _model_rules_sig = str((_load_model_rules_for_page() or {}).get("updated_at") or "")
-_summary_sig = f"{_filter_signature}|rows={len(df)}|model={_model_rules_sig}|v30031_process_model"
+_summary_sig = f"{_filter_signature}|rows={len(df)}|model={_model_rules_sig}|v30097_category"
 _cached_summary = st.session_state.get(V30030_SUMMARY_CACHE_KEY)
 if isinstance(_cached_summary, dict) and _cached_summary.get("sig") == _summary_sig and isinstance(_cached_summary.get("bundle"), dict):
     _bundle = _cached_summary["bundle"]
@@ -1002,8 +1057,8 @@ with tab1:
         x="work_order",
         y="total_hours",
         text="工時 / Time",
-        hover_data={"total_hours": ":.2f", "工時 / Time": True, "judged_model": True, "count": True, "employee_count": True, "process_count": True},
-        labels={"work_order": "製令 / Work Order", "judged_model": "判斷機型 / Model", "total_hours": "累積時數 / Total Hours", "count": "筆數"},
+        hover_data={"total_hours": ":.2f", "工時 / Time": True, "category": True, "judged_model": True, "count": True, "employee_count": True, "process_count": True},
+        labels={"work_order": "製令 / Work Order", "category": "類別 / Category", "judged_model": "判斷機型 / Model", "total_hours": "累積時數 / Total Hours", "count": "筆數"},
         title=f"{top_n} 製令累積工時 / Work Order Time",
     )
     fig.update_traces(textposition="outside")
@@ -1038,6 +1093,7 @@ with tab2:
             hover_data={
                 "process_hours": ":.2f",
                 "process_time": True,
+                "category": True,
                 "judged_model": True,
                 "work_order_total_time": True,
                 "share_percent": ":.2f",
@@ -1046,6 +1102,7 @@ with tab2:
             },
             labels={
                 "work_order": "製令 / Work Order",
+                "category": "類別 / Category",
                 "judged_model": "判斷機型 / Model",
                 "process_hours": "工段工時 / Process Hours",
                 "process_name": "工段名稱 / Process",
@@ -1106,6 +1163,7 @@ with tab3:
         hover_data={
             "total_hours": ":.2f",
             "工時 / Time": True,
+            "category": True,
             "judged_model": True,
             "count": True,
             "employee_count": True,
@@ -1113,6 +1171,7 @@ with tab3:
         },
         labels={
             "process_name": "工段 / Process",
+            "category": "類別 / Category",
             "judged_model": "判斷機型 / Model",
             "total_hours": "累積時數 / Total Hours",
             "count": "筆數",
