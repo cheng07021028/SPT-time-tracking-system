@@ -388,7 +388,7 @@ ALIAS_GROUPS = {
     "category": ["category", "cat", "類別", "分類", "show category", "show_category", "機型類別", "產品類別", "製令類別"],
     "assembly_location": ["組立地點", "組裝地點", "組立位置", "地點", "assembly location", "assembly_location", "location"],
     "customer": ["客戶", "客戶別", "customer", "client", "客戶名稱"],
-    "finished_date": ["完工日期", "完成日期", "finish date", "finished date", "completion date", "done date", "完工日"],
+    "finished_date": ["完工日期", "完成日期", "入庫日", "入庫日期", "出貨日", "出貨日期", "finish date", "finished date", "completion date", "done date", "完工日"],
     "note": ["備註", "note", "remark", "remarks", "說明", "memo"],
     "is_active": ["啟用", "active", "is active", "is_active", "狀態", "有效"],
 }
@@ -570,8 +570,14 @@ def _map_finished_machines(df_raw: pd.DataFrame, mapping: dict[str, str]) -> pd.
 def _mapping_index(cols: list[str], target: str, fallback_predicate) -> int:
     cfg = st.session_state.get("v16_finished_current_mapping", {}) or {}
     saved = str(cfg.get(target, "") or "")
+    # V16.1: do not reuse an invalid saved mapping for boolean Active.
+    # If a previous run accidentally saved a date column such as「入庫日」as Active,
+    # all imported rows become False.  Ignore that stale mapping and fall back to blank.
     if saved in cols:
-        return cols.index(saved)
+        if target == "is_active" and saved and not fallback_predicate(saved):
+            saved = ""
+        else:
+            return cols.index(saved)
     for i, c in enumerate(cols):
         if fallback_predicate(str(c)):
             return i
@@ -786,7 +792,7 @@ with tab4:
             "category": m1.selectbox("類別 / Category", cols, index=_mapping_index(cols, "category", lambda c: "category" in c.lower() or "類別" in c or "分類" in c), key=f"v16_map_category_{sheet}"),
             "assembly_location": m2.selectbox("組立地點 / Assembly Location", cols, index=_mapping_index(cols, "assembly_location", lambda c: "組立" in c or "組裝" in c or "assembly" in c.lower() or "location" in c.lower()), key=f"v16_map_location_{sheet}"),
             "customer": m3.selectbox("客戶 / Customer", cols, index=_mapping_index(cols, "customer", lambda c: "客戶" in c or "customer" in c.lower() or "client" in c.lower()), key=f"v16_map_customer_{sheet}"),
-            "finished_date": m1.selectbox("完工日期 / Finished Date", cols, index=_mapping_index(cols, "finished_date", lambda c: "完工" in c or "完成" in c or "finish" in c.lower() or "completion" in c.lower()), key=f"v16_map_finished_date_{sheet}"),
+            "finished_date": m1.selectbox("完工日期 / Finished Date", cols, index=_mapping_index(cols, "finished_date", lambda c: "完工" in c or "完成" in c or "入庫" in c or "出貨" in c or "finish" in c.lower() or "completion" in c.lower()), key=f"v16_map_finished_date_{sheet}"),
             "note": m2.selectbox("備註 / Note", cols, index=_mapping_index(cols, "note", lambda c: "備註" in c or "note" in c.lower() or "remark" in c.lower()), key=f"v16_map_note_{sheet}"),
             "is_active": m3.selectbox("啟用 / Active", cols, index=_mapping_index(cols, "is_active", lambda c: "啟用" in c or "active" in c.lower() or "狀態" in c), key=f"v16_map_active_{sheet}"),
         }
@@ -795,10 +801,19 @@ with tab4:
         st.success(f"依目前欄位對應可解析 {len(parsed)} 筆完工機台資料。")
         st.dataframe(parsed[["work_order", "part_no", "type_name", "category", "assembly_location", "customer", "finished_date", "note", "is_active"]].head(200), use_container_width=True, height=320)
         b1, b2 = st.columns(2)
+        # V16.1: OneDrive read import writes through its own explicit Apply button.
+        # It should not be disabled by the manual table edit lock; otherwise users can
+        # read and preview 1,800+ rows but cannot import them.  Keep only data-safety
+        # guards: a source work-order mapping and at least one parsed row.
+        apply_disabled = parsed.empty or not str(mapping.get("work_order", "") or "").strip()
+        if not st.session_state.get("v16_finished_edit_enabled", False):
+            st.caption("OneDrive 讀取匯入不需要先啟動『製令清單編輯』；按下套用後才會寫入 16 完工機台權威資料。")
+        if str(mapping.get("is_active", "") or "").strip() == "":
+            st.caption("未指定『啟用 / Active』欄位時，匯入資料會預設為啟用，用來隱藏 01 工時紀錄下拉中的完工製令。")
         if b1.button("儲存此活頁欄位對應 / Save Mapping", use_container_width=True, key=f"v16_save_mapping_{sheet}"):
             save_sheet_setting(setting_key, int(header_row), mapping, bool(delete_missing), import_mode="finished_machines", row_key_col="work_order")
             st.success("OneDrive 欄位對應已永久保存。")
-        if b2.button("▣ 套用讀取結果匯入完工機台 / Apply Read Import", type="primary", use_container_width=True, key=f"v16_apply_onedrive_{sheet}", disabled=not st.session_state.get("v16_finished_edit_enabled", False)):
+        if b2.button("▣ 套用讀取結果匯入完工機台 / Apply Read Import", type="primary", use_container_width=True, key=f"v16_apply_onedrive_{sheet}", disabled=apply_disabled):
             save_sheet_setting(setting_key, int(header_row), mapping, bool(delete_missing), import_mode="finished_machines", row_key_col="work_order")
             payload = parsed
             if delete_missing:
