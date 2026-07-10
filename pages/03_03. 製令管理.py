@@ -68,7 +68,7 @@ STATE_KEY = "v138_work_orders_editor"
 EDITOR_VERSION_KEY = "v253_work_orders_editor_version"
 EDITOR_IGNORE_RETURN_KEY = "v263_work_orders_ignore_next_editor_return"
 BASELINE_KEY = "v30073_work_orders_editor_save_baseline"
-COLS = ["_delete", "id", "work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active", "created_at", "updated_at"]
+COLS = ["_delete", "id", "work_order", "part_no", "type_name", "category", "assembly_location", "customer", "note", "is_active", "created_at", "updated_at"]
 
 # V61：表格實際欄名也改成與 10｜權限管理相同的中英雙語欄名。
 # 內部儲存仍維持 canonical 欄位，避免影響其他模組串接。
@@ -78,6 +78,7 @@ DISPLAY_COLUMNS = {
     "work_order": "製令 / Work Order",
     "part_no": "P/N / Part No.",
     "type_name": "機型 / Type",
+    "category": "類別 / Category",
     "assembly_location": "組立地點 / Assembly Location",
     "customer": "客戶 / Customer",
     "note": "備註 / Note",
@@ -319,6 +320,7 @@ def _v30067_work_order_column_config(table_key: str) -> dict:
         DISPLAY_COLUMNS["work_order"]: st.column_config.TextColumn("製令 / Work Order", required=True, width=_v30067_width(table_key, DISPLAY_COLUMNS["work_order"], "medium")),
         DISPLAY_COLUMNS["part_no"]: st.column_config.TextColumn("P/N / Part No.", width=_v30067_width(table_key, DISPLAY_COLUMNS["part_no"], "medium")),
         DISPLAY_COLUMNS["type_name"]: st.column_config.TextColumn("機型 / Type", width=_v30067_width(table_key, DISPLAY_COLUMNS["type_name"], "large")),
+        DISPLAY_COLUMNS["category"]: st.column_config.TextColumn("類別 / Category", width=_v30067_width(table_key, DISPLAY_COLUMNS["category"], "medium")),
         DISPLAY_COLUMNS["assembly_location"]: st.column_config.TextColumn("組立地點 / Assembly Location", width=_v30067_width(table_key, DISPLAY_COLUMNS["assembly_location"], "medium")),
         DISPLAY_COLUMNS["customer"]: st.column_config.TextColumn("客戶 / Customer", width=_v30067_width(table_key, DISPLAY_COLUMNS["customer"], "medium")),
         DISPLAY_COLUMNS["note"]: st.column_config.TextColumn("備註 / Note", width=_v30067_width(table_key, DISPLAY_COLUMNS["note"], "large")),
@@ -443,8 +445,8 @@ def parse_pasted_work_orders(raw: str) -> tuple[pd.DataFrame, bool, list[str]]:
     """Parse pasted work order data by header names when a header row exists.
 
     支援有標題列依欄名自動對應，不再依欄位順序硬吃資料。
-    可辨識範例：製令、P/N、料號、Type、機型、組立地點、客戶、備註、啟用。
-    無標題列時才使用預設順序：製令、P/N、機型、組立地點、客戶、備註。
+    可辨識範例：製令、P/N、料號、Type、機型、Category、類別、組立地點、客戶、備註、啟用。
+    無標題列時保留舊順序：製令、P/N、機型、組立地點、客戶、備註；若每列有 7 欄以上，會使用：製令、P/N、機型、Category、組立地點、客戶、備註。
     """
     lines = [line for line in raw.splitlines() if line.strip()]
     rows = [_split_paste_line(line) for line in lines]
@@ -456,6 +458,7 @@ def parse_pasted_work_orders(raw: str) -> tuple[pd.DataFrame, bool, list[str]]:
         "work_order": ["製令", "工單", "工令", "製令號碼", "製令編號", "mo", "wo", "work order", "work_order", "工單號碼"],
         "part_no": ["p/n", "pn", "part no", "part_no", "part number", "料號", "品號", "圖號"],
         "type_name": ["type", "type name", "type_name", "機型", "型號", "機種", "model"],
+        "category": ["category", "cat", "類別", "類別/category", "類別 / category", "show category", "show_category", "分類", "機型類別", "產品類別", "製令類別"],
         "assembly_location": ["組立地點", "組裝地點", "組立位置", "地點", "assembly location", "assembly_location", "location"],
         "customer": ["客戶", "客戶別", "customer", "client", "客戶名稱"],
         "note": ["備註", "note", "remark", "remarks", "說明", "memo"],
@@ -472,6 +475,7 @@ def parse_pasted_work_orders(raw: str) -> tuple[pd.DataFrame, bool, list[str]]:
         work_order = _pick_series(source, alias_groups["work_order"])
         part_no = _pick_series(source, alias_groups["part_no"])
         type_name = _pick_series(source, alias_groups["type_name"])
+        category = _pick_series(source, alias_groups["category"])
         assembly_location = _pick_series(source, alias_groups["assembly_location"])
         customer = _pick_series(source, alias_groups["customer"])
         note = _pick_series(source, alias_groups["note"])
@@ -487,6 +491,7 @@ def parse_pasted_work_orders(raw: str) -> tuple[pd.DataFrame, bool, list[str]]:
             "work_order": work_order,
             "part_no": part_no,
             "type_name": type_name,
+            "category": category,
             "assembly_location": assembly_location,
             "customer": customer,
             "note": note,
@@ -495,23 +500,43 @@ def parse_pasted_work_orders(raw: str) -> tuple[pd.DataFrame, bool, list[str]]:
             "updated_at": "",
         })
     else:
-        padded = [r + [""] * (6 - len(r)) for r in rows]
-        df = pd.DataFrame({
-            "_delete": False,
-            "id": "",
-            "work_order": [r[0] for r in padded],
-            "part_no": [r[1] for r in padded],
-            "type_name": [r[2] for r in padded],
-            "assembly_location": [r[3] for r in padded],
-            "customer": [r[4] for r in padded],
-            "note": [r[5] for r in padded],
-            "is_active": True,
-            "created_at": "",
-            "updated_at": "",
-        })
-        warnings.append("未偵測到標題列，已用預設順序解析：製令、P/N、機型、組立地點、客戶、備註。")
+        max_width = max(len(r) for r in rows)
+        if max_width >= 7:
+            padded = [r + [""] * (7 - len(r)) for r in rows]
+            df = pd.DataFrame({
+                "_delete": False,
+                "id": "",
+                "work_order": [r[0] for r in padded],
+                "part_no": [r[1] for r in padded],
+                "type_name": [r[2] for r in padded],
+                "category": [r[3] for r in padded],
+                "assembly_location": [r[4] for r in padded],
+                "customer": [r[5] for r in padded],
+                "note": [r[6] for r in padded],
+                "is_active": True,
+                "created_at": "",
+                "updated_at": "",
+            })
+            warnings.append("未偵測到標題列，已用 7 欄順序解析：製令、P/N、機型、Category、組立地點、客戶、備註。")
+        else:
+            padded = [r + [""] * (6 - len(r)) for r in rows]
+            df = pd.DataFrame({
+                "_delete": False,
+                "id": "",
+                "work_order": [r[0] for r in padded],
+                "part_no": [r[1] for r in padded],
+                "type_name": [r[2] for r in padded],
+                "category": "",
+                "assembly_location": [r[3] for r in padded],
+                "customer": [r[4] for r in padded],
+                "note": [r[5] for r in padded],
+                "is_active": True,
+                "created_at": "",
+                "updated_at": "",
+            })
+            warnings.append("未偵測到標題列，已用舊 6 欄順序解析：製令、P/N、機型、組立地點、客戶、備註；若要匯入 Category，建議貼上標題列或使用 7 欄順序。")
 
-    for c in ["work_order", "part_no", "type_name", "assembly_location", "customer", "note"]:
+    for c in ["work_order", "part_no", "type_name", "category", "assembly_location", "customer", "note"]:
         df[c] = df[c].map(_normalize_text)
     before = len(df)
     df = df[df["work_order"] != ""].copy()
@@ -665,7 +690,7 @@ def _v30028_work_order_template_bytes() -> bytes:
     """Cache the static 03 import template in session to avoid rebuilding Excel bytes on every rerun."""
     key = "v30028_work_order_template_bytes"
     if key not in st.session_state:
-        tpl = pd.DataFrame(columns=["製令", "P/N", "機型", "組立地點", "客戶", "備註", "啟用"])
+        tpl = pd.DataFrame(columns=["製令", "P/N", "機型", "Category", "組立地點", "客戶", "備註", "啟用"])
         st.session_state[key] = _excel_bytes({"template": tpl})
     return st.session_state[key]
 
@@ -743,7 +768,7 @@ def _guess_header_row(df_raw: pd.DataFrame, max_scan_rows: int = 80) -> int:
     """Guess 1-based header row for messy Excel exports."""
     if df_raw is None or df_raw.empty:
         return 1
-    tokens = ["製令", "work order", "p/n", "料號", "part", "機型", "type", "組立", "assembly", "客戶", "customer", "備註", "note", "啟用", "active"]
+    tokens = ["製令", "work order", "p/n", "料號", "part", "機型", "type", "category", "類別", "分類", "組立", "assembly", "客戶", "customer", "備註", "note", "啟用", "active"]
     best_row = 1
     best_score = -1
     limit = min(len(df_raw), max_scan_rows)
@@ -775,7 +800,7 @@ def _map_excel_work_orders(df_raw: pd.DataFrame, mapping: dict[str, str]) -> pd.
     out = pd.DataFrame()
     out["_delete"] = False
     out["id"] = ""
-    for target, default in [("work_order", ""), ("part_no", ""), ("type_name", ""), ("assembly_location", ""), ("customer", ""), ("note", "")]:
+    for target, default in [("work_order", ""), ("part_no", ""), ("type_name", ""), ("category", ""), ("assembly_location", ""), ("customer", ""), ("note", "")]:
         col = mapping.get(target, "")
         out[target] = df_raw[col].map(_normalize_text) if col in df_raw.columns else default
     active_col = mapping.get("is_active", "")
@@ -832,7 +857,7 @@ def _make_unique_work_order_keys(incoming: pd.DataFrame, src: pd.DataFrame | Non
     }
 
 
-WORK_ORDER_COMPARE_COLS = ["part_no", "type_name", "assembly_location", "customer", "note", "is_active"]
+WORK_ORDER_COMPARE_COLS = ["part_no", "type_name", "category", "assembly_location", "customer", "note", "is_active"]
 
 
 def _work_order_row_changed(in_row: pd.Series, cur_row: pd.Series) -> bool:
@@ -921,7 +946,7 @@ def _build_work_order_sync_save_df(add_df: pd.DataFrame, upd_df: pd.DataFrame, d
 
 
 
-WORK_ORDER_CANONICAL_COLS = ["id", "work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active", "created_at", "updated_at"]
+WORK_ORDER_CANONICAL_COLS = ["id", "work_order", "part_no", "type_name", "category", "assembly_location", "customer", "note", "is_active", "created_at", "updated_at"]
 
 
 def _v136_load_work_orders_from_sqlite_direct() -> pd.DataFrame:
@@ -1092,7 +1117,7 @@ with tab1:
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     if c1.button("⊕ 新增空白列 / Add Row", use_container_width=True, disabled=not work_order_edit_enabled):
         blank = pd.DataFrame([{
-            "_delete": False, "id": "", "work_order": "", "part_no": "", "type_name": "",
+            "_delete": False, "id": "", "work_order": "", "part_no": "", "type_name": "", "category": "",
             "assembly_location": "", "customer": "", "note": "", "is_active": True,
             "created_at": "", "updated_at": ""
         }])
@@ -1203,7 +1228,7 @@ with tab2:
         st.dataframe(source_df, use_container_width=True, height=280)
         parsed = parse_pasted_work_orders(source_df.to_csv(sep="\t", index=False))[0] if not source_df.empty else ensure_cols(pd.DataFrame())
         st.success(f"已解析 {len(parsed)} 筆製令資料。")
-        st.dataframe(parsed[["work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active"]], use_container_width=True, height=300)
+        st.dataframe(parsed[["work_order", "part_no", "type_name", "category", "assembly_location", "customer", "note", "is_active"]], use_container_width=True, height=300)
         if st.button("▣ 確認匯入 Excel 製令 / Import Excel Work Orders", type="primary", use_container_width=True, key="wo_excel_import_confirm_v243", disabled=not st.session_state.get("v253_work_order_edit_enabled", False)):
             result = _v30074_apply_import_delta(parsed, "excel")
             if int(result.get("planned_count", 0) or 0) <= 0:
@@ -1220,7 +1245,7 @@ with tab2:
 with tab3:
     st.subheader("貼上資料 / Paste Data")
     st.caption("V1.38 loaded｜支援『有標題列』貼上，系統會依標題列名稱自動對應欄位。")
-    st.caption("有標題列支援：製令、P/N、料號、Type、機型、組立地點、客戶、備註、啟用。無標題列時才用預設順序。")
+    st.caption("有標題列支援：製令、P/N、料號、Type、機型、Category、類別、組立地點、客戶、備註、啟用。無標題列時保留舊 6 欄順序；若有 7 欄以上可用：製令、P/N、機型、Category、組立地點、客戶、備註。")
     raw = st.text_area("貼上 Excel 複製資料", height=260, key="work_orders_paste_raw_v138")
 
     if raw.strip():
@@ -1255,12 +1280,12 @@ with tab3:
 
             st.markdown("### 解析後資料預覽 / Parsed Preview")
             st.dataframe(
-                parsed[["work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active"]],
+                parsed[["work_order", "part_no", "type_name", "category", "assembly_location", "customer", "note", "is_active"]],
                 use_container_width=True,
                 height=360,
             )
     else:
-        st.info("請先貼上 Excel 資料。建議包含標題列，例如：製令、P/N、機型、組立地點、客戶、備註。")
+        st.info("請先貼上 Excel 資料。建議包含標題列，例如：製令、P/N、機型、Category、組立地點、客戶、備註。")
 
 
 with tab4:
@@ -1322,10 +1347,11 @@ with tab4:
             "work_order": m1.selectbox("製令 / Work Order", cols, index=_mapping_index("work_order", lambda c: '製令' in c or 'work order' in c.lower()), key=f"wo_map_work_order_v246_{sheet}"),
             "part_no": m2.selectbox("P/N / Part No.", cols, index=_mapping_index("part_no", lambda c: 'p/n' in c.lower() or '料號' in c), key=f"wo_map_part_no_v246_{sheet}"),
             "type_name": m3.selectbox("機型 / Type", cols, index=_mapping_index("type_name", lambda c: '機型' in c or 'type' in c.lower()), key=f"wo_map_type_name_v246_{sheet}"),
-            "assembly_location": m1.selectbox("組立地點 / Assembly Location", cols, index=_mapping_index("assembly_location", lambda c: '組立' in c or 'assembly' in c.lower()), key=f"wo_map_assembly_location_v246_{sheet}"),
-            "customer": m2.selectbox("客戶 / Customer", cols, index=_mapping_index("customer", lambda c: '客戶' in c or 'customer' in c.lower()), key=f"wo_map_customer_v246_{sheet}"),
-            "note": m3.selectbox("備註 / Note", cols, index=_mapping_index("note", lambda c: '備註' in c or 'note' in c.lower()), key=f"wo_map_note_v246_{sheet}"),
-            "is_active": m1.selectbox("啟用 / Active", cols, index=_mapping_index("is_active", lambda c: '啟用' in c or 'active' in c.lower()), key=f"wo_map_is_active_v246_{sheet}"),
+            "category": m1.selectbox("類別 / Category", cols, index=_mapping_index("category", lambda c: 'category' in c.lower() or '類別' in c or '分類' in c), key=f"wo_map_category_v246_{sheet}"),
+            "assembly_location": m2.selectbox("組立地點 / Assembly Location", cols, index=_mapping_index("assembly_location", lambda c: '組立' in c or 'assembly' in c.lower()), key=f"wo_map_assembly_location_v246_{sheet}"),
+            "customer": m3.selectbox("客戶 / Customer", cols, index=_mapping_index("customer", lambda c: '客戶' in c or 'customer' in c.lower()), key=f"wo_map_customer_v246_{sheet}"),
+            "note": m1.selectbox("備註 / Note", cols, index=_mapping_index("note", lambda c: '備註' in c or 'note' in c.lower()), key=f"wo_map_note_v246_{sheet}"),
+            "is_active": m2.selectbox("啟用 / Active", cols, index=_mapping_index("is_active", lambda c: '啟用' in c or 'active' in c.lower()), key=f"wo_map_is_active_v246_{sheet}"),
         }
         st.markdown("### 匯入模式 / Import Mode")
         mode_options = {

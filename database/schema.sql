@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS work_orders (
         product_name TEXT,
         part_no TEXT,
         type_name TEXT,
+        category TEXT,
         assembly_location TEXT,
         customer TEXT,
         note TEXT,

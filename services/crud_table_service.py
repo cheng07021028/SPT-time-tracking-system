@@ -20,12 +20,12 @@ except Exception:  # pragma: no cover
     def now_text() -> str:
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-WORK_ORDER_COLS = ["_delete", "id", "work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active", "created_at", "updated_at"]
+WORK_ORDER_COLS = ["_delete", "id", "work_order", "part_no", "type_name", "category", "assembly_location", "customer", "note", "is_active", "created_at", "updated_at"]
 EMPLOYEE_COLS = ["_delete", "id", "employee_id", "employee_name", "department", "title", "is_active", "is_in_factory", "is_today_attendance", "include_in_missing_records", "note", "created_at", "updated_at"]
 
 WO_DISPLAY_TO_INTERNAL = {
     "刪除 / Delete": "_delete", "ID / ID": "id", "製令 / Work Order": "work_order", "P/N / Part No.": "part_no",
-    "機型 / Type": "type_name", "組立地點 / Assembly Location": "assembly_location", "客戶 / Customer": "customer",
+    "機型 / Type": "type_name", "類別 / Category": "category", "Category / 類別": "category", "組立地點 / Assembly Location": "assembly_location", "客戶 / Customer": "customer",
     "備註 / Note": "note", "啟用 / Active": "is_active", "建立時間 / Created At": "created_at", "更新時間 / Updated At": "updated_at",
 }
 EMP_DISPLAY_TO_INTERNAL = {
@@ -132,7 +132,7 @@ def _ensure_runtime_columns(force: bool = False) -> None:
     if _RUNTIME_COLUMNS_READY and not force:
         return
     ensure_database()
-    for ddl in ["work_order_no TEXT", "customer TEXT", "active INTEGER DEFAULT 1", "deleted_at TEXT", "deleted_by TEXT", "delete_reason TEXT"]:
+    for ddl in ["work_order_no TEXT", "category TEXT", "customer TEXT", "active INTEGER DEFAULT 1", "deleted_at TEXT", "deleted_by TEXT", "delete_reason TEXT"]:
         _add_col("work_orders", ddl)
     for ddl in ["active INTEGER DEFAULT 1", "is_in_factory INTEGER DEFAULT 1", "is_today_attendance INTEGER DEFAULT 1", "include_in_missing_records INTEGER DEFAULT 1", "deleted_at TEXT", "deleted_by TEXT", "delete_reason TEXT"]:
         _add_col("employees", ddl)
@@ -149,7 +149,7 @@ def _normalize(df: pd.DataFrame | None, cols: list[str], mapping: dict[str, str]
         return pd.DataFrame(columns=cols)
     work = work.rename(columns={c: mapping.get(str(c), str(c)) for c in work.columns})
     aliases = {
-        "製令": "work_order", "工單": "work_order", "工號": "employee_id", "姓名": "employee_name",
+        "製令": "work_order", "工單": "work_order", "類別": "category", "Category": "category", "category": "category", "分類": "category", "工號": "employee_id", "姓名": "employee_name",
         "部門": "department", "單位": "department", "備註": "note", "啟用": "is_active", "在廠": "is_in_factory", "今日出勤": "is_today_attendance", "納入未紀錄統計": "include_in_missing_records", "未紀錄統計": "include_in_missing_records", "免工時統計": "include_in_missing_records",
     }
     work = work.rename(columns={c: aliases.get(str(c), str(c)) for c in work.columns})
@@ -166,7 +166,7 @@ def load_work_orders() -> pd.DataFrame:
     _ensure_runtime_columns()
     df = query_df(
         """
-        SELECT id, work_order, part_no, type_name, assembly_location, customer, note,
+        SELECT id, work_order, part_no, type_name, category, assembly_location, customer, note,
                COALESCE(is_active, active, 1) AS is_active, created_at, updated_at
         FROM work_orders
         WHERE deleted_at IS NULL OR deleted_at=''
@@ -275,6 +275,7 @@ def _save_work_orders_postgres_bulk(work: pd.DataFrame, now: str) -> dict[str, A
             "work_order": wo,
             "part_no": _text(row.get("part_no")),
             "type_name": _text(row.get("type_name")),
+            "category": _text(row.get("category")),
             "assembly_location": _text(row.get("assembly_location")),
             "customer": _text(row.get("customer")),
             "note": _text(row.get("note")),
@@ -295,7 +296,7 @@ def _save_work_orders_postgres_bulk(work: pd.DataFrame, now: str) -> dict[str, A
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    SELECT id, work_order, part_no, type_name, assembly_location, customer, note,
+                    SELECT id, work_order, part_no, type_name, category, assembly_location, customer, note,
                            COALESCE(is_active, active, 1) AS is_active, deleted_at
                     FROM work_orders
                     WHERE work_order = ANY(%s::text[])
@@ -336,7 +337,7 @@ def _save_work_orders_postgres_bulk(work: pd.DataFrame, now: str) -> dict[str, A
             continue
         changed = not old or old_deleted
         if old and not old_deleted:
-            for col in ("part_no", "type_name", "assembly_location", "customer", "note"):
+            for col in ("part_no", "type_name", "category", "assembly_location", "customer", "note"):
                 if not _same_text(row.get(col), old.get(col)):
                     changed = True
                     break
@@ -352,6 +353,7 @@ def _save_work_orders_postgres_bulk(work: pd.DataFrame, now: str) -> dict[str, A
             "work_order": row["work_order"],
             "part_no": row["part_no"],
             "type_name": row["type_name"],
+            "category": row["category"],
             "assembly_location": row["assembly_location"],
             "customer": row["customer"],
             "note": row["note"],
@@ -377,6 +379,7 @@ def _save_work_orders_postgres_bulk(work: pd.DataFrame, now: str) -> dict[str, A
                                 work_order text,
                                 part_no text,
                                 type_name text,
+                                category text,
                                 assembly_location text,
                                 customer text,
                                 note text,
@@ -386,17 +389,18 @@ def _save_work_orders_postgres_bulk(work: pd.DataFrame, now: str) -> dict[str, A
                             )
                         )
                         INSERT INTO work_orders(
-                            work_order, work_order_no, part_no, type_name, assembly_location,
+                            work_order, work_order_no, part_no, type_name, category, assembly_location,
                             customer, note, is_active, active, created_at, updated_at, deleted_at,
                             deleted_by, delete_reason
                         )
-                        SELECT work_order, work_order, part_no, type_name, assembly_location,
+                        SELECT work_order, work_order, part_no, type_name, category, assembly_location,
                                customer, note, is_active, is_active, created_at, updated_at, '', '', ''
                         FROM payload
                         ON CONFLICT (work_order) DO UPDATE SET
                             work_order_no=EXCLUDED.work_order_no,
                             part_no=EXCLUDED.part_no,
                             type_name=EXCLUDED.type_name,
+                            category=EXCLUDED.category,
                             assembly_location=EXCLUDED.assembly_location,
                             customer=EXCLUDED.customer,
                             note=EXCLUDED.note,
@@ -503,6 +507,7 @@ def save_work_orders(df: pd.DataFrame) -> dict[str, Any]:
 
         part_no = _text(row.get("part_no"))
         type_name = _text(row.get("type_name"))
+        category = _text(row.get("category"))
         assembly_location = _text(row.get("assembly_location"))
         customer = _text(row.get("customer"))
         note = _text(row.get("note"))
@@ -511,10 +516,10 @@ def save_work_orders(df: pd.DataFrame) -> dict[str, Any]:
         if rid:
             operations.append((
                 """
-                UPDATE work_orders SET work_order=?, work_order_no=?, part_no=?, type_name=?, assembly_location=?, customer=?, note=?, is_active=?, active=?, updated_at=?, deleted_at='', deleted_by='', delete_reason=''
+                UPDATE work_orders SET work_order=?, work_order_no=?, part_no=?, type_name=?, category=?, assembly_location=?, customer=?, note=?, is_active=?, active=?, updated_at=?, deleted_at='', deleted_by='', delete_reason=''
                 WHERE id=?
                 """,
-                (wo, wo, part_no, type_name, assembly_location, customer, note, active_val, active_val, now, rid),
+                (wo, wo, part_no, type_name, category, assembly_location, customer, note, active_val, active_val, now, rid),
             ))
             result["updated"] += 1
             existing_by_wo[wo] = rid
@@ -524,19 +529,19 @@ def save_work_orders(df: pd.DataFrame) -> dict[str, Any]:
         if wo in existing_by_wo:
             operations.append((
                 """
-                UPDATE work_orders SET work_order_no=?, part_no=?, type_name=?, assembly_location=?, customer=?, note=?, is_active=?, active=?, updated_at=?, deleted_at='', deleted_by='', delete_reason=''
+                UPDATE work_orders SET work_order_no=?, part_no=?, type_name=?, category=?, assembly_location=?, customer=?, note=?, is_active=?, active=?, updated_at=?, deleted_at='', deleted_by='', delete_reason=''
                 WHERE work_order=?
                 """,
-                (wo, part_no, type_name, assembly_location, customer, note, active_val, active_val, now, wo),
+                (wo, part_no, type_name, category, assembly_location, customer, note, active_val, active_val, now, wo),
             ))
             result["updated"] += 1
         else:
             operations.append((
                 """
-                INSERT INTO work_orders(work_order, work_order_no, part_no, type_name, assembly_location, customer, note, is_active, active, created_at, updated_at, deleted_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
+                INSERT INTO work_orders(work_order, work_order_no, part_no, type_name, category, assembly_location, customer, note, is_active, active, created_at, updated_at, deleted_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
                 """,
-                (wo, wo, part_no, type_name, assembly_location, customer, note, active_val, active_val, now, now),
+                (wo, wo, part_no, type_name, category, assembly_location, customer, note, active_val, active_val, now, now),
             ))
             result["inserted"] += 1
             # Preserve old row-order semantics for duplicated work_order values in
