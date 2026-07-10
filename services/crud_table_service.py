@@ -156,6 +156,9 @@ def _normalize(df: pd.DataFrame | None, cols: list[str], mapping: dict[str, str]
     for c in cols:
         if c not in work.columns:
             work[c] = False if c == "_delete" else ""
+    for c in [x for x in cols if x not in {"_delete", "id", "is_active", "is_in_factory", "is_today_attendance", "include_in_missing_records"}]:
+        if c in work.columns:
+            work[c] = work[c].map(_text)
     return work[cols]
 
 
@@ -181,6 +184,12 @@ def load_work_orders() -> pd.DataFrame:
             df[c] = False if c == "_delete" else ""
     df["_delete"] = False
     df["is_active"] = df["is_active"].map(lambda x: _bool(x, True))
+    # V300.76: Category was added after many rows already existed, so old rows
+    # may return SQL NULL.  Normalize text fields before caching so 03 does not
+    # display literal None and 05 receives a clean blank/category string.
+    for c in ["work_order", "part_no", "type_name", "category", "assembly_location", "customer", "note", "created_at", "updated_at"]:
+        if c in df.columns:
+            df[c] = df[c].map(_text)
     return _store_cached_df("work_orders", df[WORK_ORDER_COLS].reset_index(drop=True))
 
 

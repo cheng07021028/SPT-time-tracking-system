@@ -282,6 +282,12 @@ def ensure_cols(df: pd.DataFrame) -> pd.DataFrame:
             df[c] = False if c in ["_delete", "is_active"] else ""
     for c in BOOL_INTERNAL_COLS:
         df[c] = df[c].map(_to_bool_value).fillna(False).astype(bool) if c in df.columns else False
+    # V300.76: keep text fields display-safe.  Existing DB rows may contain NULL/None
+    # before Category was added; do not show literal None and do not let blank
+    # values hide real Category changes during delta comparison.
+    for c in ["work_order", "part_no", "type_name", "category", "assembly_location", "customer", "note", "created_at", "updated_at"]:
+        if c in df.columns:
+            df[c] = df[c].map(_normalize_text)
     return df[COLS]
 
 
@@ -582,7 +588,7 @@ def _v30073_row_key(row) -> str:
 
 
 def _v30073_same_work_order_row(new_row, old_row) -> bool:
-    for col in ["work_order", "part_no", "type_name", "assembly_location", "customer", "note"]:
+    for col in ["work_order", "part_no", "type_name", "category", "assembly_location", "customer", "note"]:
         if _normalize_text(new_row.get(col)) != _normalize_text(old_row.get(col)):
             return False
     return bool(_is_truthy(new_row.get("is_active"))) == bool(_is_truthy(old_row.get("is_active")))
@@ -1020,7 +1026,7 @@ def _v30072_merge_sync_result_for_editor(current: pd.DataFrame, add_df: pd.DataF
         for idx, row in cur.iterrows():
             key = str(row.get("work_order", ""))
             if key in upd_by_key:
-                for col in ["part_no", "type_name", "assembly_location", "customer", "note", "is_active"]:
+                for col in ["part_no", "type_name", "category", "assembly_location", "customer", "note", "is_active"]:
                     cur.at[idx, col] = upd_by_key[key].get(col, cur.at[idx, col])
                 cur.at[idx, "updated_at"] = now_text()
     if add_df is not None and not add_df.empty:
