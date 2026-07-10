@@ -253,7 +253,7 @@ def _v30071_load_analysis_filter_options_cached(start_value, end_value, filters_
         base_options = {str(k): list(v or []) for k, v in cache.get("options", {}).items()}
     else:
         base_options: dict[str, list[str]] = {
-            "work_order": [], "part_no": [], "type_name": [], "category": [], "customer": [], "assembly_location": [],
+            "work_order": [], "part_no": [], "type_name": [], "customer": [], "assembly_location": [],
             "process_name": [], "employee_id": [], "employee_name": [], "department": [], "title": [], "status": [],
         }
         try:
@@ -262,7 +262,6 @@ def _v30071_load_analysis_filter_options_cached(start_value, end_value, filters_
                 base_options["work_order"] = _v30071_merge_options(base_options["work_order"], _v30071_df_options(wo, "work_order"))
                 base_options["part_no"] = _v30071_merge_options(base_options["part_no"], _v30071_df_options(wo, "part_no"))
                 base_options["type_name"] = _v30071_merge_options(base_options["type_name"], _v30071_df_options(wo, "type_name"))
-                base_options["category"] = _v30071_merge_options(base_options["category"], _v30071_category_options_from_work_orders(wo))
                 base_options["customer"] = _v30071_merge_options(base_options["customer"], _v30071_df_options(wo, "customer"))
                 base_options["assembly_location"] = _v30071_merge_options(base_options["assembly_location"], _v30071_df_options(wo, "assembly_location"))
         except Exception:
@@ -280,7 +279,7 @@ def _v30071_load_analysis_filter_options_cached(start_value, end_value, filters_
             try:
                 time_opts = load_history_filter_options_sql(start_value, end_value, limit_per_column=5000)
                 if isinstance(time_opts, dict):
-                    for col in ["work_order", "part_no", "type_name", "category", "assembly_location", "process_name", "employee_id", "employee_name", "status"]:
+                    for col in ["work_order", "part_no", "type_name", "assembly_location", "process_name", "employee_id", "employee_name", "status"]:
                         base_options[col] = _v30071_merge_options(base_options.get(col, []), time_opts.get(col, []))
             except Exception:
                 pass
@@ -291,7 +290,7 @@ def _v30071_load_analysis_filter_options_cached(start_value, end_value, filters_
     # remain selectable even if the date range changed or master data is partial.
     option_map = dict(base_options)
     selected_key_map = {
-        "work_order": "work_orders", "part_no": "part_nos", "type_name": "type_names", "category": "categories", "customer": "customers",
+        "work_order": "work_orders", "part_no": "part_nos", "type_name": "type_names", "customer": "customers",
         "assembly_location": "assembly_locations", "process_name": "process_names", "employee_id": "employee_ids",
         "employee_name": "employee_names", "department": "departments", "title": "titles",
     }
@@ -478,7 +477,6 @@ def _apply_filters(df: pd.DataFrame, f: dict) -> pd.DataFrame:
         "work_orders": "work_order",
         "part_nos": "part_no",
         "type_names": "type_name",
-        "categories": "category",
         "customers": "customer",
         "assembly_locations": "assembly_location",
         "process_names": "process_name",
@@ -640,7 +638,7 @@ def _build_work_order_process_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, p
     work["work_hours"] = _coerce_work_hours(work["work_hours"])
 
     detail = (
-        work.groupby(["work_order", "category", "judged_model", "operation_content", "process_name"], dropna=False)
+        work.groupby(["work_order", "judged_model", "operation_content", "process_name"], dropna=False)
         .agg(
             process_hours=("work_hours", "sum"),
             count=("id", "count"),
@@ -649,6 +647,14 @@ def _build_work_order_process_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, p
         )
         .reset_index()
     )
+    if "category" in work.columns and not detail.empty:
+        _detail_category_lookup = (
+            work.groupby("work_order", dropna=False)["category"]
+            .apply(_join_unique_text)
+            .reset_index()
+        )
+        detail = detail.merge(_detail_category_lookup, on="work_order", how="left")
+        detail["category"] = detail["category"].fillna("")
     totals = (
         work.groupby("work_order", dropna=False)["work_hours"]
         .sum()
@@ -672,7 +678,7 @@ def _build_work_order_process_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, p
 
     pivot_hours = (
         work.pivot_table(
-            index=["work_order", "category", "judged_model", "operation_content"],
+            index=["work_order", "judged_model", "operation_content"],
             columns="process_name",
             values="work_hours",
             aggfunc="sum",
@@ -680,6 +686,14 @@ def _build_work_order_process_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, p
         )
         .reset_index()
     )
+    if "category" in work.columns and not pivot_hours.empty:
+        _pivot_category_lookup = (
+            work.groupby("work_order", dropna=False)["category"]
+            .apply(_join_unique_text)
+            .reset_index()
+        )
+        pivot_hours = pivot_hours.merge(_pivot_category_lookup, on="work_order", how="left")
+        pivot_hours["category"] = pivot_hours["category"].fillna("")
     if not pivot_hours.empty:
         process_cols = [c for c in pivot_hours.columns if c not in {"work_order", "category", "judged_model", "operation_content"}]
         pivot_hours["總工時 / Total Hours"] = pivot_hours[process_cols].sum(axis=1) if process_cols else 0
@@ -797,20 +811,21 @@ def _v30030_build_analysis_bundle(source_df: pd.DataFrame, filters: dict) -> dic
     by_wo["工時 / Time"] = by_wo["total_hours"].map(hours_to_hms)
     by_wo["平均 / Avg"] = by_wo["avg_hours"].map(hours_to_hms)
 
-    # 工段分析需依「判斷機型 + 工段名稱」區分工時。
-    # 這是 05 分析用衍生彙總，不回寫 01/02 原始工時權威資料。
+    # 工段分析維持上一版「判斷機型 + 工段名稱」彙總；Category 只作為資料欄位顯示，
+    # 不再加入 groupby 維度，避免把同一工段工時拆成 Category + 判斷機型 + 工段名稱。
     by_proc_work = work_df.copy()
-    by_proc_work["category"] = _blank_to_unknown(by_proc_work["category"], "未分類")
+    by_proc_work["category"] = by_proc_work["category"].fillna("").astype(str).str.strip()
     by_proc_work["judged_model"] = _blank_to_unknown(by_proc_work["judged_model"], "未判斷機型")
     by_proc_work["process_name"] = _blank_to_unknown(by_proc_work["process_name"], "未填工段")
     by_proc = (
-        by_proc_work.groupby(["category", "judged_model", "process_name"], dropna=False)
+        by_proc_work.groupby(["judged_model", "process_name"], dropna=False)
         .agg(
             total_hours=("work_hours", "sum"),
             count=("id", "count"),
             avg_hours=("work_hours", "mean"),
             employee_count=("employee_id", "nunique"),
             work_order_count=("work_order", "nunique"),
+            category=("category", _join_unique_text),
         )
         .reset_index()
     )
@@ -823,7 +838,7 @@ def _v30030_build_analysis_bundle(source_df: pd.DataFrame, filters: dict) -> dic
 
     by_emp = (
         work_df.groupby(["employee_id", "employee_name", "department"], dropna=False)
-        .agg(total_hours=("work_hours", "sum"), count=("id", "count"), avg_hours=("work_hours", "mean"), work_order_count=("work_order", "nunique"), process_count=("process_name", "nunique"))
+        .agg(total_hours=("work_hours", "sum"), count=("id", "count"), avg_hours=("work_hours", "mean"), work_order_count=("work_order", "nunique"), process_count=("process_name", "nunique"), category=("category", _join_unique_text))
         .reset_index()
     )
     by_emp = _sort_summary(by_emp, sort_by, "employee_name")
@@ -832,7 +847,7 @@ def _v30030_build_analysis_bundle(source_df: pd.DataFrame, filters: dict) -> dic
 
     trend = (
         work_df.groupby("start_date", dropna=False)
-        .agg(total_hours=("work_hours", "sum"), count=("id", "count"), work_order_count=("work_order", "nunique"), employee_count=("employee_id", "nunique"))
+        .agg(total_hours=("work_hours", "sum"), count=("id", "count"), work_order_count=("work_order", "nunique"), employee_count=("employee_id", "nunique"), category=("category", _join_unique_text))
         .reset_index()
         .sort_values("start_date")
     )
@@ -882,12 +897,11 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
         selected_type = r2c3.multiselect("機型 / Type", _v30071_options(analysis_option_values, "type_name", filters.get("type_names")), default=filters.get("type_names", []))
         selected_customer = r2c4.multiselect("客戶 / Customer", _v30071_options(analysis_option_values, "customer", filters.get("customers")), default=filters.get("customers", []))
 
-        r3c1, r3c2, r3c3, r3c4, r3c5 = st.columns(5)
-        selected_category = r3c1.multiselect("類別 / Category", _v30071_options(analysis_option_values, "category", filters.get("categories")), default=filters.get("categories", []))
-        selected_loc = r3c2.multiselect("組立地點 / Assembly", _v30071_options(analysis_option_values, "assembly_location", filters.get("assembly_locations")), default=filters.get("assembly_locations", []))
-        selected_process = r3c3.multiselect("工段名稱 / Process", _v30071_options(analysis_option_values, "process_name", filters.get("process_names")), default=filters.get("process_names", []))
-        selected_emp_id = r3c4.multiselect("工號 / Employee ID", _v30071_options(analysis_option_values, "employee_id", filters.get("employee_ids")), default=filters.get("employee_ids", []))
-        selected_emp_name = r3c5.multiselect("姓名 / Name", _v30071_options(analysis_option_values, "employee_name", filters.get("employee_names")), default=filters.get("employee_names", []))
+        r3c1, r3c2, r3c3, r3c4 = st.columns(4)
+        selected_loc = r3c1.multiselect("組立地點 / Assembly", _v30071_options(analysis_option_values, "assembly_location", filters.get("assembly_locations")), default=filters.get("assembly_locations", []))
+        selected_process = r3c2.multiselect("工段名稱 / Process", _v30071_options(analysis_option_values, "process_name", filters.get("process_names")), default=filters.get("process_names", []))
+        selected_emp_id = r3c3.multiselect("工號 / Employee ID", _v30071_options(analysis_option_values, "employee_id", filters.get("employee_ids")), default=filters.get("employee_ids", []))
+        selected_emp_name = r3c4.multiselect("姓名 / Name", _v30071_options(analysis_option_values, "employee_name", filters.get("employee_names")), default=filters.get("employee_names", []))
 
         r4c1, r4c2, r4c3, r4c4 = st.columns(4)
         selected_dept = r4c1.multiselect("單位 / Department", _v30071_options(analysis_option_values, "department", filters.get("departments")), default=filters.get("departments", []))
@@ -909,7 +923,7 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
                 "date_preset": V30091_ANALYSIS_DEFAULT_PRESET,
                 "start_date": str(today_date()),
                 "end_date": str(today_date()),
-                "work_orders": [], "part_nos": [], "type_names": [], "categories": [], "customers": [], "assembly_locations": [],
+                "work_orders": [], "part_nos": [], "type_names": [], "customers": [], "assembly_locations": [],
                 "process_names": [], "employee_ids": [], "employee_names": [], "departments": [], "titles": [],
                 "status_filter": "全部", "anomaly_filter": "全部", "top_n": "Top 20", "sort_by": "累積工時由大到小", "detail_limit": 1000,
             })
@@ -922,7 +936,6 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
                 "work_orders": _clean_filter_list(selected_wo),
                 "part_nos": _clean_filter_list(selected_pn),
                 "type_names": _clean_filter_list(selected_type),
-                "categories": _clean_filter_list(selected_category),
                 "customers": _clean_filter_list(selected_customer),
                 "assembly_locations": _clean_filter_list(selected_loc),
                 "process_names": _clean_filter_list(selected_process),
@@ -970,7 +983,7 @@ if df.empty:
     st.stop()
 
 _model_rules_sig = str((_load_model_rules_for_page() or {}).get("updated_at") or "")
-_summary_sig = f"{_filter_signature}|rows={len(df)}|model={_model_rules_sig}|v30097_category"
+_summary_sig = f"{_filter_signature}|rows={len(df)}|model={_model_rules_sig}|v30098_category_column_no_filter"
 _cached_summary = st.session_state.get(V30030_SUMMARY_CACHE_KEY)
 if isinstance(_cached_summary, dict) and _cached_summary.get("sig") == _summary_sig and isinstance(_cached_summary.get("bundle"), dict):
     _bundle = _cached_summary["bundle"]
