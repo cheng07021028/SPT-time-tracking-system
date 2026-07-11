@@ -1123,6 +1123,26 @@ def _merge_options(*groups: list[str]) -> list[str]:
     return merged
 
 
+def _clean_history_filter_token(value: object) -> str:
+    text = str(value or "")
+    text = text.replace("\ufeff", "").replace("\u200b", "").replace("\u200c", "").replace("\u200d", "")
+    text = text.replace("　", " ").strip().strip("'\"")
+    return text.strip()
+
+
+def _history_filter_norm(value: object) -> str:
+    return _clean_history_filter_token(value).casefold()
+
+
+def _apply_history_exact_text_filter(df: pd.DataFrame, column: str, values: list[str]) -> pd.DataFrame:
+    if not values or column not in df.columns:
+        return df
+    value_set = {_history_filter_norm(v) for v in values if _history_filter_norm(v)}
+    if not value_set:
+        return df
+    return df.loc[df[column].map(_history_filter_norm).isin(value_set)].copy()
+
+
 def _parse_pasted_history_work_order_filters(raw: object) -> list[str]:
     """Parse pasted work-order values for the 02 history filter form only.
 
@@ -1142,7 +1162,7 @@ def _parse_pasted_history_work_order_filters(raw: object) -> list[str]:
     out: list[str] = []
     seen: set[str] = set()
     for token in re.split(r"[\n\t,，;；]+|\s+", raw_text):
-        value = str(token or "").replace("　", " ").strip().strip("'\"")
+        value = _clean_history_filter_token(token)
         if not value:
             continue
         if value.lower().strip() in skip_tokens:
@@ -1159,8 +1179,12 @@ def _merge_filter_lists(*groups) -> list[str]:
     for group in groups:
         if group is None:
             continue
-        for value in list(group):
-            text = str(value or "").strip()
+        try:
+            iterable = list(group)
+        except Exception:
+            iterable = [group]
+        for value in iterable:
+            text = _clean_history_filter_token(value)
             if text and text not in seen:
                 out.append(text)
                 seen.add(text)
@@ -1186,7 +1210,14 @@ def _v30108_history_manual_work_orders_for_widget(filters_map: dict | None) -> l
 
 def _v30108_history_effective_work_orders(filters_map: dict | None) -> list[str]:
     filters_map = filters_map or {}
+    effective = _merge_filter_lists(filters_map.get("work_orders_effective", []))
+    if effective:
+        return effective
     return _merge_filter_lists(filters_map.get("work_orders", []), _v30108_history_bulk_work_orders_from_filters(filters_map))
+
+
+def _v30109_history_make_effective_work_orders(manual_values, pasted_values) -> list[str]:
+    return _merge_filter_lists(manual_values, pasted_values)
 
 
 def _render_v30107_history_filter_input_text_css() -> None:
@@ -2007,7 +2038,9 @@ def _apply_history_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
             allowed = {str(x).strip() for x in values if str(x).strip()}
             out = out[out[col].fillna("").astype(str).str.strip().isin(allowed)]
 
-    in_list("work_order", _v30108_history_effective_work_orders(filters))
+    work_order_vals = _v30108_history_effective_work_orders(filters)
+    if work_order_vals and "work_order" in out.columns:
+        out = _apply_history_exact_text_filter(out, "work_order", work_order_vals)
     in_list("part_no", filters.get("part_nos", []))
     in_list("type_name", filters.get("type_names", []))
     in_list("assembly_location", filters.get("assembly_locations", []))
@@ -2207,6 +2240,7 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
                 "end_date": str(actual_end),
                 "work_orders": _merge_filter_lists(work_orders_selected),
                 "work_orders_pasted": _merge_filter_lists(pasted_work_orders),
+                "work_orders_effective": _v30109_history_make_effective_work_orders(work_orders_selected, pasted_work_orders),
                 "part_nos": part_nos,
                 "type_names": type_names,
                 "assembly_locations": assembly_locations,

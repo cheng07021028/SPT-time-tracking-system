@@ -305,10 +305,57 @@ def _v30071_options(options_map: dict[str, list[str]], col: str, selected: list[
     return _v30071_merge_options(options_map.get(col, []), selected or [])
 
 
+def _clean_filter_token(value: object) -> str:
+    """Normalize one UI filter token without changing the business key value.
+
+    Bulk-pasted values can carry invisible spaces from Excel/HTML tables.  Keep
+    internal characters such as hyphens, but remove wrapping whitespace,
+    zero-width marks and common quotes so equality filters actually match.
+    """
+    text = str(value or "")
+    text = text.replace("\ufeff", "").replace("\u200b", "").replace("\u200c", "").replace("\u200d", "")
+    text = text.replace("　", " ").strip().strip("'\"")
+    return text.strip()
+
+
 def _clean_filter_list(values) -> list[str]:
     if values is None:
         return []
-    return [str(x).strip() for x in list(values) if str(x).strip()]
+    out: list[str] = []
+    seen: set[str] = set()
+    if isinstance(values, str):
+        iterable = [values]
+    else:
+        try:
+            iterable = list(values)
+        except Exception:
+            iterable = [values]
+    for x in iterable:
+        text = _clean_filter_token(x)
+        if text and text not in seen:
+            out.append(text)
+            seen.add(text)
+    return out
+
+
+def _filter_norm(value: object) -> str:
+    return _clean_filter_token(value).casefold()
+
+
+def _apply_exact_text_filter(df: pd.DataFrame, column: str, values: list[str]) -> pd.DataFrame:
+    """Apply exact text filter with whitespace/case normalization.
+
+    This fixes the paste-filter path where pasted work orders were stored in a
+    separate bucket to avoid multiselect chip overflow, but comparisons still
+    needed to treat pasted values as real applied conditions.
+    """
+    if not values or column not in df.columns:
+        return df
+    value_set = {_filter_norm(v) for v in values if _filter_norm(v)}
+    if not value_set:
+        return df
+    mask = df[column].map(_filter_norm).isin(value_set)
+    return df.loc[mask].copy()
 
 
 def _parse_pasted_work_order_filters(raw: object) -> list[str]:
@@ -332,7 +379,7 @@ def _parse_pasted_work_order_filters(raw: object) -> list[str]:
     for token in re.split(r"[\n\t,，;；]+|\s+", text):
         # If the copied data is a simple one-column list, keep internal hyphens
         # such as 26M239-03.  Only trim common quoting and full-width spaces.
-        value = str(token or "").replace("　", " ").strip().strip("'\"")
+        value = _clean_filter_token(token)
         if not value:
             continue
         if value.lower().strip() in skip_tokens:
@@ -382,7 +429,17 @@ def _v30107_manual_work_orders_for_widget(filters_map: dict | None) -> list[str]
 
 def _v30107_effective_work_orders(filters_map: dict | None) -> list[str]:
     filters_map = filters_map or {}
+    # V301.09: keep a materialized effective list in the saved filters so every
+    # downstream path uses the same applied condition, while the UI still avoids
+    # rendering the bulk list as multiselect chips.
+    effective = _clean_filter_list(filters_map.get("work_orders_effective", []))
+    if effective:
+        return effective
     return _merge_filter_lists(filters_map.get("work_orders", []), _v30107_bulk_work_orders_from_filters(filters_map))
+
+
+def _v30109_make_effective_work_orders(manual_values, pasted_values) -> list[str]:
+    return _merge_filter_lists(manual_values, pasted_values)
 
 
 def _render_v30105_filter_input_text_css() -> None:
@@ -612,7 +669,7 @@ def _apply_filters(df: pd.DataFrame, f: dict) -> pd.DataFrame:
     out = df.copy()
     work_order_vals = _v30107_effective_work_orders(f)
     if work_order_vals and "work_order" in out.columns:
-        out = out[out["work_order"].fillna("").astype(str).isin(work_order_vals)]
+        out = _apply_exact_text_filter(out, "work_order", work_order_vals)
 
     exact_map = {
         "part_nos": "part_no",
@@ -1079,18 +1136,22 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
                 "date_preset": V30091_ANALYSIS_DEFAULT_PRESET,
                 "start_date": str(today_date()),
                 "end_date": str(today_date()),
-                "work_orders": [], "work_orders_pasted": [], "part_nos": [], "type_names": [], "customers": [], "assembly_locations": [],
+                "work_orders": [], "work_orders_pasted": [], "work_orders_effective": [], "part_nos": [], "type_names": [], "customers": [], "assembly_locations": [],
                 "process_names": [], "employee_ids": [], "employee_names": [], "departments": [], "titles": [],
                 "status_filter": "全部", "anomaly_filter": "全部", "top_n": "Top 20", "sort_by": "累積工時由大到小", "detail_limit": 1000,
             })
         else:
             new_start, new_end = _date_range_from_preset(preset, start_input, end_input)
+            manual_work_orders = _clean_filter_list(selected_wo)
+            bulk_work_orders = _clean_filter_list(pasted_work_orders)
+            effective_work_orders = _v30109_make_effective_work_orders(manual_work_orders, bulk_work_orders)
             new_filters = {
                 "date_preset": preset,
                 "start_date": str(new_start),
                 "end_date": str(new_end),
-                "work_orders": _clean_filter_list(selected_wo),
-                "work_orders_pasted": _clean_filter_list(pasted_work_orders),
+                "work_orders": manual_work_orders,
+                "work_orders_pasted": bulk_work_orders,
+                "work_orders_effective": effective_work_orders,
                 "part_nos": _clean_filter_list(selected_pn),
                 "type_names": _clean_filter_list(selected_type),
                 "customers": _clean_filter_list(selected_customer),
@@ -1117,6 +1178,11 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
 
 # 依已套用條件重新查詢與分析。
 filters = dict(st.session_state[FILTER_KEY])
+# V301.09: persist and reuse the effective Work Order list so pasted orders are
+# real filters even though they are intentionally not rendered as multiselect chips.
+if _clean_filter_list(filters.get("work_orders_pasted", [])) and not _clean_filter_list(filters.get("work_orders_effective", [])):
+    filters["work_orders_effective"] = _v30107_effective_work_orders(filters)
+    st.session_state[FILTER_KEY] = dict(filters)
 start = _parse_date(filters.get("start_date"), today_date() - timedelta(days=30))
 end = _parse_date(filters.get("end_date"), today_date())
 if not st.session_state.get(V69_QUERY_KEY, False):
