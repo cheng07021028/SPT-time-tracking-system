@@ -365,24 +365,49 @@ def _render_v30105_filter_input_text_css() -> None:
     st.markdown(
         """
         <style>
-        div[data-baseweb="select"] input,
-        div[data-baseweb="select"] input:focus,
-        div[data-baseweb="select"] input:active,
-        div[data-baseweb="input"] input,
-        div[data-baseweb="textarea"] textarea {
+        /* V301.06: Streamlit/BaseWeb multiselect search text can be rendered
+           by different nested elements across Streamlit versions.  Keep this
+           page-scoped and intentionally broad inside 05 filter controls so the
+           typed query such as "26" remains visible on the dark glass input. */
+        .stApp div[data-testid="stMultiSelect"] div[data-baseweb="select"] input,
+        .stApp div[data-testid="stMultiSelect"] div[data-baseweb="select"] input:focus,
+        .stApp div[data-testid="stMultiSelect"] div[data-baseweb="select"] input:active,
+        .stApp div[data-testid="stMultiSelect"] div[data-baseweb="select"] [role="combobox"],
+        .stApp div[data-testid="stMultiSelect"] div[data-baseweb="select"] [contenteditable="true"],
+        .stApp div[data-baseweb="select"] input,
+        .stApp div[data-baseweb="select"] input:focus,
+        .stApp div[data-baseweb="select"] input:active,
+        .stApp div[data-baseweb="input"] input,
+        .stApp div[data-baseweb="textarea"] textarea {
+            color: #FFFFFF !important;
+            -webkit-text-fill-color: #FFFFFF !important;
+            caret-color: #FFFFFF !important;
+            text-shadow: 0 0 0 #FFFFFF !important;
+        }
+        .stApp div[data-testid="stMultiSelect"] div[data-baseweb="select"] input::placeholder,
+        .stApp div[data-baseweb="select"] input::placeholder,
+        .stApp div[data-baseweb="input"] input::placeholder,
+        .stApp div[data-baseweb="textarea"] textarea::placeholder {
+            color: rgba(248, 255, 255, .78) !important;
+            -webkit-text-fill-color: rgba(248, 255, 255, .78) !important;
+            text-shadow: none !important;
+        }
+        .stApp div[data-testid="stMultiSelect"] div[data-baseweb="select"] input::selection,
+        .stApp div[data-baseweb="select"] input::selection {
+            color: #FFFFFF !important;
+            background: rgba(51, 219, 255, .38) !important;
+            -webkit-text-fill-color: #FFFFFF !important;
+        }
+        .stApp div[data-baseweb="select"] [role="listbox"] [role="option"],
+        .stApp div[data-baseweb="select"] [role="option"] {
             color: #F8FFFF !important;
             -webkit-text-fill-color: #F8FFFF !important;
-            caret-color: #FFFFFF !important;
         }
-        div[data-baseweb="select"] input::placeholder,
-        div[data-baseweb="input"] input::placeholder,
-        div[data-baseweb="textarea"] textarea::placeholder {
-            color: rgba(248, 255, 255, .76) !important;
-            -webkit-text-fill-color: rgba(248, 255, 255, .76) !important;
-        }
-        div[data-baseweb="select"] [role="combobox"],
-        div[data-baseweb="select"] [role="option"] {
-            color: #F8FFFF !important;
+        .stApp div[data-baseweb="select"] [aria-selected="true"],
+        .stApp div[data-baseweb="select"] [aria-selected="true"] * {
+            color: #061123 !important;
+            -webkit-text-fill-color: #061123 !important;
+            text-shadow: none !important;
         }
         </style>
         """,
