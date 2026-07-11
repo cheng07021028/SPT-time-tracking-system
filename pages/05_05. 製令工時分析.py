@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from io import BytesIO
 import hashlib
+import re
 
 import pandas as pd
 import plotly.express as px
