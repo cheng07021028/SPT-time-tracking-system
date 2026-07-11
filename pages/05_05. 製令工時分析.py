@@ -354,6 +354,37 @@ def _merge_filter_lists(*groups) -> list[str]:
     return out
 
 
+def _v30107_bulk_work_orders_from_filters(filters_map: dict | None) -> list[str]:
+    """Return pasted/bulk work orders without rendering them as multiselect chips.
+
+    V301.07: the first paste-filter version merged every pasted work order into
+    the multiselect value.  Large pasted lists then expanded into many chips and
+    overlapped the whole filter panel.  Keep bulk values in a separate filter
+    bucket and only use them for filtering when Apply is pressed.
+    """
+    filters_map = filters_map or {}
+    pasted = _clean_filter_list(filters_map.get("work_orders_pasted", []))
+    if pasted:
+        return pasted
+    # Backward compatibility for filters saved by V301.05/V301.06, where bulk
+    # pasted orders were stored directly in work_orders and caused chip overflow.
+    legacy = _clean_filter_list(filters_map.get("work_orders", []))
+    return legacy if len(legacy) > 8 else []
+
+
+def _v30107_manual_work_orders_for_widget(filters_map: dict | None) -> list[str]:
+    filters_map = filters_map or {}
+    legacy_bulk = _v30107_bulk_work_orders_from_filters(filters_map)
+    if legacy_bulk and not _clean_filter_list(filters_map.get("work_orders_pasted", [])):
+        return []
+    return _clean_filter_list(filters_map.get("work_orders", []))
+
+
+def _v30107_effective_work_orders(filters_map: dict | None) -> list[str]:
+    filters_map = filters_map or {}
+    return _merge_filter_lists(filters_map.get("work_orders", []), _v30107_bulk_work_orders_from_filters(filters_map))
+
+
 def _render_v30105_filter_input_text_css() -> None:
     """Keep typed text readable on the dark glass filters in 05.
 
@@ -579,8 +610,11 @@ def _enrich_records(df: pd.DataFrame) -> pd.DataFrame:
 
 def _apply_filters(df: pd.DataFrame, f: dict) -> pd.DataFrame:
     out = df.copy()
+    work_order_vals = _v30107_effective_work_orders(f)
+    if work_order_vals and "work_order" in out.columns:
+        out = out[out["work_order"].fillna("").astype(str).isin(work_order_vals)]
+
     exact_map = {
-        "work_orders": "work_order",
         "part_nos": "part_no",
         "type_names": "type_name",
         "customers": "customer",
@@ -999,21 +1033,25 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
         top_n = r1c4.selectbox("Top N", TOP_OPTIONS, index=TOP_OPTIONS.index(filters.get("top_n", "Top 20")) if filters.get("top_n", "Top 20") in TOP_OPTIONS else 1)
 
         r2c1, r2c2, r2c3, r2c4 = st.columns(4)
-        selected_wo = r2c1.multiselect("製令 / Work Order", _v30071_options(analysis_option_values, "work_order", filters.get("work_orders")), default=filters.get("work_orders", []))
+        saved_manual_work_orders = _v30107_manual_work_orders_for_widget(filters)
+        saved_bulk_work_orders = _v30107_bulk_work_orders_from_filters(filters)
+        selected_wo = r2c1.multiselect("製令 / Work Order", _v30071_options(analysis_option_values, "work_order", saved_manual_work_orders), default=saved_manual_work_orders)
         selected_pn = r2c2.multiselect("P/N", _v30071_options(analysis_option_values, "part_no", filters.get("part_nos")), default=filters.get("part_nos", []))
         selected_type = r2c3.multiselect("機型 / Type", _v30071_options(analysis_option_values, "type_name", filters.get("type_names")), default=filters.get("type_names", []))
         selected_customer = r2c4.multiselect("客戶 / Customer", _v30071_options(analysis_option_values, "customer", filters.get("customers")), default=filters.get("customers", []))
 
         paste_work_orders_raw = st.text_area(
             "批量貼上製令 / Paste Work Orders",
-            value="",
-            height=96,
-            placeholder="可直接從 Excel / 表格複製製令欄貼上；支援一行一筆、Tab、逗號或分號分隔。按下套用後會併入製令篩選。",
-            key="analysis_work_order_paste_v30105",
+            value="\n".join(saved_bulk_work_orders),
+            height=118,
+            placeholder="可直接從 Excel / 表格複製製令欄貼上；支援一行一筆、Tab、逗號或分號分隔。貼上清單會獨立套用，不會塞回上方多選框造成版面重疊。",
+            key="analysis_work_order_paste_v30107",
         )
         pasted_work_orders = _parse_pasted_work_order_filters(paste_work_orders_raw)
         if pasted_work_orders:
-            st.caption(f"已解析 {len(pasted_work_orders)} 筆貼上製令；套用後會與上方製令篩選合併，不會立即查詢 Neon。")
+            preview = "、".join(pasted_work_orders[:6])
+            more = f"...等 {len(pasted_work_orders)} 筆" if len(pasted_work_orders) > 6 else ""
+            st.caption(f"已解析 {len(pasted_work_orders)} 筆貼上製令：{preview}{more}。此清單會作為獨立篩選，不會顯示成上方多選框 chip。")
 
         r3c1, r3c2, r3c3, r3c4 = st.columns(4)
         selected_loc = r3c1.multiselect("組立地點 / Assembly", _v30071_options(analysis_option_values, "assembly_location", filters.get("assembly_locations")), default=filters.get("assembly_locations", []))
@@ -1041,7 +1079,7 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
                 "date_preset": V30091_ANALYSIS_DEFAULT_PRESET,
                 "start_date": str(today_date()),
                 "end_date": str(today_date()),
-                "work_orders": [], "part_nos": [], "type_names": [], "customers": [], "assembly_locations": [],
+                "work_orders": [], "work_orders_pasted": [], "part_nos": [], "type_names": [], "customers": [], "assembly_locations": [],
                 "process_names": [], "employee_ids": [], "employee_names": [], "departments": [], "titles": [],
                 "status_filter": "全部", "anomaly_filter": "全部", "top_n": "Top 20", "sort_by": "累積工時由大到小", "detail_limit": 1000,
             })
@@ -1051,7 +1089,8 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
                 "date_preset": preset,
                 "start_date": str(new_start),
                 "end_date": str(new_end),
-                "work_orders": _merge_filter_lists(selected_wo, pasted_work_orders),
+                "work_orders": _clean_filter_list(selected_wo),
+                "work_orders_pasted": _clean_filter_list(pasted_work_orders),
                 "part_nos": _clean_filter_list(selected_pn),
                 "type_names": _clean_filter_list(selected_type),
                 "customers": _clean_filter_list(selected_customer),

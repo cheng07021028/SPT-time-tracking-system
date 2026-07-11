@@ -1167,6 +1167,28 @@ def _merge_filter_lists(*groups) -> list[str]:
     return out
 
 
+def _v30108_history_bulk_work_orders_from_filters(filters_map: dict | None) -> list[str]:
+    filters_map = filters_map or {}
+    pasted = _merge_filter_lists(filters_map.get("work_orders_pasted", []))
+    if pasted:
+        return pasted
+    legacy = _merge_filter_lists(filters_map.get("work_orders", []))
+    return legacy if len(legacy) > 8 else []
+
+
+def _v30108_history_manual_work_orders_for_widget(filters_map: dict | None) -> list[str]:
+    filters_map = filters_map or {}
+    legacy_bulk = _v30108_history_bulk_work_orders_from_filters(filters_map)
+    if legacy_bulk and not _merge_filter_lists(filters_map.get("work_orders_pasted", [])):
+        return []
+    return _merge_filter_lists(filters_map.get("work_orders", []))
+
+
+def _v30108_history_effective_work_orders(filters_map: dict | None) -> list[str]:
+    filters_map = filters_map or {}
+    return _merge_filter_lists(filters_map.get("work_orders", []), _v30108_history_bulk_work_orders_from_filters(filters_map))
+
+
 def _render_v30107_history_filter_input_text_css() -> None:
     """Keep typed text readable on the dark glass filters in 02."""
     st.markdown(
@@ -1985,7 +2007,7 @@ def _apply_history_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
             allowed = {str(x).strip() for x in values if str(x).strip()}
             out = out[out[col].fillna("").astype(str).str.strip().isin(allowed)]
 
-    in_list("work_order", filters.get("work_orders", []))
+    in_list("work_order", _v30108_history_effective_work_orders(filters))
     in_list("part_no", filters.get("part_nos", []))
     in_list("type_name", filters.get("type_names", []))
     in_list("assembly_location", filters.get("assembly_locations", []))
@@ -2113,7 +2135,9 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
 
             # V253: build options from SQL DISTINCT values when available, not full history rows.
             _opt = option_values or {}
-            wo_options = _merge_options(_safe_unique(work_orders, "work_order"), list(_opt.get("work_order", [])) or _safe_unique(base_df, "work_order"), applied.get("work_orders", []))
+            saved_manual_work_orders = _v30108_history_manual_work_orders_for_widget(applied)
+            saved_bulk_work_orders = _v30108_history_bulk_work_orders_from_filters(applied)
+            wo_options = _merge_options(_safe_unique(work_orders, "work_order"), list(_opt.get("work_order", [])) or _safe_unique(base_df, "work_order"), saved_manual_work_orders)
             pn_options = _merge_options(_safe_unique(work_orders, "part_no"), list(_opt.get("part_no", [])) or _safe_unique(base_df, "part_no"))
             type_options = _merge_options(_safe_unique(work_orders, "type_name"), list(_opt.get("type_name", [])) or _safe_unique(base_df, "type_name"))
             loc_options = _merge_options(_safe_unique(work_orders, "assembly_location"), list(_opt.get("assembly_location", [])) or _safe_unique(base_df, "assembly_location"))
@@ -2125,20 +2149,22 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
             status_options = _merge_options(list(_opt.get("status", [])), _safe_unique(base_df, "status"), V30070_HISTORY_STATUS_FALLBACK, applied.get("statuses", []))
 
             r2c1, r2c2, r2c3 = st.columns(3)
-            work_orders_selected = r2c1.multiselect("製令", wo_options, default=[x for x in applied.get("work_orders", []) if x in wo_options])
+            work_orders_selected = r2c1.multiselect("製令", wo_options, default=[x for x in saved_manual_work_orders if x in wo_options])
             part_nos = r2c2.multiselect("P/N / 料號", pn_options, default=[x for x in applied.get("part_nos", []) if x in pn_options])
             type_names = r2c3.multiselect("機型", type_options, default=[x for x in applied.get("type_names", []) if x in type_options])
 
             paste_work_orders_raw = st.text_area(
                 "批量貼上製令 / Paste Work Orders",
-                value="",
-                height=96,
-                placeholder="可直接從 Excel / 表格複製製令欄貼上；支援一行一筆、Tab、逗號或分號分隔。按下套用後會併入製令篩選。",
-                key="history_work_order_paste_v30107",
+                value="\n".join(saved_bulk_work_orders),
+                height=118,
+                placeholder="可直接從 Excel / 表格複製製令欄貼上；支援一行一筆、Tab、逗號或分號分隔。貼上清單會獨立套用，不會塞回上方多選框造成版面重疊。",
+                key="history_work_order_paste_v30108",
             )
             pasted_work_orders = _parse_pasted_history_work_order_filters(paste_work_orders_raw)
             if pasted_work_orders:
-                st.caption(f"已解析 {len(pasted_work_orders)} 筆貼上製令；套用後會與上方製令篩選合併，不會立即查詢 Neon。")
+                preview = "、".join(pasted_work_orders[:6])
+                more = f"...等 {len(pasted_work_orders)} 筆" if len(pasted_work_orders) > 6 else ""
+                st.caption(f"已解析 {len(pasted_work_orders)} 筆貼上製令：{preview}{more}。此清單會作為獨立篩選，不會顯示成上方多選框 chip。")
 
             r3c1, r3c2, r3c3 = st.columns(3)
             assembly_locations = r3c1.multiselect("組立地點", loc_options, default=[x for x in applied.get("assembly_locations", []) if x in loc_options])
@@ -2179,7 +2205,8 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
                 "date_preset": date_preset,
                 "start_date": str(actual_start),
                 "end_date": str(actual_end),
-                "work_orders": _merge_filter_lists(work_orders_selected, pasted_work_orders),
+                "work_orders": _merge_filter_lists(work_orders_selected),
+                "work_orders_pasted": _merge_filter_lists(pasted_work_orders),
                 "part_nos": part_nos,
                 "type_names": type_names,
                 "assembly_locations": assembly_locations,
