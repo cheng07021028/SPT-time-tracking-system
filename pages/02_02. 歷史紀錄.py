@@ -1123,6 +1123,101 @@ def _merge_options(*groups: list[str]) -> list[str]:
     return merged
 
 
+def _parse_pasted_history_work_order_filters(raw: object) -> list[str]:
+    """Parse pasted work-order values for the 02 history filter form only.
+
+    This stays in the front-end/session layer: it does not query Neon and it
+    does not write history data. Users can paste one Work Order column copied
+    from Excel or a newline/comma/tab separated list, then the parsed values are
+    merged into the normal Work Order filter only after pressing Apply.
+    """
+    raw_text = str(raw or "").replace("\r", "\n").strip()
+    if not raw_text:
+        return []
+    skip_tokens = {
+        "製令", "工單", "工令", "製令號碼", "製令編號",
+        "work", "order", "work order", "workorder", "wo", "mo",
+        "/", "-", "none", "nan", "null",
+    }
+    out: list[str] = []
+    seen: set[str] = set()
+    for token in re.split(r"[\n\t,，;；]+|\s+", raw_text):
+        value = str(token or "").replace("　", " ").strip().strip("'\"")
+        if not value:
+            continue
+        if value.lower().strip() in skip_tokens:
+            continue
+        if value not in seen:
+            out.append(value)
+            seen.add(value)
+    return out
+
+
+def _merge_filter_lists(*groups) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for group in groups:
+        if group is None:
+            continue
+        for value in list(group):
+            text = str(value or "").strip()
+            if text and text not in seen:
+                out.append(text)
+                seen.add(text)
+    return out
+
+
+def _render_v30107_history_filter_input_text_css() -> None:
+    """Keep typed text readable on the dark glass filters in 02."""
+    st.markdown(
+        """
+        <style>
+        .stApp div[data-testid="stMultiSelect"] div[data-baseweb="select"] input,
+        .stApp div[data-testid="stMultiSelect"] div[data-baseweb="select"] input:focus,
+        .stApp div[data-testid="stMultiSelect"] div[data-baseweb="select"] input:active,
+        .stApp div[data-testid="stMultiSelect"] div[data-baseweb="select"] [role="combobox"],
+        .stApp div[data-testid="stMultiSelect"] div[data-baseweb="select"] [contenteditable="true"],
+        .stApp div[data-baseweb="select"] input,
+        .stApp div[data-baseweb="select"] input:focus,
+        .stApp div[data-baseweb="select"] input:active,
+        .stApp div[data-baseweb="input"] input,
+        .stApp div[data-baseweb="textarea"] textarea {
+            color: #FFFFFF !important;
+            -webkit-text-fill-color: #FFFFFF !important;
+            caret-color: #FFFFFF !important;
+            text-shadow: 0 0 0 #FFFFFF !important;
+        }
+        .stApp div[data-testid="stMultiSelect"] div[data-baseweb="select"] input::placeholder,
+        .stApp div[data-baseweb="select"] input::placeholder,
+        .stApp div[data-baseweb="input"] input::placeholder,
+        .stApp div[data-baseweb="textarea"] textarea::placeholder {
+            color: rgba(248, 255, 255, .78) !important;
+            -webkit-text-fill-color: rgba(248, 255, 255, .78) !important;
+            text-shadow: none !important;
+        }
+        .stApp div[data-testid="stMultiSelect"] div[data-baseweb="select"] input::selection,
+        .stApp div[data-baseweb="select"] input::selection {
+            color: #FFFFFF !important;
+            background: rgba(51, 219, 255, .38) !important;
+            -webkit-text-fill-color: #FFFFFF !important;
+        }
+        .stApp div[data-baseweb="select"] [role="listbox"] [role="option"],
+        .stApp div[data-baseweb="select"] [role="option"] {
+            color: #F8FFFF !important;
+            -webkit-text-fill-color: #F8FFFF !important;
+        }
+        .stApp div[data-baseweb="select"] [aria-selected="true"],
+        .stApp div[data-baseweb="select"] [aria-selected="true"] * {
+            color: #061123 !important;
+            -webkit-text-fill-color: #061123 !important;
+            text-shadow: none !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _month_range(offset: int = 0) -> tuple[date, date]:
     today = today_date()
     year = today.year
@@ -1995,6 +2090,7 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
     if "history_filters_applied_v216" not in st.session_state:
         st.session_state["history_filters_applied_v216"] = stored
     applied = st.session_state["history_filters_applied_v216"]
+    _render_v30107_history_filter_input_text_css()
 
     start_default, end_default = _date_range_from_preset(
         applied.get("date_preset", V30091_HISTORY_DEFAULT_PRESET),
@@ -2017,7 +2113,7 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
 
             # V253: build options from SQL DISTINCT values when available, not full history rows.
             _opt = option_values or {}
-            wo_options = _merge_options(_safe_unique(work_orders, "work_order"), list(_opt.get("work_order", [])) or _safe_unique(base_df, "work_order"))
+            wo_options = _merge_options(_safe_unique(work_orders, "work_order"), list(_opt.get("work_order", [])) or _safe_unique(base_df, "work_order"), applied.get("work_orders", []))
             pn_options = _merge_options(_safe_unique(work_orders, "part_no"), list(_opt.get("part_no", [])) or _safe_unique(base_df, "part_no"))
             type_options = _merge_options(_safe_unique(work_orders, "type_name"), list(_opt.get("type_name", [])) or _safe_unique(base_df, "type_name"))
             loc_options = _merge_options(_safe_unique(work_orders, "assembly_location"), list(_opt.get("assembly_location", [])) or _safe_unique(base_df, "assembly_location"))
@@ -2032,6 +2128,17 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
             work_orders_selected = r2c1.multiselect("製令", wo_options, default=[x for x in applied.get("work_orders", []) if x in wo_options])
             part_nos = r2c2.multiselect("P/N / 料號", pn_options, default=[x for x in applied.get("part_nos", []) if x in pn_options])
             type_names = r2c3.multiselect("機型", type_options, default=[x for x in applied.get("type_names", []) if x in type_options])
+
+            paste_work_orders_raw = st.text_area(
+                "批量貼上製令 / Paste Work Orders",
+                value="",
+                height=96,
+                placeholder="可直接從 Excel / 表格複製製令欄貼上；支援一行一筆、Tab、逗號或分號分隔。按下套用後會併入製令篩選。",
+                key="history_work_order_paste_v30107",
+            )
+            pasted_work_orders = _parse_pasted_history_work_order_filters(paste_work_orders_raw)
+            if pasted_work_orders:
+                st.caption(f"已解析 {len(pasted_work_orders)} 筆貼上製令；套用後會與上方製令篩選合併，不會立即查詢 Neon。")
 
             r3c1, r3c2, r3c3 = st.columns(3)
             assembly_locations = r3c1.multiselect("組立地點", loc_options, default=[x for x in applied.get("assembly_locations", []) if x in loc_options])
@@ -2072,7 +2179,7 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
                 "date_preset": date_preset,
                 "start_date": str(actual_start),
                 "end_date": str(actual_end),
-                "work_orders": work_orders_selected,
+                "work_orders": _merge_filter_lists(work_orders_selected, pasted_work_orders),
                 "part_nos": part_nos,
                 "type_names": type_names,
                 "assembly_locations": assembly_locations,
