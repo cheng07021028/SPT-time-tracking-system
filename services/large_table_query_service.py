@@ -69,10 +69,56 @@ def _list_values(values: Any) -> list[str]:
     if values is None:
         return []
     if isinstance(values, str):
-        return [values.strip()] if values.strip() else []
-    if isinstance(values, (list, tuple, set)):
-        return [str(v).strip() for v in values if str(v).strip()]
-    return []
+        raw_values = [values]
+    elif isinstance(values, (list, tuple, set)):
+        raw_values = list(values)
+    else:
+        raw_values = [values]
+
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in raw_values:
+        text = _clean_text(value)
+        # Excel / web paste can carry BOM, zero-width chars, NBSP or full-width spaces.
+        # Normalize here as the final SQL boundary so pasted Work Order filters match
+        # the same values that were parsed in the Streamlit page.
+        text = (
+            text.replace("\ufeff", "")
+            .replace("\u200b", "")
+            .replace("\u200c", "")
+            .replace("\u200d", "")
+            .replace("\xa0", " ")
+            .replace("　", " ")
+            .strip()
+            .strip("'\"")
+        )
+        if text and text not in seen:
+            seen.add(text)
+            out.append(text)
+    return out
+
+
+def _effective_work_order_values(filters: dict[str, Any]) -> list[str]:
+    """Return the Work Order filter used by SQL-first 02 history queries.
+
+    V301.10: 02 added an independent 「批量貼上製令 / Paste Work Orders」
+    field to avoid rendering hundreds of selected values as multiselect chips.
+    The page stores those values in `work_orders_pasted` and the combined list
+    in `work_orders_effective`, but the SQL-first count/page loaders previously
+    still read only `work_orders`.  As a result the screen could show that three
+    pasted work orders were parsed while the query still returned all work orders
+    in the date range.  Keep the UI independent, but make the SQL predicate use
+    the effective list.
+    """
+    if not isinstance(filters, dict):
+        return []
+    effective = _list_values(filters.get("work_orders_effective"))
+    if effective:
+        return effective
+    return _list_values(filters.get("work_orders")) + [
+        x for x in _list_values(filters.get("work_orders_pasted"))
+        if x not in set(_list_values(filters.get("work_orders")))
+    ]
 
 
 def _add_in_filter(where: list[str], params: list[Any], column: str, values: Any) -> None:
@@ -174,7 +220,7 @@ def load_history_records_sql_filtered(filters: dict[str, Any] | None = None, *, 
         where.append(date_clause)
         params.extend(date_params)
 
-    _add_in_filter(where, params, "work_order", f.get("work_orders"))
+    _add_in_filter(where, params, "work_order", _effective_work_order_values(f))
     _add_in_filter(where, params, "part_no", f.get("part_nos"))
     _add_in_filter(where, params, "type_name", f.get("type_names"))
     _add_in_filter(where, params, "assembly_location", f.get("assembly_locations"))
@@ -249,7 +295,7 @@ def count_history_records_sql_filtered(filters: dict[str, Any] | None = None, *,
     if date_clause:
         where.append(date_clause)
         params.extend(date_params)
-    _add_in_filter(where, params, "work_order", f.get("work_orders"))
+    _add_in_filter(where, params, "work_order", _effective_work_order_values(f))
     _add_in_filter(where, params, "part_no", f.get("part_nos"))
     _add_in_filter(where, params, "type_name", f.get("type_names"))
     _add_in_filter(where, params, "assembly_location", f.get("assembly_locations"))
