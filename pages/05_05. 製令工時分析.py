@@ -310,6 +310,86 @@ def _clean_filter_list(values) -> list[str]:
     return [str(x).strip() for x in list(values) if str(x).strip()]
 
 
+def _parse_pasted_work_order_filters(raw: object) -> list[str]:
+    """Parse pasted work-order values for the 05 filter form only.
+
+    This is intentionally front-end/session work: it does not query Neon and it
+    does not write analysis data.  Users can paste one column copied from Excel
+    or a newline/comma/tab separated list, then the parsed values are merged
+    into the normal Work Order filter when they press Apply Filters.
+    """
+    text = str(raw or "").replace("\r", "\n").strip()
+    if not text:
+        return []
+    skip_tokens = {
+        "製令", "工單", "工令", "製令號碼", "製令編號",
+        "work", "order", "work order", "workorder", "wo", "mo", "/", "-",
+        "none", "nan", "null",
+    }
+    out: list[str] = []
+    seen: set[str] = set()
+    for token in re.split(r"[\n\t,，;；]+|\s+", text):
+        # If the copied data is a simple one-column list, keep internal hyphens
+        # such as 26M239-03.  Only trim common quoting and full-width spaces.
+        value = str(token or "").replace("　", " ").strip().strip("'\"")
+        if not value:
+            continue
+        if value.lower().strip() in skip_tokens:
+            continue
+        if value not in seen:
+            out.append(value)
+            seen.add(value)
+    return out
+
+
+def _merge_filter_lists(*groups) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for group in groups:
+        for value in _clean_filter_list(group):
+            if value not in seen:
+                out.append(value)
+                seen.add(value)
+    return out
+
+
+def _render_v30105_filter_input_text_css() -> None:
+    """Keep typed text readable on the dark glass filters in 05.
+
+    The shared theme uses a dark/glass selectbox background.  In some Streamlit
+    versions the search input inside multiselect inherits a dark font, making
+    typed text nearly invisible.  This page-scoped patch only changes text/caret
+    color for filter input controls and leaves the existing UI layout/theme in
+    place.
+    """
+    st.markdown(
+        """
+        <style>
+        div[data-baseweb="select"] input,
+        div[data-baseweb="select"] input:focus,
+        div[data-baseweb="select"] input:active,
+        div[data-baseweb="input"] input,
+        div[data-baseweb="textarea"] textarea {
+            color: #F8FFFF !important;
+            -webkit-text-fill-color: #F8FFFF !important;
+            caret-color: #FFFFFF !important;
+        }
+        div[data-baseweb="select"] input::placeholder,
+        div[data-baseweb="input"] input::placeholder,
+        div[data-baseweb="textarea"] textarea::placeholder {
+            color: rgba(248, 255, 255, .76) !important;
+            -webkit-text-fill-color: rgba(248, 255, 255, .76) !important;
+        }
+        div[data-baseweb="select"] [role="combobox"],
+        div[data-baseweb="select"] [role="option"] {
+            color: #F8FFFF !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _join_unique_text(values) -> str:
     out: list[str] = []
     seen: set[str] = set()
@@ -881,6 +961,7 @@ if not isinstance(base_df, pd.DataFrame):
 analysis_option_values = _v30071_load_analysis_filter_options_cached(start_saved, end_saved, filters, base_df)
 
 _render_model_rules_manager()
+_render_v30105_filter_input_text_css()
 
 with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=True):
     st.caption("所有條件按「套用篩選」後才重新運算，避免每點一下就卡頓；條件會永久記錄。")
@@ -896,6 +977,17 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
         selected_pn = r2c2.multiselect("P/N", _v30071_options(analysis_option_values, "part_no", filters.get("part_nos")), default=filters.get("part_nos", []))
         selected_type = r2c3.multiselect("機型 / Type", _v30071_options(analysis_option_values, "type_name", filters.get("type_names")), default=filters.get("type_names", []))
         selected_customer = r2c4.multiselect("客戶 / Customer", _v30071_options(analysis_option_values, "customer", filters.get("customers")), default=filters.get("customers", []))
+
+        paste_work_orders_raw = st.text_area(
+            "批量貼上製令 / Paste Work Orders",
+            value="",
+            height=96,
+            placeholder="可直接從 Excel / 表格複製製令欄貼上；支援一行一筆、Tab、逗號或分號分隔。按下套用後會併入製令篩選。",
+            key="analysis_work_order_paste_v30105",
+        )
+        pasted_work_orders = _parse_pasted_work_order_filters(paste_work_orders_raw)
+        if pasted_work_orders:
+            st.caption(f"已解析 {len(pasted_work_orders)} 筆貼上製令；套用後會與上方製令篩選合併，不會立即查詢 Neon。")
 
         r3c1, r3c2, r3c3, r3c4 = st.columns(4)
         selected_loc = r3c1.multiselect("組立地點 / Assembly", _v30071_options(analysis_option_values, "assembly_location", filters.get("assembly_locations")), default=filters.get("assembly_locations", []))
@@ -933,7 +1025,7 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
                 "date_preset": preset,
                 "start_date": str(new_start),
                 "end_date": str(new_end),
-                "work_orders": _clean_filter_list(selected_wo),
+                "work_orders": _merge_filter_lists(selected_wo, pasted_work_orders),
                 "part_nos": _clean_filter_list(selected_pn),
                 "type_names": _clean_filter_list(selected_type),
                 "customers": _clean_filter_list(selected_customer),
