@@ -747,6 +747,45 @@ def _apply_top(df: pd.DataFrame, top_n: str) -> pd.DataFrame:
         return df.head(20)
 
 
+def _v30110_detail_show_all(filters: dict) -> bool:
+    """Return whether 05 detail/export should include all filtered rows.
+
+    The Detail Limit is a UI/export guard only.  It must never change summary
+    calculations, and loading all details must be explicit so opening 05 does not
+    accidentally render a huge editable table.
+    """
+    val = filters.get("detail_show_all", False) if isinstance(filters, dict) else False
+    if isinstance(val, bool):
+        return val
+    return str(val).strip().lower() in {"1", "true", "yes", "y", "on", "全部", "all"}
+
+
+def _v30110_detail_limit(filters: dict, fallback: int = 1000) -> int:
+    try:
+        raw = int(filters.get("detail_limit", fallback) if isinstance(filters, dict) else fallback)
+    except Exception:
+        raw = fallback
+    return max(1, raw)
+
+
+def _v30110_detail_rows(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
+    """Return the records used by Detail Edit and filtered-detail Excel sheets."""
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame() if not isinstance(df, pd.DataFrame) else df.copy()
+    if _v30110_detail_show_all(filters):
+        return df.copy()
+    return df.head(_v30110_detail_limit(filters)).copy()
+
+
+def _v30110_detail_status_text(total_rows: int, filters: dict) -> str:
+    if _v30110_detail_show_all(filters):
+        return f"明細顯示/匯出：全部 {int(total_rows):,} 筆。"
+    limit = _v30110_detail_limit(filters)
+    shown = min(int(total_rows), limit)
+    suffix = "；若需完整明細，請勾選『顯示/匯出全部明細』後重新套用篩選。" if int(total_rows) > limit else "。"
+    return f"明細顯示/匯出：{shown:,} / {int(total_rows):,} 筆（目前上限 {limit:,}）{suffix}"
+
+
 def _blank_to_unknown(series: pd.Series, unknown: str) -> pd.Series:
     s = series.fillna("").astype(str).str.strip()
     return s.mask(s.isin(["", "None", "none", "nan", "NaN"]), unknown)
@@ -1122,10 +1161,15 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
         status_filter = r4c3.selectbox("狀態 / Status", STATUS_OPTIONS, index=STATUS_OPTIONS.index(filters.get("status_filter", "全部")) if filters.get("status_filter", "全部") in STATUS_OPTIONS else 0)
         anomaly_filter = r4c4.selectbox("異常篩選 / Exception", ANOMALY_OPTIONS, index=ANOMALY_OPTIONS.index(filters.get("anomaly_filter", "全部")) if filters.get("anomaly_filter", "全部") in ANOMALY_OPTIONS else 0)
 
-        r5c1, r5c2, r5c3 = st.columns([1.4, 1, 1])
+        r5c1, r5c2, r5c3, r5c4 = st.columns([1.35, 0.95, 1.1, 0.8])
         sort_by = r5c1.selectbox("圖表排序 / Sort", SORT_OPTIONS, index=SORT_OPTIONS.index(filters.get("sort_by", "累積工時由大到小")) if filters.get("sort_by", "累積工時由大到小") in SORT_OPTIONS else 0)
-        detail_limit = r5c2.number_input("明細讀取上限 / Detail Limit", min_value=100, max_value=20000, value=int(filters.get("detail_limit", 1000) or 1000), step=100)
-        clear_filter = r5c3.checkbox("清除所有篩選 / Clear", value=False)
+        detail_limit = r5c2.number_input("明細讀取上限 / Detail Limit", min_value=100, max_value=200000, value=int(filters.get("detail_limit", 1000) or 1000), step=100)
+        detail_show_all = r5c3.checkbox(
+            "顯示/匯出全部明細 / All Details",
+            value=_v30110_detail_show_all(filters),
+            help="勾選後，明細編輯與 Excel 的 filtered_detail 會包含目前篩選後的全部資料。大量資料可能使表格顯示變慢，但不會增加 01/02 工時計算負擔。",
+        )
+        clear_filter = r5c4.checkbox("清除所有篩選 / Clear", value=False)
 
 
         apply_filter = st.form_submit_button("🔎 套用篩選並永久記錄 / Apply Filters", type="primary", use_container_width=True)
@@ -1138,7 +1182,7 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
                 "end_date": str(today_date()),
                 "work_orders": [], "work_orders_pasted": [], "work_orders_effective": [], "part_nos": [], "type_names": [], "customers": [], "assembly_locations": [],
                 "process_names": [], "employee_ids": [], "employee_names": [], "departments": [], "titles": [],
-                "status_filter": "全部", "anomaly_filter": "全部", "top_n": "Top 20", "sort_by": "累積工時由大到小", "detail_limit": 1000,
+                "status_filter": "全部", "anomaly_filter": "全部", "top_n": "Top 20", "sort_by": "累積工時由大到小", "detail_limit": 1000, "detail_show_all": False,
             })
         else:
             new_start, new_end = _date_range_from_preset(preset, start_input, end_input)
@@ -1166,6 +1210,7 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
                 "top_n": top_n,
                 "sort_by": sort_by,
                 "detail_limit": int(detail_limit),
+                "detail_show_all": bool(detail_show_all),
             }
         st.session_state[FILTER_KEY] = new_filters
         save_analysis_filters(new_filters)
@@ -1276,7 +1321,7 @@ st.download_button(
         "summary_process": by_proc,
         "summary_employee": by_emp,
         "daily_trend": trend,
-        "filtered_detail": df.head(int(filters.get("detail_limit", 1000) or 1000)),
+        "filtered_detail": _v30110_detail_rows(df, filters),
     }),
     file_name="SPT_製令工時分析.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1380,7 +1425,7 @@ with tab2:
             "work_order_process": wo_process_display,
             "pivot_hours": wo_process_pivot_hours,
             "pivot_time": wo_process_pivot_text,
-            "filtered_detail": df.head(int(filters.get("detail_limit", 1000) or 1000)),
+            "filtered_detail": _v30110_detail_rows(df, filters),
         }),
         file_name="SPT_製令工段工時分析.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1454,8 +1499,10 @@ with tab5:
 
 with tab6:
     st.caption("此處編輯的是分析來源明細，儲存後會影響歷史紀錄與後續統計。工時欄位以 00:00:00 顯示，需調整時請改開始/結束時間後重新計算。")
-    detail_limit = int(filters.get("detail_limit", 1000) or 1000)
-    detail_df = df.head(detail_limit).drop(columns=["work_time_text"], errors="ignore")
+    detail_df = _v30110_detail_rows(df, filters).drop(columns=["work_time_text"], errors="ignore")
+    st.caption(_v30110_detail_status_text(len(df), filters))
+    if _v30110_detail_show_all(filters) and len(detail_df) > 5000:
+        st.warning("目前明細已設定為全部顯示。資料筆數較多時，Streamlit 可編輯表格可能需要較久時間載入；若只需下載完整明細，可先匯出 Excel，再取消全部顯示以維持畫面速度。")
     # V300.93: editable render_table intentionally does not auto-render the
     # shared Column Settings panel, to avoid duplicate data_editor keys on
     # edit screens. 05 Detail Edit still needs permanent display preferences,
