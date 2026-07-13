@@ -13,6 +13,10 @@ import streamlit as st
 from services.theme_service import apply_theme, render_header
 from services.security_service import require_module_access
 from services.time_record_service import load_records, save_time_records
+try:
+    from services.time_record_service import load_records_for_analysis
+except Exception:
+    load_records_for_analysis = None
 from services.table_ui_service import render_table, render_width_settings
 from services.duration_service import hours_to_hms
 from services.timezone_service import today_date
@@ -760,6 +764,25 @@ def _v30110_detail_show_all(filters: dict) -> bool:
     return str(val).strip().lower() in {"1", "true", "yes", "y", "on", "全部", "all"}
 
 
+
+
+def _v30111_load_full_analysis_records(start_value: date, end_value: date, filters_map: dict) -> pd.DataFrame:
+    """Use the 05 analysis loader so custom date ranges are not truncated to 3,000 rows.
+
+    ``load_records()`` is intentionally capped for interactive 01/02 pages. 05
+    must aggregate the full applied date range first; Detail Limit only limits
+    the rendered/exported detail rows after filtering.
+    """
+    try:
+        if callable(load_records_for_analysis):
+            # Keep a high safety cap in the service layer.  Do not bind this to
+            # Detail Limit because summaries must be based on the whole result set.
+            return load_records_for_analysis(str(start_value), str(end_value))
+    except Exception:
+        pass
+    return load_records(str(start_value), str(end_value))
+
+
 def _v30110_detail_limit(filters: dict, fallback: int = 1000) -> int:
     try:
         raw = int(filters.get("detail_limit", fallback) if isinstance(filters, dict) else fallback)
@@ -1242,7 +1265,7 @@ _filter_signature = repr(sorted(filters.items()))
 if st.session_state.get(V69_FILTER_SIG_KEY) == _filter_signature and isinstance(st.session_state.get(V69_DF_KEY), pd.DataFrame):
     df = st.session_state[V69_DF_KEY].copy()
 else:
-    df = _enrich_records(load_records(str(start), str(end)))
+    df = _enrich_records(_v30111_load_full_analysis_records(start, end, filters))
     st.session_state[V69_DF_KEY] = df.copy()
     st.session_state[V69_FILTER_SIG_KEY] = _filter_signature
 

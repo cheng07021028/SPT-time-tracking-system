@@ -684,6 +684,85 @@ def load_records(start_date: str | None = None, end_date: str | None = None, emp
         return _safe_df(fb_sql, tuple(fb_params))
     return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
 
+
+def load_records_for_analysis(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None, max_rows: int | None = None) -> pd.DataFrame:
+    """Load full date-bounded records for 05 analysis without the 01/02 interactive 3,000-row guard.
+
+    01/02/07 hot-path calls intentionally keep ``load_records()`` capped at 3,000
+    rows so Streamlit pages stay responsive. 05 is an explicit analysis page: its
+    summaries and Excel export must be based on the whole selected date range,
+    while the UI-only Detail Limit should only control how many rows are rendered
+    in the editable detail table.
+
+    This function preserves the same indexed start_date path and only changes the
+    row cap.  The default safety cap is process-configurable through
+    ``SPT_05_ANALYSIS_MAX_ROWS`` and is deliberately high enough for management
+    analysis while still protecting Streamlit Cloud from accidental million-row
+    renders.  Set max_rows<=0 to remove the SQL LIMIT for controlled back-office
+    use.
+    """
+    _ensure_time_runtime_columns()
+
+    try:
+        if max_rows is None:
+            max_rows = _env_int("SPT_05_ANALYSIS_MAX_ROWS", 200000, min_value=1000, max_value=1000000)
+        else:
+            max_rows = int(float(str(max_rows)))
+    except Exception:
+        max_rows = 200000
+
+    def _limit_clause() -> str:
+        try:
+            n = int(max_rows or 0)
+        except Exception:
+            n = 0
+        return f" LIMIT {max(1, min(1000000, n))}" if n > 0 else ""
+
+    def _build_sql(*, timestamp_fallback: bool = False) -> tuple[str, list[Any]]:
+        sql = f"SELECT {_base_cols()} FROM time_records WHERE {_not_deleted_predicate()}"
+        params: list[Any] = []
+        if start_date:
+            if timestamp_fallback:
+                sql += " AND COALESCE(start_date,'')='' AND start_timestamp >= ?"
+                params.append(f"{_text(start_date)[:10]} 00:00:00")
+            else:
+                sql += " AND start_date >= ?"
+                params.append(_text(start_date)[:10])
+        if end_date:
+            if timestamp_fallback:
+                sql += " AND start_timestamp < ?"
+                params.append(f"{_today_end_text(_text(end_date)[:10])} 00:00:00")
+            else:
+                sql += " AND start_date <= ?"
+                params.append(_text(end_date)[:10])
+        if employee_id:
+            sql += " AND employee_id = ?"
+            params.append(_text(employee_id))
+        if work_order:
+            sql += " AND (work_order = ? OR work_order_no = ?)"
+            params.extend([_text(work_order), _text(work_order)])
+        sql += " ORDER BY start_date DESC, start_time DESC, id DESC" + _limit_clause()
+        return sql, params
+
+    sql, params = _build_sql(timestamp_fallback=False)
+    df = _safe_df(sql, tuple(params))
+    if isinstance(df, pd.DataFrame) and (not df.empty or not (start_date or end_date)):
+        try:
+            df.attrs["_spt_analysis_max_rows"] = int(max_rows or 0)
+        except Exception:
+            pass
+        return df
+
+    if start_date or end_date:
+        fb_sql, fb_params = _build_sql(timestamp_fallback=True)
+        df = _safe_df(fb_sql, tuple(fb_params))
+        try:
+            df.attrs["_spt_analysis_max_rows"] = int(max_rows or 0)
+        except Exception:
+            pass
+        return df
+    return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
+
 def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:
     """Fast interactive query for 01 Today Records.
 
