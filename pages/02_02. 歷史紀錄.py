@@ -305,6 +305,11 @@ def _v71_requested_detail_limit(filters: dict | None, default: int = 300) -> int
     return max(50, min(V71_HISTORY_INTERACTIVE_MAX_ROWS, raw))
 
 
+def _v71_sql_safe_anomaly_filter(anomaly: object) -> bool:
+    text = str(anomaly or "全部").strip()
+    return text in {"", "全部", "跨日紀錄", "跨日結束"}
+
+
 def _v71_needs_python_post_filter(filters: dict | None) -> bool:
     f = filters or {}
     anomaly = str(f.get("anomaly_filter") or "全部").strip()
@@ -312,7 +317,7 @@ def _v71_needs_python_post_filter(filters: dict | None) -> bool:
     return bool(
         f.get("departments")
         or f.get("titles")
-        or anomaly != "全部"
+        or (not _v71_sql_safe_anomaly_filter(anomaly))
         or sort_by in {"工時由大到小", "工時由小到大"}
     )
 

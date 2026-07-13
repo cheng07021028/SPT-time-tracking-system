@@ -134,24 +134,33 @@ def _add_in_filter(where: list[str], params: list[Any], column: str, values: Any
     params.extend(vals)
 
 
+def _record_start_date_expr() -> str:
+    return "COALESCE(NULLIF(start_date,''), NULLIF(substr(COALESCE(start_timestamp,''),1,10),''))"
+
+
+def _record_actual_end_date_expr() -> str:
+    return "COALESCE(NULLIF(end_date,''), NULLIF(substr(COALESCE(end_timestamp,''),1,10),''))"
+
+
+def _record_end_for_overlap_expr() -> str:
+    # If a record is still open or older data has no explicit end date, fall back
+    # to the start date so date-range overlap checks do not accidentally exclude it.
+    return f"COALESCE({_record_actual_end_date_expr()}, NULLIF(start_date,''), NULLIF(substr(COALESCE(start_timestamp,''),1,10),''))"
+
+
 def _time_record_date_where(start_date: Any, end_date: Any) -> tuple[str, list[Any]]:
     s = _date_text(start_date)
     e = _date_text(end_date)
 
-    # V301.11: 02 歷史紀錄的日期篩選必須以「工時區間是否與查詢區間重疊」判斷，
-    # 不可只用 start_date BETWEEN。現場跨日資料常見：例如 2025-06-30 23:00 開始、
-    # 2025-07-01 01:00 結束。若使用 start_date >= 2025-07-01，這筆在 7/1 發生的
-    # 工時會被漏掉；但使用者直接輸入製令時又可能從其他路徑看到，造成「條件查詢
-    # 不準」的現象。這裡改為 interval-overlap：
-    #   record_start <= query_end AND record_end >= query_start
-    # end_date 空白時以 end_timestamp、start_date、start_timestamp 依序補足，保留未結束
-    # 或舊資料的相容性。此函式同時供明細查詢、總筆數、篩選選項載入共用，避免
-    # 三處日期語意不一致。
+    # V301.11/V301.12: 02 歷史紀錄的日期篩選必須以「工時區間是否與查詢區間重疊」判斷，
+    # 不可只用 start_date BETWEEN。並且 substr('',1,10) 會回傳空字串，不是 NULL；
+    # 若沒有再 NULLIF，COALESCE 會提早吃到空字串，導致 fallback 到 start_date 失效。
+    # 因此所有 timestamp substr 都先 NULLIF('', NULL)，確保跨日與舊資料的日期區間能正確比對。
     if not s and not e:
         return "", []
 
-    record_start = "COALESCE(NULLIF(start_date,''), substr(COALESCE(start_timestamp,''),1,10))"
-    record_end = "COALESCE(NULLIF(end_date,''), substr(COALESCE(end_timestamp,''),1,10), NULLIF(start_date,''), substr(COALESCE(start_timestamp,''),1,10))"
+    record_start = _record_start_date_expr()
+    record_end = _record_end_for_overlap_expr()
 
     if s and e:
         return f"({record_start} <= ? AND {record_end} >= ?)", [e, s]
@@ -160,9 +169,30 @@ def _time_record_date_where(start_date: Any, end_date: Any) -> tuple[str, list[A
     return f"({record_start} <= ?)", [e]
 
 
+def _sql_safe_anomaly_filter_clause(anomaly_filter: Any) -> tuple[str, list[Any], bool]:
+    """Return SQL predicate for anomaly filters that must be applied before paging.
 
+    V301.12: 02 previously applied anomaly filters such as「跨日紀錄」in pandas
+    after loading one SQL page. A broad date query could load the newest 1,000
+    candidates, remove all of them in pandas, and show 0 rows; adding one Work
+    Order narrowed SQL enough that the same cross-day row appeared. Push SQL-safe
+    anomaly filters into both count and page SQL so the conditions are consistent.
+    """
+    anomaly = _clean_text(anomaly_filter)
+    if anomaly in {"", "全部"}:
+        return "", [], True
 
+    start_date = _record_start_date_expr()
+    end_date = _record_actual_end_date_expr()
+    cross_day = f"({start_date} IS NOT NULL AND {end_date} IS NOT NULL AND {start_date} <> '' AND {end_date} <> '' AND {start_date} <> {end_date})"
 
+    if anomaly == "跨日紀錄":
+        return cross_day, [], True
+    if anomaly == "跨日結束":
+        return cross_day, [], True
+
+    # 工時大小、部門/職稱等仍由 02 頁面的 pandas 後處理維持既有語意。
+    return "", [], False
 
 def _v79_default_history_range_if_blank(start_date: Any, end_date: Any) -> tuple[Any, Any]:
     """Protect interactive 02 queries from accidentally scanning all history rows.
@@ -257,6 +287,11 @@ def load_history_records_sql_filtered(filters: dict[str, Any] | None = None, *, 
     elif end_state == "已結束":
         where.append("COALESCE(end_timestamp,'') NOT IN ('','None','none','nan','NaT','nat','null')")
 
+    anomaly_clause, anomaly_params, _ = _sql_safe_anomaly_filter_clause(f.get("anomaly_filter"))
+    if anomaly_clause:
+        where.append(anomaly_clause)
+        params.extend(anomaly_params)
+
     sql = "SELECT " + ", ".join(TIME_RECORD_COLS) + " FROM time_records"
     if where:
         sql += " WHERE " + " AND ".join(f"({w})" for w in where)
@@ -333,6 +368,11 @@ def count_history_records_sql_filtered(filters: dict[str, Any] | None = None, *,
         where.append("COALESCE(end_timestamp,'') IN ('','None','none','nan','NaT','nat','null')")
     elif end_state == "已結束":
         where.append("COALESCE(end_timestamp,'') NOT IN ('','None','none','nan','NaT','nat','null')")
+
+    anomaly_clause, anomaly_params, _ = _sql_safe_anomaly_filter_clause(f.get("anomaly_filter"))
+    if anomaly_clause:
+        where.append(anomaly_clause)
+        params.extend(anomaly_params)
 
     sql = "SELECT COUNT(*) AS cnt FROM time_records"
     if where:
