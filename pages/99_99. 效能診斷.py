@@ -45,13 +45,17 @@ def _safe_table(rows, *, max_rows: int = 200):
         unsafe_allow_html=True,
     )
 
-st.set_page_config(page_title="99. 效能診斷", page_icon="⏱", layout="wide")
+st.set_page_config(page_title="99｜效能診斷", page_icon="⏱", layout="wide")
 apply_theme()
 require_login("99_speed_diagnostic")
 if not _is_system_admin():
     st.error("權限不足：99. 效能診斷只允許系統管理員進入。")
     st.stop()
-render_header("99｜效能診斷", "V258 自動測速紀錄：登入、首頁、01工時紀錄、Neon/SQL、按鈕交易耗時｜限系統管理員")
+render_header(
+    "99",
+    "效能診斷",
+    "登入、首頁、01 工時紀錄、Neon／SQL 與按鈕交易耗時｜限系統管理員",
+)
 
 try:
     from services.performance_profiler_service import start_page_event as _spt_v40_start_page_event, finish_page_event as _spt_v40_finish_page_event

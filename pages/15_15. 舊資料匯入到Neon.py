@@ -4,7 +4,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from services.theme_service import apply_theme
+from services.theme_service import apply_theme, render_header
 from services.security_service import require_module_access
 from services.db_service import is_postgres_enabled
 from services.legacy_neon_migration_service import (
@@ -12,7 +12,7 @@ from services.legacy_neon_migration_service import (
     save_uploaded_zip_and_migrate,
 )
 
-st.set_page_config(page_title="15｜舊資料匯入到 Neon", page_icon="▣", layout="wide")
+st.set_page_config(page_title="15｜舊資料匯入到Neon", page_icon="▣", layout="wide")
 apply_theme()
 
 try:
@@ -23,8 +23,11 @@ except Exception:
 
 require_module_access("09_persistence", "can_restore")
 
-st.title("15｜舊資料匯入到 Neon")
-st.caption("保留舊系統介面與功能，將舊專案 ZIP 內的 SQLite / permanent_store 資料匯入目前 Neon/PostgreSQL。")
+render_header(
+    "15",
+    "舊資料匯入到Neon",
+    "舊專案 ZIP 的 SQLite／permanent_store 資料匯入目前 Neon／PostgreSQL｜保留既有介面與功能，不寫入 GitHub",
+)
 
 V30040_PREVIEW_KEY = "v30040_legacy_import_preview"
 V30040_RESULT_KEY = "v30040_legacy_import_result"

@@ -11,6 +11,7 @@ This file is self-contained and keeps backward-compatible function names used by
 from __future__ import annotations
 
 import base64
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
@@ -37,14 +38,20 @@ MODULE_TITLES = {
     "10": ("權限管理", "帳號、角色、模組權限與閒置自動登出設定"),
     "11": ("登入紀錄", "登入、登出、閒置自動登出、權限不足與安全事件查詢"),
     "12": ("模組永久紀錄中心", "每個模組獨立 records、settings、audit 與 history 時間戳備份"),
-    "13": ("系統設定", "工段名稱、休息時間與跨模組共用設定"),
+    "13": ("系統設定", "工段名稱下拉選單、休息時間扣除規則｜新增、刪除、修改、套用後永久保存"),
+    "14": ("資料健康檢查中心", "工時紀錄稽核、資料遺失檢查、01/02 權威檔非破壞式修復"),
+    "15": ("舊資料匯入到Neon", "舊專案 ZIP 的 SQLite／permanent_store 資料匯入目前 Neon／PostgreSQL｜保留既有介面與功能，不寫入 GitHub"),
+    "16": ("完工機台", "已完工製令資訊查詢、Excel 匯入、貼上資料與 OneDrive 對應更新｜01 工時紀錄自動隱藏已完工製令"),
+    "98": ("權威檔診斷", "盤點各模組權威檔、舊來源與資料保存狀態｜只診斷，不覆蓋正式資料"),
+    "99": ("效能診斷", "登入、首頁、01 工時紀錄、Neon／SQL 與按鈕交易耗時｜限系統管理員"),
 }
 
 MODULE_DESC_TO_NO = {
     "工時紀錄": "01", "歷史紀錄": "02", "製令管理": "03", "人員名單": "04",
     "製令工時分析": "05", "LOG查詢": "06", "今日未紀錄名單": "07", "人員每日工時": "08",
     "資料永久保存與備份": "09", "權限管理": "10", "登入紀錄": "11", "模組永久紀錄中心": "12",
-    "系統設定": "13",
+    "系統設定": "13", "資料健康檢查中心": "14", "舊資料匯入到Neon": "15",
+    "舊資料匯入到 Neon": "15", "完工機台": "16", "權威檔診斷": "98", "效能診斷": "99",
 }
 
 
@@ -66,6 +73,15 @@ def _safe_html(text: Any) -> str:
         .replace(">", "&gt;")
         .replace('"', "&quot;")
     )
+
+
+def _split_numbered_title(value: Any) -> tuple[str, str]:
+    """Split common title forms such as ``13｜系統設定`` or ``13. 系統設定``."""
+    text = "" if value is None else str(value).strip()
+    match = re.match(r"^(\d{1,2})\s*(?:｜|\||[.．、:：-])\s*(.+?)\s*$", text)
+    if not match:
+        return "", ""
+    return match.group(1).zfill(2), match.group(2).strip()
 
 
 def _normalize_module(module_no: Any = None, title: Any = None, subtitle: Any = None) -> tuple[str, str, str]:
@@ -118,7 +134,28 @@ def _normalize_module(module_no: Any = None, title: Any = None, subtitle: Any = 
         final_subtitle = possible_subtitles[-1] if possible_subtitles else default_subtitle
         return found_no, final_title, final_subtitle
 
-    # Fallback for home or unknown custom page.
+    # Generic numbered module support.  This prevents an unknown/new module's
+    # subtitle from being promoted to the main title when pages use the common
+    # two-argument form: render_header("16｜完工機台", "說明").
+    for idx, value in enumerate(candidates):
+        parsed_no, parsed_title = _split_numbered_title(value)
+        if not parsed_no:
+            continue
+        explicit_subtitle = ""
+        for later in candidates[idx + 1:]:
+            later_text = str(later or "").strip()
+            if later_text and not _split_numbered_title(later_text)[0]:
+                explicit_subtitle = later_text
+                break
+        return parsed_no, parsed_title, explicit_subtitle or "Super Plus Tech Manufacturing Time Tracking System"
+
+    # Generic explicit style: render_header("98", "權威檔診斷", "說明").
+    if found_no:
+        generic_title = b if b and not b.replace("｜", "|").strip().isdigit() else ""
+        if generic_title:
+            return found_no, generic_title, c or "Super Plus Tech Manufacturing Time Tracking System"
+
+    # Fallback for home or unnumbered custom page.
     final_title = b or a or "超慧科技製造部｜智慧工時紀錄系統"
     final_subtitle = c or "Super Plus Tech Manufacturing Time Tracking System"
     return "", final_title, final_subtitle
