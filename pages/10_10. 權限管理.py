@@ -52,6 +52,7 @@ if not st.session_state.get("_spt_v67_permission_bootstrap_ready", False):
 st.caption("V300.48 loaded｜權限管理頁：Account Editor 儲存只送出有異動列，避免套用帳號密碼總表時長時間運轉。")
 
 ROLE_OPTIONS = ["admin", "manager", "leader", "operator", "viewer", "auditor"]
+ROLE_IDLE_SETTING_KEYS = {role: f"idle_timeout_minutes_role_{role}" for role in ROLE_OPTIONS}
 ACTION_COLS = [a[0] for a in ACTIONS]
 
 
@@ -1480,9 +1481,14 @@ def _v93_permission_export_df() -> pd.DataFrame:
 def _v93_security_export_df() -> pd.DataFrame:
     settings = _v104_get_security_cached() or {}
     labels = {
-        "idle_timeout_minutes": "閒置自動登出分鐘數 / Idle Auto Logout Minutes",
+        "idle_timeout_minutes": "未設定角色預設分鐘數 / Default Idle Auto Logout Minutes",
         "ask_continue_after_record": "工時完成後詢問是否繼續記錄 / Ask Continue After Time Record",
     }
+    for role_code in ROLE_OPTIONS:
+        info = ROLE_DESCRIPTIONS.get(role_code, {})
+        role_zh = _role_text(info, "zh", "label", role_code)
+        role_en = _role_text(info, "en", "role_en", role_code)
+        labels[ROLE_IDLE_SETTING_KEYS[role_code]] = f"{role_zh} / {role_en} 閒置自動登出分鐘數"
     rows = []
     for key in sorted(settings.keys()):
         value = settings.get(key, "")
@@ -2126,20 +2132,85 @@ elif _selected_permission_section == "帳號模組權限 / Account Module Permis
 elif _selected_permission_section == "安全設定 / Security":
     st.subheader("安全設定 / Security Settings")
     settings = _v104_get_security_cached()
-    idle = int(settings.get("idle_timeout_minutes", "15") or 15)
+    try:
+        idle = max(1, int(float(settings.get("idle_timeout_minutes", "15") or 15)))
+    except Exception:
+        idle = 15
+
+    st.info(
+        "可依角色個別設定閒置自動登出時間。帳號登入後會依『帳號主檔角色』套用；"
+        "未設定或未識別的角色，則使用預設分鐘數。"
+    )
+
     with st.form("security_settings_commit_form", clear_on_submit=False):
-        new_idle = st.number_input("閒置自動登出分鐘數 / Idle Auto Logout Minutes", min_value=1, max_value=240, value=idle, step=1)
-        confirm_after_record = st.checkbox("工時完成後詢問是否繼續記錄 / Ask continue after time record", value=settings.get("ask_continue_after_record", "1") != "0")
-        submitted_security = st.form_submit_button("⛨ 確認套用安全設定 / Apply Security Settings", type="primary", use_container_width=True)
+        new_idle = st.number_input(
+            "未設定角色預設分鐘數 / Default Idle Auto Logout Minutes",
+            min_value=1,
+            max_value=480,
+            value=idle,
+            step=1,
+            help="僅供沒有個別角色設定或未識別角色使用。",
+        )
+
+        st.markdown("#### 依角色設定登出時間 / Idle Timeout by Role")
+        role_idle_values: dict[str, int] = {}
+        role_cols = st.columns(3)
+        for idx, role_code in enumerate(ROLE_OPTIONS):
+            info = ROLE_DESCRIPTIONS.get(role_code, {})
+            role_zh = _role_text(info, "zh", "label", role_code)
+            role_en = _role_text(info, "en", "role_en", role_code)
+            raw_value = settings.get(ROLE_IDLE_SETTING_KEYS[role_code], idle)
+            try:
+                current_value = max(1, int(float(raw_value or idle)))
+            except Exception:
+                current_value = idle
+            with role_cols[idx % len(role_cols)]:
+                role_idle_values[role_code] = int(st.number_input(
+                    f"{role_zh} / {role_en}",
+                    min_value=1,
+                    max_value=480,
+                    value=current_value,
+                    step=1,
+                    key=f"v301_role_idle_timeout_{role_code}",
+                    help=f"角色代碼：{role_code}",
+                ))
+
+        confirm_after_record = st.checkbox(
+            "工時完成後詢問是否繼續記錄 / Ask continue after time record",
+            value=settings.get("ask_continue_after_record", "1") != "0",
+        )
+        submitted_security = st.form_submit_button(
+            "⛨ 確認套用安全設定 / Apply Security Settings",
+            type="primary",
+            use_container_width=True,
+        )
+
     if submitted_security:
-        save_security_settings({"idle_timeout_minutes": str(int(new_idle)), "ask_continue_after_record": "1" if confirm_after_record else "0"})
+        security_payload = {
+            "idle_timeout_minutes": str(int(new_idle)),
+            "ask_continue_after_record": "1" if confirm_after_record else "0",
+        }
+        for role_code, minutes in role_idle_values.items():
+            security_payload[ROLE_IDLE_SETTING_KEYS[role_code]] = str(int(minutes))
+
+        result = save_security_settings(security_payload)
         _v104_cache_clear("security")
         try:
-            from services.security_service import set_idle_timeout_minutes
-            set_idle_timeout_minutes(int(new_idle))
+            from services.security_service import sync_idle_timeout_runtime_settings
+            sync_idle_timeout_runtime_settings(int(new_idle), role_idle_values)
         except Exception:
             pass
-        st.success(f"安全設定已永久儲存：閒置自動登出 {int(new_idle)} 分鐘 / Security settings permanently saved")
+
+        saved_n = result.get("saved", 0) if isinstance(result, dict) else 0
+        skipped_n = result.get("skipped_unchanged", 0) if isinstance(result, dict) else 0
+        role_summary = "、".join(
+            f"{_role_text(ROLE_DESCRIPTIONS.get(role_code, {}), 'zh', 'label', role_code)} {minutes} 分"
+            for role_code, minutes in role_idle_values.items()
+        )
+        st.success(
+            f"安全設定已永久儲存：預設 {int(new_idle)} 分；{role_summary}。"
+            f"異動 {saved_n} 項，未異動 {skipped_n} 項。"
+        )
         st.rerun()
 
 try:

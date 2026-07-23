@@ -101,6 +101,8 @@ ROLES = [
     ("viewer", "查詢者", "Viewer"),
     ("auditor", "稽核", "Auditor"),
 ]
+ROLE_CODES = tuple(role_code for role_code, _, _ in ROLES)
+ROLE_IDLE_SETTING_PREFIX = "idle_timeout_minutes_role_"
 
 DEFAULT_USERS = [
     ("admin", "Admin@1234", "系統管理員", "admin"),
@@ -505,32 +507,94 @@ def seed_security_defaults() -> None:
 
 
 
-def _read_idle_timeout_from_files() -> int | None:
-    """Read idle timeout from permanent JSON files first.
+def _normalize_idle_minutes(value: Any, default: int | None = None) -> int | None:
+    try:
+        return max(1, min(480, int(float(value))))
+    except Exception:
+        return default
 
-    SQLite on Streamlit Cloud can be rebuilt after GitHub deploy.  These JSON
-    files are committed as permanent settings, so the configured value will not
-    fall back to 15 minutes after update/relogin.
-    """
+
+def _resolve_idle_timeout_role(role_code: str | None = None) -> str:
+    role = str(role_code or "").strip().lower()
+    if role:
+        return role
+    try:
+        roles = st.session_state.get("auth_roles", []) or []
+        if roles:
+            role = str(roles[0] or "").strip().lower()
+    except Exception:
+        role = ""
+    if role:
+        return role
+    try:
+        username = str(st.session_state.get("auth_username", "") or "").strip()
+        if username:
+            role = str(_auth_role_for_username(username) or "").strip().lower()
+    except Exception:
+        role = ""
+    return role
+
+
+def _read_idle_timeout_file_payload() -> dict[str, Any]:
     for path in IDLE_TIMEOUT_FILES:
         try:
             if not path.exists() or path.stat().st_size <= 0:
                 continue
             data = json.loads(path.read_text(encoding="utf-8"))
-            raw = data.get("idle_timeout_minutes") or data.get("setting_value")
-            if raw not in (None, ""):
-                return max(1, int(float(raw)))
+            if isinstance(data, dict):
+                return data
         except Exception:
             continue
-    return None
+    return {}
 
 
-def _write_idle_timeout_files(minutes: int) -> None:
-    payload = {
-        "idle_timeout_minutes": int(minutes),
+def _read_idle_timeout_from_files(role_code: str | None = None) -> int | None:
+    """Read role-aware idle timeout from permanent JSON fallback files."""
+    data = _read_idle_timeout_file_payload()
+    role = str(role_code or "").strip().lower()
+    if role:
+        role_map = data.get("role_idle_timeout_minutes", {})
+        if isinstance(role_map, dict):
+            value = _normalize_idle_minutes(role_map.get(role))
+            if value is not None:
+                return value
+        value = _normalize_idle_minutes(data.get(f"{ROLE_IDLE_SETTING_PREFIX}{role}"))
+        if value is not None:
+            return value
+    return _normalize_idle_minutes(data.get("idle_timeout_minutes") or data.get("setting_value"))
+
+
+def _read_idle_timeout_role_map_from_files() -> dict[str, int]:
+    data = _read_idle_timeout_file_payload()
+    out: dict[str, int] = {}
+    role_map = data.get("role_idle_timeout_minutes", {})
+    if isinstance(role_map, dict):
+        for role_code, value in role_map.items():
+            minutes = _normalize_idle_minutes(value)
+            if minutes is not None:
+                out[str(role_code).strip().lower()] = minutes
+    for role_code in ROLE_CODES:
+        minutes = _normalize_idle_minutes(data.get(f"{ROLE_IDLE_SETTING_PREFIX}{role_code}"))
+        if minutes is not None:
+            out[role_code] = minutes
+    return out
+
+
+def _write_idle_timeout_files(minutes: int, role_minutes: dict[str, int] | None = None) -> None:
+    default_minutes = _normalize_idle_minutes(minutes, DEFAULT_IDLE_MINUTES) or DEFAULT_IDLE_MINUTES
+    merged_roles = _read_idle_timeout_role_map_from_files()
+    for role_code, value in (role_minutes or {}).items():
+        normalized = _normalize_idle_minutes(value)
+        if normalized is not None:
+            merged_roles[str(role_code).strip().lower()] = normalized
+    payload: dict[str, Any] = {
+        "idle_timeout_minutes": default_minutes,
+        "role_idle_timeout_minutes": merged_roles,
         "updated_at": _now(),
-        "note": "閒置自動登出分鐘數永久設定；GitHub 更新或 SQLite 重建後優先讀取此檔。",
+        "note": "閒置自動登出分鐘數永久鏡像；正式權威為 PostgreSQL auth_security_settings。",
     }
+    for role_code, value in merged_roles.items():
+        payload[f"{ROLE_IDLE_SETTING_PREFIX}{role_code}"] = value
     for path in IDLE_TIMEOUT_FILES:
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -538,32 +602,79 @@ def _write_idle_timeout_files(minutes: int) -> None:
         except Exception:
             pass
 
-def get_idle_timeout_minutes() -> int:
-    """讀取閒置登出設定，優先讀永久 JSON，再回退 SQLite。"""
-    cache = st.session_state.get("_spt_idle_timeout_cache")
+
+def _read_idle_timeout_from_db(role_code: str | None = None) -> int | None:
+    role = str(role_code or "").strip().lower()
+    keys = ["idle_timeout_minutes", "idle_auto_logout_minutes"]
+    role_key = f"{ROLE_IDLE_SETTING_PREFIX}{role}" if role else ""
+    if role_key:
+        keys.insert(0, role_key)
+    placeholders = ",".join(["?"] * len(keys))
+    for table in ("auth_security_settings", "security_settings"):
+        try:
+            df = query_df(
+                f"SELECT setting_key, setting_value FROM {table} WHERE setting_key IN ({placeholders})",
+                tuple(keys),
+            )
+            if df is None or df.empty:
+                continue
+            values = {
+                str(row.get("setting_key", "")): row.get("setting_value")
+                for row in df.to_dict("records")
+            }
+            if role_key:
+                role_minutes = _normalize_idle_minutes(values.get(role_key))
+                if role_minutes is not None:
+                    return role_minutes
+            default_minutes = _normalize_idle_minutes(
+                values.get("idle_timeout_minutes", values.get("idle_auto_logout_minutes"))
+            )
+            if default_minutes is not None:
+                return default_minutes
+        except Exception:
+            continue
+    return None
+
+
+def get_idle_timeout_minutes(role_code: str | None = None) -> int:
+    """Return effective idle timeout for the current or specified account role.
+
+    PostgreSQL ``auth_security_settings`` is authoritative.  Permanent JSON is
+    only a fallback mirror for temporary database unavailability.
+    """
+    role = _resolve_idle_timeout_role(role_code)
+    cache_key = role or "__default__"
     now_ts = time.time()
-    if cache and now_ts - float(cache.get("ts", 0)) < _PERMISSION_CACHE_TTL_SECONDS:
-        return int(cache.get("minutes", DEFAULT_IDLE_MINUTES))
+    cache_map = st.session_state.get("_spt_idle_timeout_cache_by_role", {})
+    if isinstance(cache_map, dict):
+        cache = cache_map.get(cache_key)
+        if isinstance(cache, dict) and now_ts - float(cache.get("ts", 0)) < _PERMISSION_CACHE_TTL_SECONDS:
+            return int(cache.get("minutes", DEFAULT_IDLE_MINUTES))
+
     ensure_security_schema()
-    minutes = _read_idle_timeout_from_files()
+    minutes = _read_idle_timeout_from_db(role)
+    if minutes is None:
+        minutes = _read_idle_timeout_from_files(role)
     if minutes is None:
         minutes = DEFAULT_IDLE_MINUTES
-        for table in ("auth_security_settings", "security_settings"):
-            try:
-                row = query_one(f"SELECT setting_value FROM {table} WHERE setting_key='idle_timeout_minutes'")
-                if row and row.get("setting_value") not in (None, ""):
-                    minutes = int(float(row["setting_value"]))
-                    break
-            except Exception:
-                pass
-    minutes = max(1, int(minutes))
-    st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": now_ts}
+    minutes = _normalize_idle_minutes(minutes, DEFAULT_IDLE_MINUTES) or DEFAULT_IDLE_MINUTES
+
+    if not isinstance(cache_map, dict):
+        cache_map = {}
+    cache_map[cache_key] = {"minutes": minutes, "ts": now_ts}
+    st.session_state["_spt_idle_timeout_cache_by_role"] = cache_map
+    # Keep the old cache key for compatibility with older page code and logout cleanup.
+    st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "role": role, "ts": now_ts}
     return minutes
 
-def set_idle_timeout_minutes(minutes: int) -> None:
-    """Write idle timeout to both runtime and permission tables."""
+
+def set_idle_timeout_minutes(minutes: int, role_code: str | None = None) -> None:
+    """Persist a default or role-specific idle timeout to both security tables."""
     ensure_security_schema()
-    minutes = max(1, int(minutes))
+    minutes = _normalize_idle_minutes(minutes, DEFAULT_IDLE_MINUTES) or DEFAULT_IDLE_MINUTES
+    role = str(role_code or "").strip().lower()
+    setting_key = f"{ROLE_IDLE_SETTING_PREFIX}{role}" if role else "idle_timeout_minutes"
+    note = f"角色 {role} 閒置自動登出分鐘數" if role else "未設定角色預設閒置自動登出分鐘數"
     for table in ("security_settings", "auth_security_settings"):
         try:
             execute(f"""
@@ -576,16 +687,35 @@ def set_idle_timeout_minutes(minutes: int) -> None:
             """)
             execute(f"""
                 INSERT INTO {table} (setting_key, setting_value, note, updated_at)
-                VALUES ('idle_timeout_minutes', ?, '閒置多久自動登出，單位分鐘', ?)
+                VALUES (?, ?, ?, ?)
                 ON CONFLICT(setting_key) DO UPDATE SET
                     setting_value=excluded.setting_value,
                     note=excluded.note,
                     updated_at=excluded.updated_at
-            """, (str(minutes), _now()))
+            """, (setting_key, str(minutes), note, _now()))
         except Exception:
             pass
-    _write_idle_timeout_files(minutes)
-    st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": 0}
+
+    default_minutes = minutes if not role else (
+        _read_idle_timeout_from_db("") or _read_idle_timeout_from_files("") or DEFAULT_IDLE_MINUTES
+    )
+    role_map = {role: minutes} if role else None
+    _write_idle_timeout_files(default_minutes, role_map)
+    st.session_state.pop("_spt_idle_timeout_cache_by_role", None)
+    st.session_state.pop("_spt_idle_timeout_cache", None)
+
+
+def sync_idle_timeout_runtime_settings(default_minutes: int, role_minutes: dict[str, int] | None = None) -> None:
+    """Refresh JSON fallback and session cache after page 10 saves PostgreSQL settings."""
+    default_minutes = _normalize_idle_minutes(default_minutes, DEFAULT_IDLE_MINUTES) or DEFAULT_IDLE_MINUTES
+    clean_roles: dict[str, int] = {}
+    for role_code, value in (role_minutes or {}).items():
+        normalized = _normalize_idle_minutes(value)
+        if normalized is not None:
+            clean_roles[str(role_code).strip().lower()] = normalized
+    _write_idle_timeout_files(default_minutes, clean_roles)
+    st.session_state.pop("_spt_idle_timeout_cache_by_role", None)
+    st.session_state.pop("_spt_idle_timeout_cache", None)
 
 
 def log_security_event(username: str | None, event_type: str, result: str, message: str = "", module_code: str = "", idle_seconds: int | None = None) -> None:
@@ -4563,22 +4693,28 @@ def _v36_parse_minutes(value: Any) -> int | None:
         minutes = int(float(value))
         if minutes < 1:
             return None
-        return max(1, min(240, minutes))
+        return max(1, min(480, minutes))
     except Exception:
         return None
 
 
-def _v36_query_security_minutes() -> int | None:
-    """Fast Neon-first reader. Do not create schema or scan local files here."""
+def _v36_query_security_minutes(role_code: str | None = None) -> int | None:
+    """Fast Neon-first role-aware reader without schema creation or full scans."""
+    role = str(role_code or "").strip().lower()
+    setting_keys = []
+    if role:
+        setting_keys.append(f"{ROLE_IDLE_SETTING_PREFIX}{role}")
+    setting_keys.extend(["idle_timeout_minutes", "idle_auto_logout_minutes"])
     for table in ("auth_security_settings", "security_settings"):
         try:
-            row = query_one(
-                f"SELECT setting_value FROM {table} WHERE setting_key=? LIMIT 1",
-                ("idle_timeout_minutes",),
-            )
-            minutes = _v36_parse_minutes((row or {}).get("setting_value"))
-            if minutes is not None:
-                return minutes
+            for setting_key in setting_keys:
+                row = query_one(
+                    f"SELECT setting_value FROM {table} WHERE setting_key=? LIMIT 1",
+                    (setting_key,),
+                )
+                minutes = _v36_parse_minutes((row or {}).get("setting_value"))
+                if minutes is not None:
+                    return minutes
         except Exception:
             continue
     return None
@@ -4615,61 +4751,80 @@ def _v36_upsert_security_setting(key: str, value: str, note: str = "") -> None:
             pass
 
 
-def get_idle_timeout_minutes() -> int:  # type: ignore[override]
-    """Final V36 reader: Neon/PostgreSQL is the authority; local files cannot override it."""
+def get_idle_timeout_minutes(role_code: str | None = None) -> int:  # type: ignore[override]
+    """Final role-aware reader: PostgreSQL is authority; JSON is fallback only."""
+    role = _resolve_idle_timeout_role(role_code)
+    cache_key = role or "__default__"
     try:
-        cache = st.session_state.get("_spt_idle_timeout_cache")
+        cache_map = st.session_state.get("_spt_idle_timeout_cache_by_role", {})
         now_ts = time.time()
-        if isinstance(cache, dict) and now_ts - float(cache.get("ts", 0) or 0) < _V36_IDLE_CACHE_TTL_SECONDS:
-            minutes = _v36_parse_minutes(cache.get("minutes"))
-            if minutes is not None:
-                return minutes
+        if isinstance(cache_map, dict):
+            cache = cache_map.get(cache_key)
+            if isinstance(cache, dict) and now_ts - float(cache.get("ts", 0) or 0) < _V36_IDLE_CACHE_TTL_SECONDS:
+                minutes = _v36_parse_minutes(cache.get("minutes"))
+                if minutes is not None:
+                    return minutes
     except Exception:
-        pass
+        cache_map = {}
 
-    minutes = _v36_query_security_minutes()
+    minutes = _v36_query_security_minutes(role)
 
-    # Fallback only: do not let local JSON override Neon when Neon has data.
+    # Fallback only: local JSON can never override a value already found in PostgreSQL.
     if minutes is None:
         try:
-            minutes = _read_idle_timeout_from_files()
+            minutes = _read_idle_timeout_from_files(role)
         except Exception:
             minutes = None
     if minutes is None:
         minutes = DEFAULT_IDLE_MINUTES
-    minutes = max(1, int(minutes))
+    minutes = _v36_parse_minutes(minutes) or DEFAULT_IDLE_MINUTES
     try:
-        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+        cache_map = st.session_state.get("_spt_idle_timeout_cache_by_role", {})
+        if not isinstance(cache_map, dict):
+            cache_map = {}
+        cache_map[cache_key] = {"minutes": minutes, "ts": time.time()}
+        st.session_state["_spt_idle_timeout_cache_by_role"] = cache_map
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "role": role, "ts": time.time()}
     except Exception:
         pass
     return minutes
 
 
-def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
-    """Final V36 writer: persist to Neon authority tables and refresh runtime cache."""
+def set_idle_timeout_minutes(minutes: int, role_code: str | None = None) -> None:  # type: ignore[override]
+    """Final role-aware writer for default or one specific account role."""
     minutes = _v36_parse_minutes(minutes) or DEFAULT_IDLE_MINUTES
-    try:
-        # Preserve the checkbox setting from session if available.
-        settings = st.session_state.get("spt_security_settings", {})
-        ask = "1"
-        if isinstance(settings, dict) and settings.get("ask_continue_after_record") is not None:
-            ask = str(settings.get("ask_continue_after_record"))
-        ask = "0" if str(ask).strip().lower() in {"0", "false", "no", "n", "否"} else "1"
-    except Exception:
-        ask = "1"
+    role = str(role_code or "").strip().lower()
+    setting_key = f"{ROLE_IDLE_SETTING_PREFIX}{role}" if role else "idle_timeout_minutes"
+    note = f"Role {role} idle auto logout minutes" if role else "Default idle auto logout minutes"
+    _v36_upsert_security_setting(setting_key, str(minutes), note)
 
-    _v36_upsert_security_setting("idle_timeout_minutes", str(minutes), "Neon authority idle auto logout minutes")
-    _v36_upsert_security_setting("idle_auto_logout_minutes", str(minutes), "Neon authority idle auto logout minutes alias")
-    _v36_upsert_security_setting("ask_continue_after_record", str(ask), "Ask continue after time record")
+    if not role:
+        _v36_upsert_security_setting("idle_auto_logout_minutes", str(minutes), "Default idle auto logout minutes alias")
+        try:
+            settings = st.session_state.get("spt_security_settings", {})
+            ask = "1"
+            if isinstance(settings, dict) and settings.get("ask_continue_after_record") is not None:
+                ask = str(settings.get("ask_continue_after_record"))
+            ask = "0" if str(ask).strip().lower() in {"0", "false", "no", "n", "否"} else "1"
+        except Exception:
+            ask = "1"
+        _v36_upsert_security_setting("ask_continue_after_record", str(ask), "Ask continue after time record")
+
+    default_minutes = minutes if not role else (
+        _v36_query_security_minutes("") or _read_idle_timeout_from_files("") or DEFAULT_IDLE_MINUTES
+    )
+    _write_idle_timeout_files(default_minutes, {role: minutes} if role else None)
 
     try:
-        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+        st.session_state.pop("_spt_idle_timeout_cache_by_role", None)
+        st.session_state.pop("_spt_idle_timeout_cache", None)
         settings = st.session_state.get("spt_security_settings", {})
         if not isinstance(settings, dict):
             settings = {}
-        settings["idle_timeout_minutes"] = str(minutes)
-        settings["idle_auto_logout_minutes"] = str(minutes)
-        settings["ask_continue_after_record"] = str(ask)
+        settings[setting_key] = str(minutes)
+        if not role:
+            settings["idle_timeout_minutes"] = str(minutes)
+            settings["idle_auto_logout_minutes"] = str(minutes)
         st.session_state["spt_security_settings"] = settings
     except Exception:
         pass
