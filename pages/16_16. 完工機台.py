@@ -4,6 +4,8 @@ from __future__ import annotations
 import re
 from io import BytesIO
 from pathlib import Path
+from datetime import date, timedelta
+import math
 import pandas as pd
 import streamlit as st
 
@@ -52,6 +54,14 @@ except Exception:
     def save_sheet_setting(sheet_name: str, header_row: int, mapping: dict, delete_missing: bool = False, **_):
         return {}
 
+try:
+    from services.timezone_service import today_date, now_stamp
+except Exception:
+    def today_date() -> date:
+        return date.today()
+    def now_stamp() -> str:
+        return pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
+
 st.set_page_config(page_title="16. 完工機台", page_icon="▣", layout="wide")
 apply_theme()
 require_module_access("16_finished_machines")
@@ -62,6 +72,12 @@ EDITOR_VERSION_KEY = "v16_finished_machines_editor_version"
 EDITOR_IGNORE_RETURN_KEY = "v16_finished_machines_ignore_next_editor_return"
 BASELINE_KEY = "v16_finished_machines_editor_save_baseline"
 TABLE_KEY = "16_finished_machines_editor_main"
+SEARCH_STATE_KEY = "v16_finished_search_config"
+SEARCH_PAGE_KEY = "v16_finished_search_page"
+SEARCH_FORM_VERSION_KEY = "v16_finished_search_form_version"
+SEARCH_EXPORT_BYTES_KEY = "v16_finished_search_export_bytes"
+SEARCH_EXPORT_NAME_KEY = "v16_finished_search_export_name"
+SEARCH_EXPORT_SIGNATURE_KEY = "v16_finished_search_export_signature"
 
 COLS = list(FINISHED_MACHINE_COLS)
 DISPLAY_COLUMNS = {
@@ -362,6 +378,436 @@ def _render_column_settings(table_key: str, df: pd.DataFrame, title: str) -> Non
             rerun()
 
 
+
+DATE_MODE_OPTIONS = ["全部日期", "今日", "本週", "本月", "今年", "自訂日期"]
+STATUS_OPTIONS = ["全部狀態", "啟用", "停用"]
+PAGE_SIZE_OPTIONS = [25, 50, 100, 200]
+SORT_LABEL_TO_COLUMN = {
+    "完工日期 / Finished Date": "finished_date",
+    "製令 / Work Order": "work_order",
+    "P/N / Part No.": "part_no",
+    "機型 / Type": "type_name",
+    "類別 / Category": "category",
+    "組立地點 / Assembly Location": "assembly_location",
+    "客戶 / Customer": "customer",
+    "更新時間 / Updated At": "updated_at",
+    "ID / ID": "id",
+}
+SORT_COLUMN_TO_LABEL = {v: k for k, v in SORT_LABEL_TO_COLUMN.items()}
+SEARCH_RESULT_INTERNAL_COLS = [
+    "id", "work_order", "part_no", "type_name", "category",
+    "assembly_location", "customer", "finished_date", "note",
+    "is_active", "created_at", "updated_at",
+]
+
+
+def _default_search_config() -> dict:
+    return {
+        "keyword": "",
+        "date_mode": "全部日期",
+        "start_date": "",
+        "end_date": "",
+        "categories": [],
+        "types": [],
+        "locations": [],
+        "customers": [],
+        "status": "全部狀態",
+        "sort_column": "finished_date",
+        "sort_ascending": False,
+        "page_size": 50,
+    }
+
+
+def _search_config() -> dict:
+    current = st.session_state.get(SEARCH_STATE_KEY)
+    default = _default_search_config()
+    if not isinstance(current, dict):
+        current = {}
+    merged = {**default, **current}
+    for key in ["categories", "types", "locations", "customers"]:
+        value = merged.get(key, [])
+        merged[key] = list(value) if isinstance(value, (list, tuple, set)) else []
+    if merged.get("date_mode") not in DATE_MODE_OPTIONS:
+        merged["date_mode"] = default["date_mode"]
+    if merged.get("status") not in STATUS_OPTIONS:
+        merged["status"] = default["status"]
+    if merged.get("sort_column") not in SORT_COLUMN_TO_LABEL:
+        merged["sort_column"] = default["sort_column"]
+    try:
+        merged["page_size"] = int(merged.get("page_size", 50))
+    except Exception:
+        merged["page_size"] = 50
+    if merged["page_size"] not in PAGE_SIZE_OPTIONS:
+        merged["page_size"] = 50
+    st.session_state[SEARCH_STATE_KEY] = merged
+    return merged
+
+
+def _option_values(df: pd.DataFrame, column: str) -> list[str]:
+    if not isinstance(df, pd.DataFrame) or df.empty or column not in df.columns:
+        return []
+    values = {_normalize_text(v) for v in df[column].tolist() if _normalize_text(v)}
+    return sorted(values, key=lambda x: (x.casefold(), x))
+
+
+def _as_date(v) -> date | None:
+    text = _normalize_text(v)
+    if not text:
+        return None
+    try:
+        ts = pd.to_datetime(text, errors="coerce")
+        if pd.notna(ts):
+            return ts.date()
+    except Exception:
+        pass
+    return None
+
+
+def _resolved_date_range(config: dict) -> tuple[date | None, date | None]:
+    mode = str(config.get("date_mode", "全部日期"))
+    today = today_date()
+    if mode == "今日":
+        return today, today
+    if mode == "本週":
+        start = today - timedelta(days=today.weekday())
+        return start, start + timedelta(days=6)
+    if mode == "本月":
+        start = date(today.year, today.month, 1)
+        if today.month == 12:
+            next_month = date(today.year + 1, 1, 1)
+        else:
+            next_month = date(today.year, today.month + 1, 1)
+        return start, next_month - timedelta(days=1)
+    if mode == "今年":
+        return date(today.year, 1, 1), date(today.year, 12, 31)
+    if mode == "自訂日期":
+        start = _as_date(config.get("start_date"))
+        end = _as_date(config.get("end_date"))
+        if start and end and start > end:
+            start, end = end, start
+        return start, end
+    return None, None
+
+
+def _apply_search_filters(df: pd.DataFrame, config: dict) -> pd.DataFrame:
+    work = ensure_cols(df)
+    if work.empty:
+        return work
+    work = work[work["work_order"].map(_normalize_text) != ""].copy()
+    if work.empty:
+        return ensure_cols(work)
+
+    keyword = _normalize_text(config.get("keyword")).casefold()
+    if keyword:
+        keyword_columns = [
+            "work_order", "part_no", "type_name", "category",
+            "assembly_location", "customer", "finished_date", "note",
+        ]
+        mask = pd.Series(False, index=work.index)
+        for col in keyword_columns:
+            mask = mask | work[col].map(lambda v: keyword in _normalize_text(v).casefold())
+        work = work.loc[mask].copy()
+
+    exact_filters = {
+        "category": config.get("categories", []),
+        "type_name": config.get("types", []),
+        "assembly_location": config.get("locations", []),
+        "customer": config.get("customers", []),
+    }
+    for column, selected in exact_filters.items():
+        selected_keys = {_normalize_text(v).casefold() for v in selected if _normalize_text(v)}
+        if selected_keys:
+            work = work[work[column].map(lambda v: _normalize_text(v).casefold() in selected_keys)].copy()
+
+    status = str(config.get("status", "全部狀態"))
+    if status == "啟用":
+        work = work[work["is_active"].map(_to_bool_value)].copy()
+    elif status == "停用":
+        work = work[~work["is_active"].map(_to_bool_value)].copy()
+
+    start_date, end_date = _resolved_date_range(config)
+    if start_date or end_date:
+        parsed_dates = pd.to_datetime(work["finished_date"], errors="coerce").dt.date
+        date_mask = parsed_dates.notna()
+        if start_date:
+            date_mask = date_mask & parsed_dates.map(lambda d: bool(pd.notna(d) and d >= start_date))
+        if end_date:
+            date_mask = date_mask & parsed_dates.map(lambda d: bool(pd.notna(d) and d <= end_date))
+        work = work.loc[date_mask].copy()
+
+    sort_column = str(config.get("sort_column", "finished_date"))
+    ascending = bool(config.get("sort_ascending", False))
+    if sort_column not in work.columns:
+        sort_column = "finished_date"
+    if sort_column in {"finished_date", "created_at", "updated_at"}:
+        work["__sort_value"] = pd.to_datetime(work[sort_column], errors="coerce")
+    elif sort_column == "id":
+        work["__sort_value"] = pd.to_numeric(work[sort_column], errors="coerce")
+    else:
+        work["__sort_value"] = work[sort_column].map(lambda v: _normalize_text(v).casefold())
+    work["__sort_work_order"] = work["work_order"].map(lambda v: _normalize_text(v).casefold())
+    work = work.sort_values(
+        by=["__sort_value", "__sort_work_order"],
+        ascending=[ascending, True],
+        na_position="last",
+        kind="stable",
+    ).drop(columns=["__sort_value", "__sort_work_order"], errors="ignore")
+    return ensure_cols(work.reset_index(drop=True))
+
+
+def _search_signature(config: dict, matched_rows: int) -> str:
+    normalized = []
+    for key in sorted(config):
+        value = config.get(key)
+        if isinstance(value, list):
+            value = tuple(value)
+        normalized.append((key, value))
+    return repr((tuple(normalized), int(matched_rows)))
+
+
+def _active_filter_summary(config: dict) -> str:
+    parts: list[str] = []
+    keyword = _normalize_text(config.get("keyword"))
+    if keyword:
+        parts.append(f"關鍵字：{keyword}")
+    mode = str(config.get("date_mode", "全部日期"))
+    start_date, end_date = _resolved_date_range(config)
+    if mode != "全部日期":
+        if start_date and end_date:
+            parts.append(f"完工日期：{start_date:%Y-%m-%d}～{end_date:%Y-%m-%d}")
+        else:
+            parts.append(f"完工日期：{mode}")
+    label_map = {
+        "categories": "類別",
+        "types": "機型",
+        "locations": "組立地點",
+        "customers": "客戶",
+    }
+    for key, label in label_map.items():
+        values = [str(v) for v in config.get(key, []) if str(v).strip()]
+        if values:
+            preview = "、".join(values[:3])
+            if len(values) > 3:
+                preview += f"…共 {len(values)} 項"
+            parts.append(f"{label}：{preview}")
+    status = str(config.get("status", "全部狀態"))
+    if status != "全部狀態":
+        parts.append(f"狀態：{status}")
+    return "｜".join(parts) if parts else "目前未設定篩選條件，顯示全部完工機台。"
+
+
+def _render_advanced_search(base_df: pd.DataFrame) -> pd.DataFrame:
+    config = _search_config()
+    version = int(st.session_state.get(SEARCH_FORM_VERSION_KEY, 0))
+    categories = _option_values(base_df, "category")
+    types = _option_values(base_df, "type_name")
+    locations = _option_values(base_df, "assembly_location")
+    customers = _option_values(base_df, "customer")
+
+    default_start = _as_date(config.get("start_date")) or today_date()
+    default_end = _as_date(config.get("end_date")) or today_date()
+    selected_categories = [v for v in config.get("categories", []) if v in categories]
+    selected_types = [v for v in config.get("types", []) if v in types]
+    selected_locations = [v for v in config.get("locations", []) if v in locations]
+    selected_customers = [v for v in config.get("customers", []) if v in customers]
+    sort_label = SORT_COLUMN_TO_LABEL.get(config.get("sort_column"), "完工日期 / Finished Date")
+
+    with st.expander("⌕ 專業篩選查詢 / Advanced Search", expanded=True):
+        st.caption("輸入條件後按『套用篩選』才會更新結果；選擇條件時不會反覆查詢 PostgreSQL。支援模糊搜尋、多條件交叉篩選、日期區間、排序、分頁與篩選結果匯出。")
+        with st.form(f"v16_finished_search_form_{version}", clear_on_submit=False):
+            row1 = st.columns([2.4, 1, 1, 1])
+            keyword = row1[0].text_input(
+                "關鍵字搜尋 / Keyword",
+                value=str(config.get("keyword", "")),
+                placeholder="製令、P/N、機型、Category、地點、客戶或備註",
+                key=f"v16_search_keyword_{version}",
+            )
+            date_mode = row1[1].selectbox(
+                "日期快速篩選 / Date",
+                DATE_MODE_OPTIONS,
+                index=DATE_MODE_OPTIONS.index(config.get("date_mode", "全部日期")),
+                key=f"v16_search_date_mode_{version}",
+            )
+            start_date_value = row1[2].date_input(
+                "起始日期 / From",
+                value=default_start,
+                key=f"v16_search_start_date_{version}",
+            )
+            end_date_value = row1[3].date_input(
+                "結束日期 / To",
+                value=default_end,
+                key=f"v16_search_end_date_{version}",
+            )
+
+            row2 = st.columns(4)
+            selected_category_values = row2[0].multiselect(
+                "類別 / Category",
+                categories,
+                default=selected_categories,
+                key=f"v16_search_categories_{version}",
+            )
+            selected_type_values = row2[1].multiselect(
+                "機型 / Type",
+                types,
+                default=selected_types,
+                key=f"v16_search_types_{version}",
+            )
+            selected_location_values = row2[2].multiselect(
+                "組立地點 / Assembly Location",
+                locations,
+                default=selected_locations,
+                key=f"v16_search_locations_{version}",
+            )
+            selected_customer_values = row2[3].multiselect(
+                "客戶 / Customer",
+                customers,
+                default=selected_customers,
+                key=f"v16_search_customers_{version}",
+            )
+
+            row3 = st.columns([1, 1.5, 1, 1])
+            status = row3[0].selectbox(
+                "啟用狀態 / Status",
+                STATUS_OPTIONS,
+                index=STATUS_OPTIONS.index(config.get("status", "全部狀態")),
+                key=f"v16_search_status_{version}",
+            )
+            sort_label_value = row3[1].selectbox(
+                "排序欄位 / Sort By",
+                list(SORT_LABEL_TO_COLUMN.keys()),
+                index=list(SORT_LABEL_TO_COLUMN.keys()).index(sort_label),
+                key=f"v16_search_sort_column_{version}",
+            )
+            sort_direction = row3[2].selectbox(
+                "排序方向 / Direction",
+                ["新到舊／大到小", "舊到新／小到大"],
+                index=1 if bool(config.get("sort_ascending", False)) else 0,
+                key=f"v16_search_sort_direction_{version}",
+            )
+            page_size = row3[3].selectbox(
+                "每頁筆數 / Page Size",
+                PAGE_SIZE_OPTIONS,
+                index=PAGE_SIZE_OPTIONS.index(int(config.get("page_size", 50))),
+                key=f"v16_search_page_size_{version}",
+            )
+            action1, action2, action3 = st.columns([1, 1, 3])
+            apply_search = action1.form_submit_button("套用篩選", type="primary", use_container_width=True)
+            clear_search = action2.form_submit_button("清除", use_container_width=True)
+            action3.caption("查詢條件只有在按下套用後才生效；清除會回復全部資料。")
+
+        if clear_search:
+            st.session_state[SEARCH_STATE_KEY] = _default_search_config()
+            st.session_state[SEARCH_PAGE_KEY] = 1
+            st.session_state[SEARCH_FORM_VERSION_KEY] = version + 1
+            for key in [SEARCH_EXPORT_BYTES_KEY, SEARCH_EXPORT_NAME_KEY, SEARCH_EXPORT_SIGNATURE_KEY]:
+                st.session_state.pop(key, None)
+            rerun()
+
+        if apply_search:
+            st.session_state[SEARCH_STATE_KEY] = {
+                "keyword": _normalize_text(keyword),
+                "date_mode": date_mode,
+                "start_date": start_date_value.strftime("%Y-%m-%d"),
+                "end_date": end_date_value.strftime("%Y-%m-%d"),
+                "categories": list(selected_category_values),
+                "types": list(selected_type_values),
+                "locations": list(selected_location_values),
+                "customers": list(selected_customer_values),
+                "status": status,
+                "sort_column": SORT_LABEL_TO_COLUMN[sort_label_value],
+                "sort_ascending": sort_direction == "舊到新／小到大",
+                "page_size": int(page_size),
+            }
+            st.session_state[SEARCH_PAGE_KEY] = 1
+            for key in [SEARCH_EXPORT_BYTES_KEY, SEARCH_EXPORT_NAME_KEY, SEARCH_EXPORT_SIGNATURE_KEY]:
+                st.session_state.pop(key, None)
+            config = _search_config()
+
+        filtered = _apply_search_filters(base_df, config)
+        matched = len(filtered)
+        total_rows = int((ensure_cols(base_df)["work_order"].map(_normalize_text) != "").sum())
+        matched_active = int(filtered["is_active"].map(_to_bool_value).sum()) if not filtered.empty else 0
+        matched_inactive = matched - matched_active
+        start_date_resolved, end_date_resolved = _resolved_date_range(config)
+
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("符合筆數 / Matched", matched, delta=f"全部 {total_rows} 筆")
+        k2.metric("啟用 / Active", matched_active)
+        k3.metric("停用 / Inactive", matched_inactive)
+        if start_date_resolved and end_date_resolved:
+            k4.metric("日期範圍 / Date Range", f"{start_date_resolved:%m/%d}～{end_date_resolved:%m/%d}")
+        else:
+            k4.metric("日期範圍 / Date Range", "全部")
+        st.caption(_active_filter_summary(config))
+
+        signature = _search_signature(config, matched)
+        if st.session_state.get(SEARCH_EXPORT_SIGNATURE_KEY) not in {None, signature}:
+            for key in [SEARCH_EXPORT_BYTES_KEY, SEARCH_EXPORT_NAME_KEY, SEARCH_EXPORT_SIGNATURE_KEY]:
+                st.session_state.pop(key, None)
+
+        exp1, exp2 = st.columns([1, 2])
+        if exp1.button("⟰ 準備篩選結果 Excel / Prepare Filtered Export", use_container_width=True, key="v16_prepare_filtered_export"):
+            export_df = filtered[SEARCH_RESULT_INTERNAL_COLS].rename(columns=DISPLAY_COLUMNS)
+            st.session_state[SEARCH_EXPORT_BYTES_KEY] = _excel_bytes({"篩選結果": export_df})
+            st.session_state[SEARCH_EXPORT_NAME_KEY] = f"SPT_完工機台_篩選結果_{now_stamp()}.xlsx"
+            st.session_state[SEARCH_EXPORT_SIGNATURE_KEY] = signature
+        if SEARCH_EXPORT_BYTES_KEY in st.session_state:
+            exp2.download_button(
+                "下載篩選結果 / Download Filtered Results",
+                data=st.session_state[SEARCH_EXPORT_BYTES_KEY],
+                file_name=st.session_state.get(SEARCH_EXPORT_NAME_KEY, "SPT_完工機台_篩選結果.xlsx"),
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+                key="v16_download_filtered_export",
+            )
+
+        if filtered.empty:
+            st.warning("目前沒有符合條件的完工機台資料。請調整條件或按『清除』恢復全部資料。")
+            return filtered
+
+        page_size_value = int(config.get("page_size", 50))
+        page_count = max(1, math.ceil(matched / page_size_value))
+        current_page = int(st.session_state.get(SEARCH_PAGE_KEY, 1))
+        current_page = max(1, min(current_page, page_count))
+        st.session_state[SEARCH_PAGE_KEY] = current_page
+        start_idx = (current_page - 1) * page_size_value
+        end_idx = min(start_idx + page_size_value, matched)
+        page_df = filtered.iloc[start_idx:end_idx].copy()
+
+        nav1, nav2, nav3, nav4, nav5 = st.columns([1, 1, 2.5, 1, 1])
+        if nav1.button("第一頁", disabled=current_page <= 1, use_container_width=True, key="v16_search_first_page"):
+            st.session_state[SEARCH_PAGE_KEY] = 1
+            rerun()
+        if nav2.button("上一頁", disabled=current_page <= 1, use_container_width=True, key="v16_search_prev_page"):
+            st.session_state[SEARCH_PAGE_KEY] = current_page - 1
+            rerun()
+        nav3.markdown(
+            f"<div style='text-align:center;padding-top:8px;font-weight:700'>第 {current_page} / {page_count} 頁　｜　顯示第 {start_idx + 1}～{end_idx} 筆，共 {matched} 筆</div>",
+            unsafe_allow_html=True,
+        )
+        if nav4.button("下一頁", disabled=current_page >= page_count, use_container_width=True, key="v16_search_next_page"):
+            st.session_state[SEARCH_PAGE_KEY] = current_page + 1
+            rerun()
+        if nav5.button("最後頁", disabled=current_page >= page_count, use_container_width=True, key="v16_search_last_page"):
+            st.session_state[SEARCH_PAGE_KEY] = page_count
+            rerun()
+
+        result_df = page_df[SEARCH_RESULT_INTERNAL_COLS].rename(columns=DISPLAY_COLUMNS)
+        st.dataframe(
+            result_df,
+            hide_index=True,
+            use_container_width=True,
+            height=min(620, max(220, 38 * (len(result_df) + 1))),
+            key="v16_finished_search_results",
+            column_config={
+                key: value
+                for key, value in _column_config(TABLE_KEY).items()
+                if key in result_df.columns
+            },
+        )
+        return filtered
+
+
 def _split_paste_line(line: str) -> list[str]:
     line = line.strip()
     if "\t" in line:
@@ -626,6 +1072,11 @@ m3.metric("停用不隱藏 / Inactive", inactive)
 m4.metric("待刪除 / Pending Delete", pending_delete)
 
 st.info("01｜工時紀錄的製令下拉會用快取的完工製令集合過濾，不會每次輸入或展開下拉都逐筆查 Neon。停用本頁資料即可讓該製令重新出現在 01 下拉。")
+
+filtered_query_df = _render_advanced_search(base_df)
+
+st.divider()
+st.markdown("### 資料維護與匯入 / Data Maintenance & Import")
 
 tab1, tab2, tab3, tab4 = st.tabs(["製令清單編輯", "Excel 匯入", "貼上資料", "OneDrive 對應更新"])
 
